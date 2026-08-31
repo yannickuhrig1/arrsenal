@@ -83,7 +83,7 @@ def build_config(
         inst = ServiceInstance(spec_id=sid, host_port=spec.default_host_port)
         if spec.api_family == "arr":
             inst.api_key = seed.generate_api_key()
-        if spec.api_family in ("arr", "transmission", "qbittorrent", "jellyfin"):
+        if spec.api_family in ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr"):
             inst.username = "arrsenal"
             inst.password = seed.generate_password()
         cfg.services[sid] = inst

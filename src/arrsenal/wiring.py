@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from . import catalog
 from .clients.arr import ArrClient
+from .clients.autobrr import AutobrrClient
 from .clients.base import WiringError
 from .clients.jellyfin import JellyfinClient
 from .clients.qbittorrent import QBittorrentClient
@@ -406,6 +407,55 @@ class Wirer:
         detail += f", bibliotheques creees: {', '.join(made) or 'aucune (deja presentes)'}"
         return StepResult("jellyfin: assistant + bibliotheques", ok=ok, detail=detail, created=ran)
 
+    def step_autobrr(self) -> StepResult:
+        """Declare les applications et le client de telechargement dans autobrr.
+
+        autobrr ne distingue pas les deux : Sonarr et qBittorrent passent par le
+        meme endpoint, seul le `type` change.
+        """
+        inst = self.cfg.services["autobrr"]
+        url = f"http://{self.cfg.host}:{inst.host_port}"
+        created: list[str] = []
+        warnings: list[str] = []
+
+        with AutobrrClient(url) as brr:
+            brr.wait_ready()
+            first = brr.onboard(inst.username or "arrsenal", inst.password or "")
+            brr.login(inst.username or "arrsenal", inst.password or "")
+            inst.api_key = brr.ensure_api_key("arrsenal")
+
+            targets = [
+                sid
+                for sid in (*catalog.MANAGED_ARRS, *catalog.DOWNLOAD_CLIENTS)
+                if self.cfg.enabled(sid)
+            ]
+            for sid in targets:
+                spec, target = catalog.get(sid), self.cfg.services[sid]
+                added, _ = brr.ensure_client(
+                    name=spec.display_name,
+                    service_id=sid,
+                    host=self.internal_url(sid),
+                    api_key=target.api_key,
+                    username=target.username or "",
+                    password=target.password or "",
+                )
+                if added:
+                    created.append(spec.display_name)
+                if self.run_tests:
+                    ok, message = brr.test_client(spec.display_name)
+                    if not ok:
+                        warnings.append(f"{spec.display_name} : {message.splitlines()[0]}")
+
+        detail = "accueil execute" if first else "utilisateur existant"
+        detail += f", declares : {', '.join(created) or 'aucun (deja presents)'}"
+        return StepResult(
+            "autobrr: applications et client de telechargement",
+            ok=not warnings,
+            detail=detail,
+            created=bool(created),
+            warnings=warnings,
+        )
+
     # -- graphe --------------------------------------------------------------
 
     def build_plan(self) -> list[WiringStep]:
@@ -458,6 +508,9 @@ class Wirer:
                         lambda a=arr_id: self.step_prowlarr_application(a),
                     )
                 )
+
+        if cfg.enabled("autobrr"):
+            steps.append(WiringStep("autobrr/clients", self.step_autobrr))
 
         if cfg.enabled("jellyfin"):
             steps.append(WiringStep("jellyfin/setup", self.step_jellyfin_setup))

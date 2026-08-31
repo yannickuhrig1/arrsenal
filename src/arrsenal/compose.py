@@ -97,6 +97,17 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
 
     if service_id == "flood":
         block.update(_flood_block(cfg))
+    elif service_id == "qui":
+        # qui n'est pas une image LinuxServer : ni PUID/PGID ni UMASK. Il decouvre
+        # ses instances qBittorrent par sa propre interface, on ne fait que lui
+        # donner un port et un dossier de donnees.
+        block["environment"] = {"TZ": cfg.timezone, "QUI__HOST": "0.0.0.0"}
+        block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
+        block["depends_on"] = ["qbittorrent"]
+    elif service_id == "autobrr":
+        # autobrr n'a pas besoin de /data : il ne touche pas aux fichiers, il
+        # pousse des sorties vers les applications.
+        block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
 
     torrent_client = spec.category is Category.DOWNLOAD
     if cfg.vpn_enabled and torrent_client:

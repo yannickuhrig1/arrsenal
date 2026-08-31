@@ -412,3 +412,46 @@ détection le lit au lieu de deviner.
 Le mot de passe d'un client de téléchargement existant est haché dans sa configuration :
 illisible. `--dl-user` et `--dl-pass` le demandent explicitement, et l'étape échoue avec
 un message clair plutôt qu'une erreur technique.
+
+## autobrr et qui — vérifiés le 2026-08-31
+
+Signalés par un utilisateur depuis [github.com/autobrr](https://github.com/autobrr).
+
+| | |
+|---|---|
+| autobrr | `ghcr.io/autobrr/autobrr:v1.85.0`, port **7474** |
+| qui | `ghcr.io/autobrr/qui:v1.27.0`, port **7476** |
+
+### Quatre particularités d'autobrr, aucune devinable
+
+**L'en-tête d'authentification est `X-API-Token`**, pas `X-Api-Key` comme les *arr. Le
+mauvais en-tête donne un `403` sans explication. Vérifié en essayant les trois.
+
+**Une clé API exige un champ `scopes`.** Sans lui, la création échoue en `500` sur une
+contrainte SQL : `NOT NULL constraint failed: api_key.scopes`. Le message d'erreur est
+d'ailleurs ce qui a permis de trouver le champ manquant.
+
+**Sonarr, Radarr et Lidarr sont des « clients de téléchargement ».** autobrr ne distingue
+pas les applications des clients : même endpoint `POST /api/download_clients`, seul le
+`type` change. Types confirmés un par un : `SONARR`, `RADARR`, `LIDARR`, `QBITTORRENT`,
+`TRANSMISSION`, `DELUGE_V2`, `SABNZBD`, `WHISPARR`, `READARR`.
+
+**L'accueil n'est jouable qu'une fois.** `GET /api/auth/onboard` renvoie `204` tant
+qu'aucun compte n'existe, puis `503 — user already registered`. C'est ce qui rend
+l'étape rejouable.
+
+### Une mise en garde qui ne s'applique pas au conteneur
+
+La documentation avertit qu'autobrr écoute sur `127.0.0.1` par défaut, ce qui rendrait un
+conteneur injoignable. **Vérifié : l'image génère `host = "0.0.0.0"`.** La mise en garde
+vaut pour une installation hors conteneur.
+
+### Résultat
+
+Installation réelle avec Sonarr et qBittorrent : autobrr créé, compte initialisé, clé API
+générée, les deux services déclarés — et **les deux tests de connexion déclenchés par
+autobrr lui-même répondent `204`**.
+
+`qui` écoute bien sur 7476, confirmé par ses propres journaux. C'est une interface : elle
+découvre ses instances qBittorrent par son écran de configuration, aucun câblage
+automatique n'est possible.

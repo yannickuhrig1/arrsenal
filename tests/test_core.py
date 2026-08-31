@@ -366,3 +366,53 @@ def test_flood_gets_no_puid_pgid(tmp_path):
     cfg = make_cfg(tmp_path, services=("qbittorrent", "flood"))
     env = compose.build_compose(cfg)["services"]["flood"]["environment"]
     assert "PUID" not in env
+
+
+def test_autobrr_needs_at_least_one_arr():
+    """Sans application a alimenter, autobrr n'a rien a faire."""
+    assert "sonarr" in catalog.resolve_dependencies(["autobrr"])
+
+
+def test_autobrr_next_to_radarr_does_not_pull_sonarr():
+    assert catalog.resolve_dependencies(["radarr", "autobrr"]) == ["radarr", "autobrr"]
+
+
+def test_qui_pulls_in_qbittorrent():
+    """qui est une UI pour qBittorrent : il n'a pas d'autre backend."""
+    assert catalog.resolve_dependencies(["qui"]) == ["qbittorrent", "qui"]
+
+
+def test_autobrr_is_wired_after_the_arrs_and_the_clients():
+    """autobrr les declare tous les deux, et son test de connexion les contacte
+    reellement : ils doivent repondre avant."""
+    order = catalog.STARTUP_ORDER
+    for sid in ("sonarr", "radarr", "qbittorrent", "prowlarr"):
+        assert order.index("autobrr") > order.index(sid), sid
+
+
+def test_autobrr_gets_no_data_mount(tmp_path):
+    """autobrr ne touche pas aux fichiers : il pousse des sorties vers les
+    applications. Lui monter /data serait un acces inutile."""
+    cfg = make_cfg(tmp_path, services=("sonarr", "autobrr"))
+    volumes = compose.build_compose(cfg)["services"]["autobrr"]["volumes"]
+    assert not any(v.endswith(":/data") for v in volumes)
+    assert any(v.endswith(":/config") for v in volumes)
+
+
+def test_qui_gets_no_puid_pgid(tmp_path):
+    """qui n'est pas une image LinuxServer : ces variables n'y font rien."""
+    cfg = make_cfg(tmp_path, services=("qbittorrent", "qui"))
+    env = compose.build_compose(cfg)["services"]["qui"]["environment"]
+    assert "PUID" not in env
+    assert env["QUI__HOST"] == "0.0.0.0"
+
+
+def test_autobrr_step_appears_only_when_selected(tmp_path):
+    from arrsenal.wiring import Wirer
+
+    without = {s.name for s in Wirer(make_cfg(tmp_path, services=("sonarr",))).build_plan()}
+    with_it = {
+        s.name for s in Wirer(make_cfg(tmp_path, services=("sonarr", "autobrr"))).build_plan()
+    }
+    assert "autobrr/clients" not in without
+    assert "autobrr/clients" in with_it

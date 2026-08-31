@@ -19,6 +19,8 @@ _TAGS = {
     "lidarr": "3.1.0",
     "jellyfin": "10.11.11",
     "flood": "4.16.1",
+    "autobrr": "v1.85.0",
+    "qui": "v1.27.0",
 }
 
 CATALOG: dict[str, ServiceSpec] = {
@@ -103,6 +105,30 @@ CATALOG: dict[str, ServiceSpec] = {
         api_family="jellyfin",
         notes="Serveur media. Bibliotheques creees pour vous.",
     ),
+    "autobrr": ServiceSpec(
+        id="autobrr",
+        display_name="autobrr",
+        category=Category.ARR,
+        image=f"ghcr.io/autobrr/autobrr:{_TAGS['autobrr']}",
+        internal_port=7474,
+        default_host_port=7474,
+        config_dir="autobrr",
+        requires_one_of=("sonarr", "radarr", "lidarr"),
+        api_family="autobrr",
+        notes="Ecoute les annonces IRC. Plus rapide que le sondage RSS.",
+    ),
+    "qui": ServiceSpec(
+        id="qui",
+        display_name="qui",
+        category=Category.UI,
+        image=f"ghcr.io/autobrr/qui:{_TAGS['qui']}",
+        internal_port=7476,
+        default_host_port=7476,
+        config_dir="qui",
+        requires=("qbittorrent",),
+        api_family=None,
+        notes="UI web pour qBittorrent. N'est pas un client.",
+    ),
     "flood": ServiceSpec(
         id="flood",
         display_name="Flood",
@@ -129,8 +155,12 @@ STARTUP_ORDER = (
     "radarr",
     "lidarr",
     "prowlarr",
+    # autobrr apres les *arr ET apres les clients : il les declare tous les deux
+    # au meme endpoint, et son test de connexion les contacte reellement.
+    "autobrr",
     "jellyfin",
     "flood",
+    "qui",
 )
 
 #: Applications *arr pilotables par Prowlarr et rattachables a un client de download.

@@ -49,6 +49,7 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 | Source | Cible | Ce qui est posé |
 |---|---|---|
 | Prowlarr | Sonarr, Radarr, Lidarr | enregistrement en *Application*, `fullSync` des indexeurs |
+| autobrr | Sonarr, Radarr, Lidarr, client de téléchargement | déclarés dans autobrr, connexions testées |
 | Prowlarr | client de téléchargement | rattachement + catégorie |
 | Sonarr, Radarr, Lidarr | client de téléchargement | rattachement + routage par catégorie ou répertoire |
 | Sonarr, Radarr, Lidarr | système de fichiers | dossier racine sous `/data/media` |

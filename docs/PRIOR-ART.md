@@ -79,12 +79,40 @@ script. Chaque lien est validé par le bouton *Test* de l'application cible.
 **Les profils de qualité viendront de Recyclarr.** Réimplémenter les TRaSH Guides
 serait une duplication inutile et vite périmée.
 
+## L'écosystème autobrr
+
+Signalé en cours de route, et il change deux choses.
+
+### dashbrr — la page d'administration n'est pas une idée neuve
+
+[`autobrr/dashbrr`](https://github.com/autobrr/dashbrr) (227 étoiles, Go) est un tableau
+de bord de surveillance et de gestion d'une stack média. C'est-à-dire, pour une bonne
+part, ce que fait `arrsenal serve`.
+
+Autant le dire plutôt que de faire semblant. Ce qui reste à `arrsenal` : la page sort de
+l'installation, sans conteneur supplémentaire ni configuration. dashbrr est plus riche et
+plus abouti pour qui veut un tableau de bord permanent.
+
+### autobrr et qui — deux ajouts, pas deux concurrents
+
+[`autobrr`](https://github.com/autobrr/autobrr) (2 991 étoiles) écoute les canaux
+d'annonce IRC des trackers au lieu d'attendre le prochain sondage RSS. Il se branche sur
+les *arr **et** sur le client de téléchargement : c'est un nœud de câblage, exactement
+ce que ce projet automatise. Ajouté au catalogue.
+
+[`qui`](https://github.com/autobrr/qui) (4 430 étoiles) est une interface qBittorrent en
+binaire unique — plus étoilée que Flood, et plus récente. Ajoutée en option, sans
+remplacer Flood, qui couvre aussi Transmission.
+
+Laissés de côté : `netronome` (test de débit réseau) et `mkbrr` (création de fichiers
+torrent) sortent du périmètre d'une stack de consommation. `upbrr` prépare des envois
+vers des trackers privés : c'est un outil légitime, mais son objet s'écarte de la
+position de ce projet, qui ne fournit ni tracker ni facilitation.
+
 ## Ce qu'aucun ne fait, et que nous non plus (encore)
 
 - **Vérifier que les hardlinks fonctionnent vraiment** avant l'installation. `arrsenal`
   le fait — c'est peut-être son ajout le plus utile après le câblage.
-- **Détecter une stack existante et proposer de la reprendre** plutôt que d'en poser une
-  seconde. Personne ne le fait. Ce serait un vrai sujet.
 - **Un mode « diagnostic » d'une installation qu'on n'a pas faite soi-même.**
   `arrsenal doctor` n'en fait qu'une partie.
 
@@ -95,3 +123,6 @@ entre elles change le positionnement d'`arrsenal`, et il vaut mieux le savoir t�
 de le découvrir dans un commentaire Reddit.
 
 Dernière relecture : 2026-08-31.
+
+*Depuis la première rédaction, `arrsenal adopt` couvre la reprise d'une stack existante,
+qui figurait ici comme un manque de tout l'écosystème.*
