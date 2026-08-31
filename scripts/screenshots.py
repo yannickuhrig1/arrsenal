@@ -18,7 +18,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from textual.widgets import Label, ListItem, ListView
+
+from arrsenal.clients.prowlarr import IndexerDefinition
 from arrsenal.tui.app import ArrsenalApp
+from arrsenal.tui.indexers import IndexersScreen
 from arrsenal.tui.screens import (
     InstallScreen,
     PathsScreen,
@@ -29,7 +33,7 @@ from arrsenal.tui.screens import (
 from arrsenal.wiring import StepResult
 
 OUT = ROOT / "docs" / "screenshots"
-SIZE = (104, 30)
+SIZE = (104, 34)
 
 
 #: Resultats fictifs pour illustrer l'ecran de rapport sans rien demarrer.
@@ -43,6 +47,24 @@ FAKE_STEPS = [
     StepResult("prowlarr -> radarr (Application, fullSync)", True, "cree (id=2), test OK"),
     StepResult("jellyfin: assistant + bibliotheques", True, "Films, Series"),
 ]
+
+
+#: Definition fictive : arrsenal ne nomme et ne recommande aucun indexeur reel.
+FAKE_DEFINITION = IndexerDefinition(
+    name="Votre indexeur",
+    implementation="Torznab",
+    privacy="private",
+    protocol="torrent",
+    language="fr-FR",
+    description="La liste vient de votre Prowlarr. arrsenal n'en fournit aucun.",
+    raw={
+        "indexerUrls": ["https://exemple.invalid/"],
+        "fields": [
+            {"name": "baseUrl", "type": "select", "label": "Url", "value": None},
+            {"name": "apiKey", "type": "textbox", "label": "API Key", "privacy": "apiKey"},
+        ],
+    },
+)
 
 
 async def capture() -> None:
@@ -85,10 +107,28 @@ async def capture() -> None:
         await pilot.pause()
         await shot(app, pilot, "5-installation")
 
+        # Etape indexeurs : rendue hors ligne. Le chargement des definitions est
+        # neutralise, on injecte des exemples representatifs de ce que Prowlarr
+        # renvoie. Aucun indexeur reel n'est nomme : arrsenal n'en recommande aucun.
+        IndexersScreen.load_definitions = lambda self: None  # type: ignore[method-assign]
+        app.push_screen(IndexersScreen())
+        await pilot.pause()
+        screen = app.screen
+        screen._set_status("[dim]626 definitions fournies par votre Prowlarr[/dim]")
+        screen._matches = [FAKE_DEFINITION]
+        results = screen.query_one("#indexer-results", ListView)
+        results.append(ListItem(Label("Votre indexeur  [dim]prive - torrent[/dim]")))
+        screen._render_form(FAKE_DEFINITION)
+        # mount() est asynchrone : sans ces passes, la capture part avant que les
+        # champs du formulaire soient rendus.
+        for _ in range(4):
+            await pilot.pause()
+        await shot(app, pilot, "6-indexeurs")
+
         app.results = FAKE_STEPS
         app.push_screen(ReportScreen())
         await pilot.pause()
-        await shot(app, pilot, "6-rapport")
+        await shot(app, pilot, "7-rapport")
 
 
 if __name__ == "__main__":

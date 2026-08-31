@@ -16,6 +16,16 @@ Il vous appartient de respecter le droit d'auteur et la legislation applicable d
 votre juridiction. Les auteurs et contributeurs de ce projet declinent toute
 responsabilite quant a l'usage qui en est fait.
 
+## Sur l'etape de saisie des indexeurs
+
+L'assistant propose une etape facultative pour saisir vos propres indexeurs. Elle ne
+change rien a ce qui precede :
+
+- la liste presentee est celle que **votre Prowlarr** embarque, pas la notre
+- aucune definition n'est preselectionnee, mise en avant ou recommandee
+- aucun identifiant n'est fourni : vous saisissez les votres
+- l'etape se passe entierement d'un bouton
+
 ## Sur les services tiers
 
 Certains services du catalogue integrent des sources dont le statut juridique est

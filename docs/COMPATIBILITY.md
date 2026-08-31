@@ -185,3 +185,57 @@ Trois différences qui cassent le code écrit pour Sonarr et Radarr :
 - Flood n'a pas encore été démarré dans une campagne de test.
 - Aucun test sur Linux natif : la campagne a tourné sous Docker Desktop / WSL2.
   Le comportement des permissions y est plus permissif que sur un NAS réel.
+
+## Indexeurs — constats vérifiés (Prowlarr 2.5.2)
+
+### Ce que Prowlarr embarque
+
+`GET /api/v1/indexer/schema` renvoie **626 définitions**, soit **5,7 Mo** — à charger une
+seule fois et à mettre en cache, jamais à chaque frappe.
+
+| | |
+|---|---|
+| privées | 475 |
+| publiques | 88 |
+| semi-privées | 63 |
+| torrent / usenet | 605 / 21 |
+
+### Repérer les champs d'identifiants
+
+Le marqueur `privacy` au niveau champ (`apiKey`, `password`, `userName`) ne couvre que
+**115 champs sur plus de 9500** : la majorité des définitions Cardigann laissent leurs
+clés en `privacy: normal`. Une heuristique combinée est nécessaire :
+
+1. `privacy` ∈ (`apiKey`, `password`, `userName`)
+2. ou `type == "password"`
+3. ou nom connu (`apikey`, `passkey`, `cookie`, `rsskey`, …)
+4. en excluant les préfixes de réglage (`baseSettings.`, `torrentBaseSettings.`,
+   `usenetBaseSettings.`) et les 882 champs `type: "info"`, purement décoratifs
+
+### Les URL ne sont pas dans le champ `baseUrl`
+
+**600 des 626** définitions exposent un `baseUrl` de type `select` **sans valeur et sans
+`selectOptions`**. Les adresses vivent au niveau de la définition, dans `indexerUrls`.
+Sans cette reprise, l'utilisateur devrait deviner l'adresse du tracker. Seules 3
+définitions n'ont légitimement aucune URL : les génériques (`Generic Newznab`,
+`Generic Torznab`, `Torrent RSS Feed`).
+
+### L'ajout contacte forcément l'indexeur
+
+`appProfileId` doit être `> 0`, comme le dossier racine de Lidarr. Résolu par nom
+(`Standard`), jamais codé en dur.
+
+Surtout : **`forceSave=true` ne saute pas la validation.** Vérifié sur deux cas d'échec :
+
+| Situation | Résultat |
+|---|---|
+| indexeur injoignable | `400 — Unable to connect to indexer` |
+| recherche de test sans résultat | `400 — Query successful, but no results were returned` |
+| faux indexeur Torznab local renvoyant un résultat | enregistré |
+
+Il n'existe donc **aucun moyen d'enregistrer un indexeur hors ligne**. Ce n'est pas un
+choix d'arrsenal. La contrepartie est utile : la validation *est* le test, donc un ajout
+réussi prouve que les identifiants fonctionnent.
+
+Vérification menée contre un **faux serveur Torznab local**, jamais contre un vrai
+tracker.

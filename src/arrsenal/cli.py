@@ -12,7 +12,7 @@ from pathlib import Path
 import typer
 import yaml
 
-from . import catalog, compose, orchestrator, report
+from . import catalog, compose, indexers_cli, orchestrator, report
 from .clients.arr import ArrClient
 from .layout import PROFILE_DEFAULTS
 from .models import PlatformProfile, StackConfig
@@ -28,6 +28,8 @@ app = typer.Typer(
 console = report.console
 
 STACK_FILE = "stack.yml"
+
+app.add_typer(indexers_cli.app, name="indexers")
 
 
 @app.callback()

@@ -116,6 +116,7 @@ Autres commandes :
 ```bash
 arrsenal             # assistant interactif
 arrsenal list        # catalogue des services
+arrsenal indexers    # chercher et ajouter vos indexeurs
 arrsenal wire        # rejoue le câblage sur une stack déjà démarrée
 arrsenal doctor      # diagnostique une installation existante
 arrsenal generate    # régénère docker-compose.yml depuis stack.yml
@@ -132,7 +133,8 @@ régression visuelle apparaît dans le diff d'une pull request.
 | | |
 |---|---|
 | ![Accueil](docs/screenshots/1-accueil.svg) | ![Chemins](docs/screenshots/3-chemins.svg) |
-| ![Récapitulatif](docs/screenshots/4-recapitulatif.svg) | ![Rapport](docs/screenshots/6-rapport.svg) |
+| ![Récapitulatif](docs/screenshots/4-recapitulatif.svg) | ![Indexeurs](docs/screenshots/6-indexeurs.svg) |
+| ![Rapport](docs/screenshots/7-rapport.svg) | |
 
 </details>
 
@@ -174,11 +176,39 @@ prévue dans le générateur de compose.
 
 ---
 
+## Vos indexeurs
+
+Une fois la stack en place, l'assistant propose une **étape optionnelle** pour saisir
+les indexeurs que vous utilisez déjà. Elle se passe d'un bouton.
+
+La liste proposée n'est pas la nôtre : ce sont les **626 définitions que votre propre
+Prowlarr embarque**. `arrsenal` n'est qu'un formulaire par-dessus, et n'en présélectionne
+aucune. Il devine quels champs sont des identifiants (clé API, passkey, cookie, mot de
+passe) et n'affiche que ceux-là, plutôt que de vous noyer sous la douzaine d'options de
+réglage que chaque définition traîne.
+
+En ligne de commande, la même chose reste scriptable :
+
+```bash
+arrsenal indexers search <terme>          # chercher dans les définitions de VOTRE Prowlarr
+arrsenal indexers add "<nom>" -f apiKey=… # ajouter avec VOS identifiants
+arrsenal indexers list                    # ce qui est déjà configuré
+```
+
+Un point à connaître : **ajouter un indexeur le contacte** pour valider vos identifiants.
+C'est Prowlarr qui l'impose — `forceSave` n'y change rien, il n'existe pas
+d'enregistrement hors ligne. La contrepartie est agréable : si l'ajout réussit, vos
+identifiants sont bons.
+
+---
+
 ## Ce que ce projet ne fait pas
 
-`arrsenal` ne fournit **aucun indexeur, aucun tracker, aucun contenu**, et n'en
-préconfigure aucun. C'est un outil d'automatisation de médiathèque personnelle.
-Ce que vous y branchez, et sa légalité, vous regardent. Voir [DISCLAIMER.md](DISCLAIMER.md).
+`arrsenal` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
+contenu**, et n'en préconfigure aucun. Aucune liste n'est livrée avec le code : celle de
+l'assistant vient de Prowlarr. C'est un outil d'automatisation de médiathèque personnelle.
+Ce que vous y branchez, et sa légalité, vous regardent.
+Voir [DISCLAIMER.md](DISCLAIMER.md).
 
 ---
 

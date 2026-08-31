@@ -403,7 +403,14 @@ class InstallScreen(WizardScreen):
 
     @on(Button.Pressed, "#done")
     def go(self) -> None:
-        self.app.push_screen(ReportScreen())
+        # L'etape indexeurs n'a de sens que si Prowlarr tourne : c'est lui qui
+        # fournit les definitions et qui recevra les identifiants.
+        if self.app.stack_config and self.app.stack_config.enabled("prowlarr"):
+            from .indexers import IndexersScreen
+
+            self.app.push_screen(IndexersScreen())
+        else:
+            self.app.push_screen(ReportScreen())
 
 
 # ------------------------------------------------------------------- rapport

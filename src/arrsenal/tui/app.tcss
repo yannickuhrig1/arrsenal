@@ -129,3 +129,53 @@ Checkbox.service.-on > .toggle--button {
     width: 1fr;
     text-wrap: wrap;
 }
+
+/* -- etape indexeurs ------------------------------------------------------- */
+
+#indexers-intro {
+    padding: 1 2;
+    margin: 1 2 0 2;
+    background: $panel;
+    border-left: thick $warning;
+}
+
+#indexers-body {
+    height: 1fr;
+    padding: 1 2;
+}
+
+.indexers-pane {
+    width: 1fr;
+    padding: 0 1;
+}
+
+#indexer-results {
+    height: 1fr;
+    border: round $primary-darken-2;
+}
+
+#indexer-form {
+    border: round $primary-darken-2;
+    padding: 0 1;
+}
+
+/* Les champs d'indexeur restent compacts : un terminal court doit afficher
+   l'URL ET les identifiants sans faire defiler. */
+.indexer-field {
+    margin: 0;
+    height: 3;
+}
+
+#indexer-form .group-title {
+    margin: 0;
+}
+
+.indexer-title {
+    margin-bottom: 1;
+}
+
+#indexer-status {
+    padding: 1 2;
+    margin: 0 2;
+    background: $panel;
+}
