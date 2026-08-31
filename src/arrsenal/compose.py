@@ -77,6 +77,11 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # SERVICE compose (`http://sonarr:8989`), pas par container_name.
         "container_name": f"{cfg.project_name}-{spec.id}",
         "restart": "unless-stopped",
+        # Marqueur explicite, pour que `scan` reconnaisse nos propres conteneurs
+        # sans deviner d'apres leur nom. Deviner produisait des faux positifs sur
+        # des noms legitimes comme "mon-sonarr" ou "media-sonarr", et sautait donc
+        # en silence des conteneurs qui ne nous appartiennent pas.
+        "labels": {"arrsenal.managed": "true", "arrsenal.service": spec.id},
         "environment": {
             "PUID": str(cfg.puid),
             "PGID": str(cfg.pgid),

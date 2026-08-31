@@ -116,6 +116,8 @@ Autres commandes :
 ```bash
 arrsenal             # assistant interactif
 arrsenal list        # catalogue des services
+arrsenal scan        # detecte une stack existante
+arrsenal adopt       # cable une stack existante sans la recreer
 arrsenal serve       # page d'administration : etat, demarrer / arreter
 arrsenal indexers    # chercher et ajouter vos indexeurs
 arrsenal wire        # rejoue le câblage sur une stack déjà démarrée
@@ -138,6 +140,31 @@ régression visuelle apparaît dans le diff d'une pull request.
 | ![Rapport](docs/screenshots/7-rapport.svg) | |
 
 </details>
+
+---
+
+## Vous avez déjà une stack ?
+
+`install` s'adresse à qui part de zéro. Si vos services tournent déjà, montés à la main
+au fil des années, `arrsenal` peut **les câbler sans rien recréer** :
+
+```bash
+arrsenal scan     # ce qui est détecté sur cette machine, sans rien écrire
+arrsenal adopt --data-root /mnt/user/medias --config-root /mnt/user/appdata
+```
+
+Il lit les clés API dans les `config.xml` de vos conteneurs, puis pose les mêmes liens
+que `install`. **Aucun conteneur n'est démarré, arrêté ou recréé**, et aucun
+`docker-compose.yml` n'est généré : ces services ne lui appartiennent pas.
+
+Trois principes, appris en le testant sur une vraie stack :
+
+- **Votre arborescence est la vôtre.** Les dossiers racine existants sont lus et
+  respectés, jamais remplacés. Idem pour les catégories de votre client.
+- **Deux Sonarr ? arrsenal ne devine pas.** Il s'arrête et demande
+  `--pick sonarr=<conteneur>`. Un choix silencieux serait pire qu'une question.
+- **Un nom de conteneur ne prouve rien.** arrsenal reconnaît ses propres services à un
+  libellé qu'il pose, pas à leur nom : `mon-sonarr` est à vous, il n'y touche pas.
 
 ---
 

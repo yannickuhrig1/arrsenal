@@ -101,9 +101,12 @@ class Wirer:
         return self._arr_cache[service_id]
 
     def internal_url(self, service_id: str) -> str:
-        """URL du service vue par un AUTRE conteneur."""
-        spec = catalog.get(service_id)
-        return f"http://{spec.id}:{spec.internal_port}"
+        """URL du service vue par un AUTRE conteneur.
+
+        Delegue a ServiceInstance : un service adopte n'est pas sur le reseau
+        compose et doit etre joint par l'hote.
+        """
+        return self.cfg.services[service_id].internal_url(catalog.get(service_id), self.cfg.host)
 
     def close(self) -> None:
         for client in self._arr_cache.values():
@@ -114,6 +117,33 @@ class Wirer:
 
     def step_root_folder(self, arr_id: str, path: str) -> StepResult:
         client = self.arr(arr_id)
+
+        if self.cfg.services[arr_id].adopted:
+            # Une stack adoptee a DEJA son arborescence, et ce n'est pas la notre.
+            # Constate en conditions reelles : imposer /data/media/tv a un Sonarr
+            # existant echoue avec "Path does not exist", et ce serait de toute
+            # facon une intrusion. Adopter, c'est cabler des services entre eux,
+            # pas reorganiser les dossiers de quelqu'un.
+            existing = [f.get("path", "") for f in client.get("rootfolder") or []]
+            if existing:
+                return StepResult(
+                    f"{arr_id}: dossier racine",
+                    ok=True,
+                    detail=f"deja configure ({', '.join(existing)}), respecte",
+                )
+            return StepResult(
+                f"{arr_id}: dossier racine",
+                ok=True,
+                detail="aucun dossier racine configure",
+                warnings=[
+                    (
+                        f"{arr_id} n'a aucun dossier racine et arrsenal ne peut pas "
+                        f"deviner votre arborescence. Ajoutez-le dans {arr_id} avant "
+                        f"d'importer."
+                    )
+                ],
+            )
+
         extra: dict[str, object] = {}
         if arr_id == "lidarr":
             # Lidarr refuse un dossier racine sans nom ni profils par defaut, la ou
@@ -148,13 +178,39 @@ class Wirer:
         dl_spec = catalog.get(dl_id)
         dl = self.cfg.services[dl_id]
 
+        if dl.adopted:
+            # Le client existant n'est pas sur le reseau compose : on le joint par
+            # l'hote. Et son mot de passe est hache dans sa configuration, donc
+            # illisible : il doit venir de l'utilisateur.
+            if not dl.password:
+                return StepResult(
+                    f"{arr_id}: client de telechargement {dl_spec.display_name}",
+                    ok=False,
+                    detail="identifiants inconnus",
+                    warnings=[
+                        (
+                            f"Le mot de passe de {dl_spec.display_name} est hache dans "
+                            f"sa configuration : arrsenal ne peut pas le lire. Passez "
+                            f"--dl-user et --dl-pass."
+                        )
+                    ],
+                )
+            host, port = self.cfg.host, dl.host_port
+        else:
+            host, port = dl_spec.id, dl_spec.internal_port
+
         values = profile.arr_values(
-            host=dl_spec.id,
-            port=dl_spec.internal_port,
+            host=host,
+            port=port,
             username=dl.username or "",
             password=dl.password or "",
             arr_id=arr_id,
         )
+        if dl.adopted:
+            # Ne pas imposer notre arborescence a une stack existante : on laisse
+            # le routage par categorie et on efface tout repertoire que le profil
+            # aurait pose.
+            values = {k: ("" if k.endswith("Directory") else v) for k, v in values.items()}
         obj, created, skipped = client.ensure_resource(
             "downloadclient",
             name=dl_spec.display_name,
@@ -179,6 +235,15 @@ class Wirer:
     def step_qbittorrent_categories(self) -> StepResult:
         """Cree les categories qBittorrent avec leur chemin de sauvegarde."""
         inst = self.cfg.services["qbittorrent"]
+        if inst.adopted:
+            # Meme raison que pour les dossiers racine : un client existant a deja
+            # ses categories et ses chemins. Les ecraser deplacerait les
+            # telechargements en cours de quelqu'un.
+            return StepResult(
+                "qbittorrent: categories",
+                ok=True,
+                detail="client existant, categories laissees telles quelles",
+            )
         url = f"http://{self.cfg.host}:{inst.host_port}"
         with QBittorrentClient(url, inst.username or "", inst.password or "") as qb:
             qb.wait_ready()

@@ -12,7 +12,8 @@ from pathlib import Path
 import typer
 import yaml
 
-from . import admin, catalog, compose, dashboard, indexers_cli, orchestrator, report
+from . import admin, catalog, compose, dashboard, discovery, indexers_cli, orchestrator, report
+from . import adopt as adopt_mod
 from .clients.arr import ArrClient
 from .models import PlatformProfile, StackConfig
 from .orchestrator import InstallAborted, Progress
@@ -143,6 +144,144 @@ def install(
 
     report.print_final(cfg, results)
     _announce_page(project_dir / dashboard.FILENAME, open_page)
+    raise typer.Exit(0 if all(r.ok for r in results) else 2)
+
+
+@app.command()
+def scan(include_stopped: bool = typer.Option(False, "--all", help="Inclure les arretes.")) -> None:
+    """Liste les services deja installes sur cette machine. N'ecrit rien."""
+    from rich.table import Table
+
+    found = discovery.scan(include_stopped=include_stopped)
+    if not found:
+        console.print("Aucun service connu detecte sur cette machine.")
+        raise typer.Exit(0)
+
+    table = Table(title=f"{len(found)} service(s) detecte(s)")
+    for column in ("Service", "Conteneur", "Port", "Cle API", "Etat"):
+        table.add_column(column, overflow="fold")
+    for entry in found:
+        if discovery.looks_like_arrsenal(entry):
+            state = "[dim]gere par arrsenal[/dim]"
+        elif entry.usable:
+            state = "[green]adoptable[/green]"
+        else:
+            state = "[yellow]" + (entry.problems[0] if entry.problems else "inutilisable") + "[/yellow]"
+        table.add_row(
+            catalog.get(entry.service_id).display_name,
+            entry.container,
+            str(entry.host_port or "-"),
+            discovery.mask_key(entry.api_key),
+            state,
+        )
+    console.print(table)
+
+    doubles = discovery.duplicates([e for e in found if e.usable])
+    for service_id, items in doubles.items():
+        names = ", ".join(i.container for i in items)
+        console.print(
+            f"[yellow]{catalog.get(service_id).display_name} est present {len(items)} fois "
+            f"({names}).[/yellow]\n"
+            f"[dim]Precisez lequel cabler : --pick {service_id}=<conteneur>[/dim]"
+        )
+
+
+@app.command()
+def adopt(
+    data_root: str = typer.Option(..., help="Racine des medias de la stack existante."),
+    config_root: str = typer.Option(..., help="Racine des configurations existantes."),
+    pick: list[str] = typer.Option(
+        [], "--pick", help="Lever une ambiguite : service=conteneur. Repetable."
+    ),
+    host: str | None = typer.Option(
+        None, help="Adresse de cette machine, joignable DEPUIS les conteneurs."
+    ),
+    dl_user: str | None = typer.Option(
+        None, help="Identifiant du client de telechargement existant."
+    ),
+    dl_pass: str | None = typer.Option(
+        None, help="Mot de passe du client existant. Illisible depuis sa configuration."
+    ),
+    project_dir: Path = typer.Option(Path("."), help="Ou ecrire stack.yml."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Montrer le plan, ne rien faire."),
+    yes: bool = typer.Option(False, "--yes", "-y"),
+) -> None:
+    """Cable une stack DEJA installee, sans la recreer.
+
+    Aucun conteneur n'est demarre, arrete ou recree, et aucun docker-compose.yml
+    n'est genere : ces services ne sont pas geres par arrsenal.
+    """
+    picks: dict[str, str] = {}
+    for item in pick:
+        if "=" not in item:
+            raise typer.BadParameter(f"attendu service=conteneur, recu {item!r}")
+        key, _, value = item.partition("=")
+        picks[key.strip()] = value.strip()
+
+    # Les services adoptes vivent sur des reseaux Docker differents. Le cablage
+    # les fait se joindre par l'hote — et depuis l'INTERIEUR d'un conteneur,
+    # `localhost` designe ce conteneur, pas la machine. Il faut donc une vraie
+    # adresse. Constate en conditions reelles : Prowlarr repondait "cannot connect
+    # to Sonarr" sur une URL en localhost.
+    if host in (None, "localhost", "127.0.0.1"):
+        detected = dashboard.primary_lan_ip()
+        if detected is None:
+            console.print(
+                "[red]Impossible de determiner l'adresse de cette machine sur le "
+                "reseau.[/red]\n"
+                "[dim]Les conteneurs doivent pouvoir se joindre entre eux : "
+                "`localhost` ne convient pas. Passez --host <adresse>.[/dim]"
+            )
+            raise typer.Exit(1)
+        host = detected
+        console.print(f"[dim]Adresse retenue pour le cablage : {host}[/dim]")
+
+    plan = adopt_mod.build_plan(discovery.scan(), picks)
+
+    for entry, why in plan.skipped:
+        console.print(f"[dim]ignore  {entry.container} ({why})[/dim]")
+    for service_id, items in plan.ambiguous.items():
+        names = ", ".join(i.container for i in items)
+        console.print(
+            f"[red]{service_id} est ambigu : {names}.[/red] "
+            f"[dim]Ajoutez --pick {service_id}=<conteneur>[/dim]"
+        )
+    if not plan.chosen:
+        console.print("[red]Rien d'adoptable. Lancez `arrsenal scan` pour comprendre.[/red]")
+        raise typer.Exit(1)
+    if plan.ambiguous:
+        raise typer.Exit(1)
+
+    cfg = adopt_mod.config_from_plan(
+        plan, data_root=data_root, config_root=config_root, host=host
+    )
+    for sid in catalog.DOWNLOAD_CLIENTS:
+        if cfg.enabled(sid) and (dl_user or dl_pass):
+            cfg.services[sid].username = dl_user or ""
+            cfg.services[sid].password = dl_pass or ""
+    for note in adopt_mod.missing_for_wiring(cfg):
+        console.print(f"[yellow]{note}[/yellow]")
+
+    console.print()
+    report.print_summary(cfg)
+    console.print(
+        f"[cyan]{orchestrator.planned_links(cfg)} lien(s) seraient poses sur ces "
+        f"conteneurs existants. Aucun ne sera recree.[/cyan]"
+    )
+
+    if dry_run:
+        raise typer.Exit(0)
+    if not yes and not typer.confirm("Cabler ces services ?", default=True):
+        raise typer.Exit(0)
+
+    adopt_mod.write_stack(cfg, project_dir)
+    wirer = Wirer(cfg)
+    try:
+        results = wirer.execute(on_step=report.print_step)
+    finally:
+        wirer.close()
+    adopt_mod.write_stack(cfg, project_dir)
+    report.print_final(cfg, results)
     raise typer.Exit(0 if all(r.ok for r in results) else 2)
 
 

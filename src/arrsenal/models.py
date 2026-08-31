@@ -63,11 +63,32 @@ class ServiceInstance(BaseModel):
     username: str | None = None
     password: str | None = None
 
-    def url(self, host: str = "localhost") -> str:
-        return f"http://{host}:{self.host_port}"
+    #: True quand le service existait DEJA et n'est pas gere par arrsenal :
+    #: aucun conteneur n'est genere pour lui, on se contente de le cabler.
+    adopted: bool = False
+    #: Nom du conteneur existant, pour un service adopte.
+    container: str | None = None
+    #: `UrlBase` du service, quand il n'est pas servi a la racine.
+    url_base: str = ""
 
-    def internal_url(self, spec: ServiceSpec) -> str:
-        """URL vue depuis un autre conteneur du meme reseau compose."""
+    def url(self, host: str = "localhost") -> str:
+        base = f"http://{host}:{self.host_port}"
+        return f"{base}/{self.url_base}" if self.url_base else base
+
+    def internal_url(self, spec: ServiceSpec, host: str = "localhost") -> str:
+        """URL a utiliser quand un service en appelle un autre.
+
+        Pour une stack geree par arrsenal, les conteneurs partagent un reseau
+        compose : le nom de SERVICE resout, et c'est le plus robuste.
+
+        Pour un service ADOPTE, non. Les conteneurs existants vivent sur leurs
+        propres reseaux, souvent differents les uns des autres : `http://sonarr:8989`
+        ne resout pas d'un reseau a l'autre. Il faut passer par l'adresse de
+        l'hote et le port publie, seul chemin garanti entre deux conteneurs
+        etrangers l'un a l'autre.
+        """
+        if self.adopted:
+            return self.url(host)
         return f"http://{spec.id}:{spec.internal_port}"
 
 

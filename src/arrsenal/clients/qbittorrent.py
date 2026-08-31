@@ -82,7 +82,19 @@ class QBittorrentClient:
 
     def categories(self) -> dict:
         resp = self._http.get("/api/v2/torrents/categories")
-        return resp.json() if resp.content else {}
+        if not resp.content:
+            return {}
+        try:
+            return resp.json()
+        except ValueError as exc:
+            # Sur une session refusee, qBittorrent repond "Forbidden" en texte
+            # brut avec un code 200. Sans ce garde-fou, l'appelant recevait une
+            # JSONDecodeError nue au lieu d'un diagnostic.
+            raise WiringError(
+                "qbittorrent: reponse illisible sur les categories",
+                f"contenu non JSON : {resp.text[:120]!r}",
+                "les identifiants sont probablement refuses",
+            ) from exc
 
     def ensure_category(self, name: str, save_path: str) -> bool:
         """Cree la categorie si absente. Renvoie True si creee.

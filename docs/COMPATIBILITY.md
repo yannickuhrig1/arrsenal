@@ -367,3 +367,48 @@ ces cibles — et migre automatiquement les données au premier démarrage.
 Conséquence pour arrsenal : la feuille de route ne vise plus qu'un seul service de
 demandes utilisateurs. Prévoir la reprise d'une installation Jellyseerr ou Overseerr
 existante est inutile : Seerr le fait lui-même.
+
+## Reprise d'une stack existante — vérifié le 2026-08-31
+
+Testé contre une stack **qu'arrsenal n'a pas créée** : quatre conteneurs aux noms
+libres, répartis sur **deux réseaux Docker différents**, dont deux Sonarr.
+
+Résultat : `prowlarr → sonarr` établi et validé par le bouton Test, sur des conteneurs
+étrangers, avec des clés API lues dans leurs `config.xml`.
+
+Trois erreurs de conception que seul le test réel a révélées.
+
+### Ne pas imposer son arborescence
+
+Le premier essai a échoué : `Path '/data/media/tv' does not exist`. arrsenal appliquait
+sa propre arborescence à une stack qui a la sienne.
+
+**Adopter, c'est câbler des services entre eux, pas réorganiser les dossiers de
+quelqu'un.** Les dossiers racine existants sont désormais lus et respectés ; quand il
+n'y en a aucun, arrsenal le signale au lieu d'en inventer un. Même règle pour les
+catégories qBittorrent : les écraser déplacerait des téléchargements en cours.
+
+### `localhost` ne veut rien dire entre conteneurs
+
+Deuxième échec : `Unable to complete application test, cannot connect to Sonarr`. Les
+services adoptés vivent sur leurs propres réseaux — le nom de service compose n'y résout
+pas — et **depuis l'intérieur d'un conteneur, `localhost` désigne ce conteneur**, pas la
+machine.
+
+`adopt` détecte donc l'adresse de la machine sur le réseau local, et refuse de continuer
+s'il n'y arrive pas plutôt que de câbler des URL mortes.
+
+### Un nom de conteneur ne prouve rien
+
+`looks_like_arrsenal` reconnaissait ses propres conteneurs à leur nom
+(`<projet>-<service>`). Un test a montré que `mon-sonarr` correspondait : arrsenal
+**sautait en silence un conteneur qui ne lui appartenait pas**.
+
+Les services générés portent maintenant un libellé `arrsenal.managed=true`, et la
+détection le lit au lieu de deviner.
+
+### Ce qui reste hors de portée
+
+Le mot de passe d'un client de téléchargement existant est haché dans sa configuration :
+illisible. `--dl-user` et `--dl-pass` le demandent explicitement, et l'étape échoue avec
+un message clair plutôt qu'une erreur technique.
