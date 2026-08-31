@@ -202,3 +202,56 @@ def test_hardlink_probe_actually_runs(tmp_path):
 def test_bad_umask_is_rejected_with_a_readable_message(tmp_path):
     with pytest.raises(ValueError, match="umask"):
         StackConfig(config_root=str(tmp_path), data_root=str(tmp_path), umask="99")
+
+
+# ------------------------------------------------------- identifiants systeme
+
+
+def test_unraid_uses_the_platform_constant_not_detection():
+    """Unraid fait tourner ses conteneurs en nobody:users a l'echelle de la
+    plateforme : detecter l'utilisateur courant y serait faux."""
+    from arrsenal.layout import PROFILE_DEFAULTS, resolve_ids
+
+    uid, gid, source, certain = resolve_ids(PlatformProfile.UNRAID)
+    assert (uid, gid) == (99, 100)
+    assert certain
+    assert "Unraid" in source
+    assert not PROFILE_DEFAULTS[PlatformProfile.UNRAID].prefer_detection
+
+
+def test_synology_detects_because_dsm_uids_vary():
+    """Sur DSM l'UID depend de l'ordre de creation des utilisateurs : une
+    constante serait fausse par conception."""
+    from arrsenal.layout import PROFILE_DEFAULTS
+
+    assert PROFILE_DEFAULTS[PlatformProfile.SYNOLOGY].prefer_detection
+
+
+def test_detection_returns_none_rather_than_inventing_a_value(monkeypatch):
+    """Renvoyer 1000:1000 en silence empecherait d'avertir l'utilisateur."""
+    import os as _os
+
+    from arrsenal.layout import detect_ids
+
+    monkeypatch.delattr(_os, "getuid", raising=False)
+    monkeypatch.delattr(_os, "getgid", raising=False)
+    assert detect_ids() is None
+
+
+def test_undetectable_ids_are_flagged_as_uncertain(monkeypatch):
+    import os as _os
+
+    from arrsenal.layout import resolve_ids
+
+    monkeypatch.delattr(_os, "getuid", raising=False)
+    monkeypatch.delattr(_os, "getgid", raising=False)
+    _uid, _gid, source, certain = resolve_ids(PlatformProfile.GENERIC_LINUX)
+    assert not certain
+    assert "detection impossible" in source
+
+
+def test_config_records_where_the_ids_came_from(tmp_path):
+    from arrsenal import orchestrator
+
+    cfg = orchestrator.build_config(services=["sonarr"], data_root=str(tmp_path))
+    assert cfg.ids_source and cfg.ids_source != "non renseigne"

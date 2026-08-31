@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import catalog, compose, seed
 from .clients.arr import ArrClient
-from .layout import PROFILE_DEFAULTS, create_tree, detect_ids
+from .layout import PROFILE_DEFAULTS, create_tree, resolve_ids
 from .models import PlatformProfile, ServiceInstance, StackConfig
 from .runner import (
     Check,
@@ -65,10 +65,7 @@ def build_config(
     Transmission.
     """
     defaults = PROFILE_DEFAULTS[platform]
-    if platform is PlatformProfile.GENERIC_LINUX:
-        uid, gid = detect_ids()
-    else:
-        uid, gid = defaults.puid, defaults.pgid
+    uid, gid, source, certain = resolve_ids(platform)
 
     cfg = StackConfig(
         platform=platform,
@@ -78,6 +75,8 @@ def build_config(
         pgid=gid,
         timezone=timezone,
         host=host,
+        ids_source=source,
+        ids_certain=certain,
     )
     for sid in catalog.resolve_dependencies(services):
         spec = catalog.get(sid)

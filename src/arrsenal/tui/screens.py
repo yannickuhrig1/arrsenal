@@ -29,7 +29,7 @@ from textual.widgets import (
 )
 
 from .. import catalog, orchestrator
-from ..layout import PROFILE_DEFAULTS, hardlink_supported
+from ..layout import PROFILE_DEFAULTS, hardlink_supported, resolve_ids
 from ..models import Category, PlatformProfile
 from ..orchestrator import InstallAborted, Progress
 from ..wiring import StepResult
@@ -238,14 +238,14 @@ class PathsScreen(WizardScreen):
         self._update_note(profile)
 
     def _update_note(self, profile: PlatformProfile) -> None:
-        defaults = PROFILE_DEFAULTS[profile]
+        uid, gid, source, certain = resolve_ids(profile)
         note = self.query_one("#platform-note", Static)
-        if defaults.verified:
-            note.update("[dim]PUID/PGID detectes automatiquement.[/dim]")
+        if certain:
+            note.update(f"[dim]PUID/PGID {uid}:{gid} - {source}[/dim]")
         else:
             note.update(
-                f"[yellow]Valeurs par defaut NON VERIFIEES pour ce profil.[/yellow]\n"
-                f"[dim]{defaults.note}[/dim]"
+                f"[yellow]PUID/PGID non detectables ici : repli sur {uid}:{gid}.[/yellow]\n"
+                f"[dim]Sur un NAS, lancez `id` et corrigez ces valeurs.[/dim]"
             )
 
     def platform(self) -> PlatformProfile:
@@ -313,7 +313,8 @@ class SummaryScreen(WizardScreen):
         self.query_one("#summary-paths", Static).update(
             f"[b]Configurations[/b]  {cfg.config_root}\n"
             f"[b]Donnees[/b]        {cfg.data_root}  -> /data dans tous les conteneurs\n"
-            f"[b]PUID:PGID[/b]      {cfg.puid}:{cfg.pgid}   UMASK {cfg.umask}   TZ {cfg.timezone}\n"
+            f"[b]PUID:PGID[/b]      {cfg.puid}:{cfg.pgid} [dim]({cfg.ids_source})[/dim]\n"
+            f"[b]UMASK / TZ[/b]     {cfg.umask}   {cfg.timezone}\n"
             f"[b]Liens a cabler[/b] {orchestrator.planned_links(cfg)}"
         )
 
@@ -323,9 +324,12 @@ class SummaryScreen(WizardScreen):
             "machine, visible par les autres pairs.[/dim]"
         )
         warnings = [vpn_warning]
-        if not PROFILE_DEFAULTS[cfg.platform].verified:
+        if not cfg.ids_certain:
             warnings.append(
-                f"[yellow]Profil {cfg.platform.value} : PUID/PGID non verifies.[/yellow]"
+                f"[yellow]PUID/PGID non detectables ici : repli sur "
+                f"{cfg.puid}:{cfg.pgid}.[/yellow]\n"
+                f"[dim]Des identifiants faux font ecrire toute la stack avec de "
+                f"mauvaises permissions. Sur un NAS, lancez `id`.[/dim]"
             )
         self.query_one("#summary-warnings", Static).update("\n\n".join(warnings))
 

@@ -176,9 +176,35 @@ Trois différences qui cassent le code écrit pour Sonarr et Radarr :
 3. Lidarr n'expose **pas** l'implémentation de notification `MediaBrowser` : aucun lien
    Lidarr vers Jellyfin n'est tenté.
 
+## PUID / PGID par plateforme — vérifié
+
+Le point de départ était un `TODO(verify)`. La vérification a montré que **la question
+était mal posée** : ce ne sont pas les mêmes valeurs qu'il fallait trouver, mais deux
+comportements différents.
+
+| Profil | Comportement | Pourquoi |
+|---|---|---|
+| `generic-linux` | détection (`os.getuid`) | l'utilisateur courant est le bon |
+| `unraid` | **constante 99:100** | Unraid fait tourner ses conteneurs en `nobody:users` à l'échelle de la plateforme, et son `appdata` appartient à 99:100 |
+| `synology` | détection | **les UID DSM varient selon l'ordre de création des utilisateurs** : 1026 pour le premier, mais on rencontre couramment bien plus haut |
+
+Coder `1026` en dur pour Synology était donc **faux par conception**, pas seulement non
+vérifié. Une constante ne peut pas être juste quand la valeur dépend de l'installation.
+
+Deux conséquences dans le code :
+
+- `detect_ids()` renvoie `None` quand la plateforme n'expose pas `os.getuid` (Windows),
+  au lieu d'inventer `1000:1000` en silence. Une valeur fabriquée sans le dire empêche
+  d'avertir l'utilisateur.
+- `StackConfig` porte `ids_source` et `ids_certain`. Le récapitulatif affiche d'où
+  viennent les valeurs (« détecté », « constante Unraid », « repli »), et l'assistant
+  avertit explicitement quand la détection a échoué.
+
+Sources : [forums Unraid](https://forums.unraid.net/topic/117661-docker-user-puid-and-group-pgid-settings/)
+· [Marius Hosting, UID/GID sur Synology](https://mariushosting.com/synology-how-to-find-uid-userid-and-gid-groupid/)
+
 ## Non vérifié à ce jour
 
-- `TODO(verify)` — PUID/PGID par défaut sur Unraid et Synology (`layout.py`).
 - Bazarr est **volontairement absent du catalogue** : sa configuration passe par un
   fichier YAML et non par une API, et rien n'a encore été vérifié. Le projet ne livre
   pas de service qu'il ne sait pas câbler.

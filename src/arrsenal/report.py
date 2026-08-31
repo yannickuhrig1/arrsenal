@@ -50,7 +50,8 @@ def print_summary(cfg: StackConfig) -> None:
         Panel(
             f"CONFIG_ROOT : {cfg.config_root}\n"
             f"DATA_ROOT   : {cfg.data_root}  (monte sur /data dans TOUS les conteneurs)\n"
-            f"PUID:PGID   : {cfg.puid}:{cfg.pgid}   UMASK {cfg.umask}   TZ {cfg.timezone}\n"
+            f"PUID:PGID   : {cfg.puid}:{cfg.pgid}  ({cfg.ids_source})\n"
+            f"UMASK / TZ  : {cfg.umask}   {cfg.timezone}\n"
             f"Plateforme  : {cfg.platform.value}",
             title="Chemins",
             border_style="blue",

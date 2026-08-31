@@ -46,47 +46,78 @@ class ProfileDefaults:
     data_root: str
     puid: int
     pgid: int
-    verified: bool
-    note: str = ""
+    #: True quand les identifiants corrects sont ceux de l'utilisateur courant et
+    #: doivent etre DETECTES. False quand la plateforme impose une constante.
+    prefer_detection: bool
+    #: D'ou viennent puid/pgid. Affiche a l'utilisateur : il doit pouvoir juger.
+    source: str
 
 
-#: TODO(verify) : les UID/GID Unraid et Synology doivent etre confirmes contre la
-#: documentation officielle de chaque plateforme avant d'etre presentes sans avertissement.
-#: Tant que `verified` est False, la CLI demande une confirmation explicite.
 PROFILE_DEFAULTS: dict[PlatformProfile, ProfileDefaults] = {
     PlatformProfile.GENERIC_LINUX: ProfileDefaults(
         config_root="/opt/arrsenal/config",
         data_root="/srv/data",
         puid=1000,
         pgid=1000,
-        verified=True,
+        prefer_detection=True,
+        source="utilisateur courant",
     ),
     PlatformProfile.UNRAID: ProfileDefaults(
         config_root="/mnt/user/appdata/arrsenal",
         data_root="/mnt/user/data",
         puid=99,
         pgid=100,
-        verified=False,
-        note="UID/GID 99:100 (nobody:users) a confirmer contre la doc Unraid.",
+        prefer_detection=False,
+        source="constante Unraid : nobody:users = 99:100",
     ),
     PlatformProfile.SYNOLOGY: ProfileDefaults(
         config_root="/volume1/docker/arrsenal",
         data_root="/volume1/data",
+        # Valeurs de repli seulement. Sur DSM, l'UID depend de l'ordre de creation
+        # des utilisateurs : 1026 pour le premier, mais on rencontre couramment
+        # bien plus haut. Une constante serait fausse par conception, d'ou la
+        # detection.
         puid=1026,
         pgid=100,
-        verified=False,
-        note="UID/GID a confirmer : varient selon l'utilisateur DSM cree.",
+        prefer_detection=True,
+        source="utilisateur courant (les UID DSM varient selon l'utilisateur cree)",
     ),
 }
 
 
-def detect_ids() -> tuple[int, int]:
-    """UID/GID courants. Retombe sur 1000:1000 la ou os.getuid n'existe pas (Windows)."""
+def detect_ids() -> tuple[int, int] | None:
+    """UID/GID de l'utilisateur courant, ou None si la plateforme ne les expose pas.
+
+    Renvoie None plutot que 1000:1000 sous Windows : une valeur inventee
+    silencieusement est pire qu'une absence de valeur, puisqu'elle empeche de
+    prevenir l'utilisateur.
+    """
     getuid = getattr(os, "getuid", None)
     getgid = getattr(os, "getgid", None)
     if getuid is None or getgid is None:
-        return 1000, 1000
+        return None
     return getuid(), getgid()
+
+
+def resolve_ids(profile: PlatformProfile) -> tuple[int, int, str, bool]:
+    """Determine PUID/PGID pour un profil.
+
+    Renvoie (uid, gid, explication, sur). `sur` est False quand on a du se rabattre
+    sur une valeur par defaut faute de detection : l'appelant doit alors avertir.
+    """
+    defaults = PROFILE_DEFAULTS[profile]
+    if not defaults.prefer_detection:
+        return defaults.puid, defaults.pgid, defaults.source, True
+
+    detected = detect_ids()
+    if detected is None:
+        return (
+            defaults.puid,
+            defaults.pgid,
+            "valeur par defaut : detection impossible sur cette plateforme",
+            False,
+        )
+    return detected[0], detected[1], f"detecte ({defaults.source})", True
 
 
 def create_tree(data_root: str | Path, config_root: str | Path, service_ids: list[str]) -> list[Path]:

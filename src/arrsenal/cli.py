@@ -14,7 +14,6 @@ import yaml
 
 from . import catalog, compose, indexers_cli, orchestrator, report
 from .clients.arr import ArrClient
-from .layout import PROFILE_DEFAULTS
 from .models import PlatformProfile, StackConfig
 from .orchestrator import InstallAborted, Progress
 from .runner import Compose
@@ -96,11 +95,11 @@ def install(
         timezone=timezone,
     )
 
-    defaults = PROFILE_DEFAULTS[platform]
-    if not defaults.verified:
+    if not cfg.ids_certain:
         console.print(
-            f"[yellow]Profil {platform.value} : valeurs par defaut NON VERIFIEES."
-            f"\n{defaults.note}\nVerifiez PUID/PGID et les chemins avant de continuer.[/yellow]"
+            f"[yellow]PUID/PGID non detectables ici : repli sur {cfg.puid}:{cfg.pgid}.\n"
+            f"Sur un NAS, lancez `id` et passez les vraies valeurs. Des identifiants "
+            f"faux font ecrire toute la stack avec de mauvaises permissions.[/yellow]"
         )
 
     if not report.print_checks(orchestrator.preflight(cfg)):

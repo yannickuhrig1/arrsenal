@@ -107,8 +107,9 @@ async def test_switching_platform_rewrites_the_default_paths(app):
 
 
 @pytest.mark.asyncio
-async def test_unverified_platform_is_flagged_in_the_wizard(app):
-    """Le TODO(verify) sur Unraid/Synology doit rester visible pour l'utilisateur."""
+async def test_platform_note_states_where_the_ids_come_from(app):
+    """Des PUID/PGID faux cassent les permissions de toute la stack :
+    l'utilisateur doit voir d'ou viennent les valeurs proposees."""
     async with app.run_test() as pilot:
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
@@ -116,7 +117,9 @@ async def test_unverified_platform_is_flagged_in_the_wizard(app):
         screen.query_one("#plat-unraid", RadioButton).value = True
         await pilot.pause()
         note = str(screen.query_one("#platform-note", Static).content)
-        assert "NON VERIFIEES" in note
+        # Unraid impose nobody:users a l'echelle de la plateforme : c'est une
+        # constante, pas une detection.
+        assert "99:100" in note
 
 
 @pytest.mark.asyncio

@@ -86,6 +86,12 @@ class StackConfig(BaseModel):
     #: Hote joignable depuis le navigateur de l'utilisateur, pour le rapport final.
     host: str = "localhost"
 
+    #: D'ou viennent puid/pgid. Affiche a l'utilisateur : des identifiants faux
+    #: cassent les permissions de toute la stack, il doit pouvoir les juger.
+    ids_source: str = "non renseigne"
+    #: False quand on s'est rabattu sur une valeur par defaut faute de detection.
+    ids_certain: bool = True
+
     services: dict[str, ServiceInstance] = Field(default_factory=dict)
 
     #: Desactive = avertissement explicite au recapitulatif (PROMPT.md sec. 11.1).
