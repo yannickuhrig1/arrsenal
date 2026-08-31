@@ -22,7 +22,7 @@ from .clients.jellyfin import JellyfinClient
 from .clients.qbittorrent import QBittorrentClient
 from .downloadclients import ARR_ROUTING, profile_for
 from .layout import CONTAINER_PATHS
-from .models import StackConfig
+from .models import Category, StackConfig
 
 #: Categories d'indexeurs Prowlarr poussees vers chaque application (conventions Newznab).
 #: 2000 = Movies, 3000 = Audio, 5000 = TV.
@@ -107,7 +107,11 @@ class Wirer:
         Delegue a ServiceInstance : un service adopte n'est pas sur le reseau
         compose et doit etre joint par l'hote.
         """
-        return self.cfg.services[service_id].internal_url(catalog.get(service_id), self.cfg.host)
+        spec = catalog.get(service_id)
+        behind_vpn = self.cfg.vpn.enabled and spec.category is Category.DOWNLOAD
+        return self.cfg.services[service_id].internal_url(
+            spec, self.cfg.host, behind_vpn=behind_vpn
+        )
 
     def close(self) -> None:
         for client in self._arr_cache.values():
@@ -197,6 +201,10 @@ class Wirer:
                     ],
                 )
             host, port = self.cfg.host, dl.host_port
+        elif self.cfg.vpn.enabled:
+            # Le client partage la pile reseau de Gluetun : c'est gluetun qu'il
+            # faut viser, pas son propre nom de service qui ne resout plus.
+            host, port = "gluetun", dl_spec.internal_port
         else:
             host, port = dl_spec.id, dl_spec.internal_port
 

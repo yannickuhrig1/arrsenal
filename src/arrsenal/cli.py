@@ -15,7 +15,7 @@ import yaml
 from . import admin, catalog, compose, dashboard, discovery, indexers_cli, orchestrator, report
 from . import adopt as adopt_mod
 from .clients.arr import ArrClient
-from .models import PlatformProfile, StackConfig
+from .models import VPN_PROVIDERS, PlatformProfile, StackConfig, VpnConfig
 from .orchestrator import InstallAborted, Progress
 from .runner import Compose
 from .wiring import Wirer
@@ -99,6 +99,15 @@ def install(
     open_page: bool = typer.Option(
         True, "--open/--no-open", help="Ouvrir la page d'acces dans le navigateur."
     ),
+    vpn: bool = typer.Option(False, "--vpn", help="Faire passer le client torrent par un VPN."),
+    vpn_provider: str = typer.Option(
+        "", help="Fournisseur VPN. Voir `arrsenal vpn-providers`."
+    ),
+    vpn_type: str = typer.Option("wireguard", help="wireguard ou openvpn."),
+    vpn_user: str = typer.Option("", help="Identifiant OpenVPN."),
+    vpn_pass: str = typer.Option("", help="Mot de passe OpenVPN."),
+    vpn_key: str = typer.Option("", help="Cle privee WireGuard."),
+    vpn_countries: str = typer.Option("", help="Pays souhaites, separes par des virgules."),
 ) -> None:
     """Deploie et cable la stack de bout en bout, sans interaction."""
     selection = [s.strip() for s in services.split(",") if s.strip()]
@@ -113,6 +122,30 @@ def install(
         host=host,
         timezone=timezone,
     )
+
+    if vpn:
+        cfg.vpn = VpnConfig(
+            enabled=True,
+            provider=vpn_provider,
+            vpn_type=vpn_type,
+            openvpn_user=vpn_user,
+            openvpn_password=vpn_pass,
+            wireguard_private_key=vpn_key,
+            countries=vpn_countries,
+        )
+        gaps = cfg.vpn.missing()
+        if gaps:
+            console.print(
+                f"[red]VPN active mais incomplet : il manque {', '.join(gaps)}.[/red]\n"
+                f"[dim]Sans cela Gluetun refuse de demarrer, et le client torrent "
+                f"reste injoignable puisqu'il partage sa pile reseau.[/dim]"
+            )
+            raise typer.Exit(1)
+        if not any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS):
+            console.print(
+                "[yellow]--vpn sans client de telechargement : Gluetun ne protegerait "
+                "rien.[/yellow]"
+            )
 
     if not cfg.ids_certain:
         console.print(
@@ -397,6 +430,14 @@ def uninstall(
         shutil.rmtree(cfg.config_root, ignore_errors=True)
         console.print(f"{cfg.config_root} supprime.")
     console.print(f"[dim]Vos medias dans {cfg.data_root} n'ont pas ete touches.[/dim]")
+
+
+@app.command("vpn-providers")
+def vpn_providers() -> None:
+    """Liste les fournisseurs VPN acceptes par Gluetun."""
+    console.print("[dim]Liste obtenue de Gluetun v3.41.3 lui-meme, pas recopiee.[/dim]\n")
+    for name in VPN_PROVIDERS:
+        console.print(f"  {name}")
 
 
 @app.command("list")

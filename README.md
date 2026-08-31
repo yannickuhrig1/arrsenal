@@ -240,8 +240,27 @@ Les identifiants sont écrits dans `.env` en `chmod 600`, déjà couvert par le
 `.gitignore` généré, et masqués dans les journaux.
 
 **Sans VPN**, le trafic BitTorrent sort sur votre IP publique. `arrsenal` vous
-l'affiche au récapitulatif. Le support Gluetun arrive en phase 4 ; la bascule est déjà
-prévue dans le générateur de compose.
+l'affiche au récapitulatif.
+
+Avec `--vpn`, le client passe par [Gluetun](https://github.com/passteque/gluetun) :
+
+```bash
+arrsenal install --vpn --vpn-provider nordvpn --vpn-key <votre-cle-wireguard>
+```
+
+```bash
+arrsenal vpn-providers   # les 25 fournisseurs acceptes
+```
+
+Ce qui compte n'est pas que le tunnel existe, c'est qu'**aucun paquet ne puisse sortir
+sans lui**. Le client de téléchargement ne démarre pas tant que Gluetun n'est pas
+*healthy* — vérifié avec des identifiants volontairement faux : Gluetun reste
+`unhealthy`, et qBittorrent ne quitte jamais l'état `created`.
+
+Deux subtilités traitées, chacune capable de tout casser en silence : les ports du
+client **migrent vers Gluetun** (un conteneur qui partage une pile réseau ne peut plus
+publier de port), et le câblage vise `http://gluetun:8080` car le client **perd son
+alias DNS**.
 
 ---
 

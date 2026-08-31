@@ -164,7 +164,7 @@ def test_a_clean_install_shows_no_failure_banner():
 def test_the_vpn_warning_follows_the_config():
     cfg = make()
     assert "Aucun VPN" in dashboard.render(cfg)
-    cfg.vpn_enabled = True
+    cfg.vpn.enabled = True
     assert "Aucun VPN" not in dashboard.render(cfg)
 
 

@@ -18,6 +18,10 @@ from . import catalog
 from .models import Category, StackConfig
 
 NETWORK_NAME = "arrsenal"
+
+#: Tag epingle de Gluetun. Le depot a ete transfere de qdm12/gluetun vers
+#: passteque/gluetun ; l'image, elle, reste qmcgaw/gluetun.
+GLUETUN_TAG = "v3.41.3"
 _HEADER = (
     "# Genere par arrsenal - NE PAS EDITER A LA MAIN.\n"
     "# Modifiez stack.yml puis relancez `arrsenal generate`.\n"
@@ -61,6 +65,40 @@ def _flood_block(cfg: StackConfig) -> dict:
         block["depends_on"] = [client_id]
         break
     return block
+
+
+def _gluetun_block(cfg: StackConfig) -> dict:
+    """Le conteneur VPN, et les ports qu'il porte a la place du client.
+
+    Un service en `network_mode: service:gluetun` n'a plus de pile reseau propre :
+    il ne PEUT plus publier de port. Les siens doivent donc etre declares ici,
+    sinon son interface web devient injoignable — panne silencieuse et tres
+    deroutante.
+
+    `cap_add: NET_ADMIN` et `/dev/net/tun` sont indispensables pour monter le
+    tunnel. Le healthcheck est fourni par l'image elle-meme (verifie sur la
+    v3.41.3), ce qui permet aux services qui en dependent d'attendre une
+    connexion VPN reellement etablie, et pas seulement un conteneur demarre.
+    """
+    ports = []
+    for sid in catalog.STARTUP_ORDER:
+        if not cfg.enabled(sid):
+            continue
+        spec = catalog.get(sid)
+        if spec.category is Category.DOWNLOAD:
+            ports.append(f"{cfg.services[sid].host_port}:{spec.internal_port}")
+    return {
+        "image": f"qmcgaw/gluetun:{GLUETUN_TAG}",
+        "container_name": f"{cfg.project_name}-gluetun",
+        "restart": "unless-stopped",
+        "labels": {"arrsenal.managed": "true", "arrsenal.service": "gluetun"},
+        "cap_add": ["NET_ADMIN"],
+        "devices": ["/dev/net/tun:/dev/net/tun"],
+        "environment": cfg.vpn.environment(cfg.timezone),
+        "volumes": ["${CONFIG_ROOT}/gluetun:/gluetun"],
+        "ports": ports,
+        "networks": [NETWORK_NAME],
+    }
 
 
 def _service_block(cfg: StackConfig, service_id: str) -> dict:
@@ -129,6 +167,11 @@ def build_compose(cfg: StackConfig) -> dict:
     }
     if not services:
         raise ValueError("aucun service selectionne")
+    if cfg.vpn.enabled:
+        gaps = cfg.vpn.missing()
+        if gaps:
+            raise ValueError("VPN active mais incomplet : il manque " + ", ".join(gaps))
+        services = {"gluetun": _gluetun_block(cfg), **services}
     return {
         "name": cfg.project_name,
         "services": services,

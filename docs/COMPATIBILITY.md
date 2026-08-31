@@ -455,3 +455,62 @@ autobrr lui-même répondent `204`**.
 `qui` écoute bien sur 7476, confirmé par ses propres journaux. C'est une interface : elle
 découvre ses instances qBittorrent par son écran de configuration, aucun câblage
 automatique n'est possible.
+
+## Gluetun — vérifié le 2026-08-31
+
+| | |
+|---|---|
+| Image | `qmcgaw/gluetun:v3.41.3` |
+| Dépôt | `qdm12/gluetun` **redirige vers `passteque/gluetun`** — 15 356 étoiles, actif |
+| Healthcheck | fourni par l'image : `/gluetun-entrypoint healthcheck`, 5 s, 3 essais |
+
+### La liste des fournisseurs vient de Gluetun
+
+Plutôt que de recopier une liste d'article, on lui a passé un nom invalide. Il répond
+avec l'énumération exacte : `airvpn, cyberghost, expressvpn, fastestvpn, giganews,
+hidemyass, ipvanish, ivpn, mullvad, nordvpn, perfect privacy, privado, private internet
+access, privatevpn, protonvpn, purevpn, slickvpn, surfshark, torguard, vpnsecure, vpn
+unlimited, vyprvpn, windscribe, custom, pia`.
+
+C'est cette liste qui est dans `models.py`, et `arrsenal vpn-providers` l'affiche.
+
+### Les deux modes n'exigent pas les mêmes champs
+
+Constaté en lançant Gluetun à vide et en lisant ce qu'il réclame :
+
+| Mode | Ce qu'il exige |
+|---|---|
+| `wireguard` | `WIREGUARD_PRIVATE_KEY`, et une **vraie clé base64** — il refuse toute autre chaîne |
+| `openvpn` | `OPENVPN_USER` et `OPENVPN_PASSWORD` |
+
+### Deux pièges du `network_mode: service:`
+
+**Les ports du client doivent migrer vers Gluetun.** Un conteneur qui partage la pile
+réseau d'un autre n'a plus de pile propre : il *ne peut plus* publier de port. Sans ce
+transfert, l'interface du client devient injoignable — panne silencieuse et déroutante.
+
+**Le client perd son alias DNS.** Vérifié contre Docker Compose 5.3 avec deux conteneurs
+factices :
+
+```
+depuis un tiers :
+  getent hosts client    -> rien
+  getent hosts faux-vpn  -> 172.18.0.2
+```
+
+`http://qbittorrent:8080` ne résout donc plus : le câblage doit viser `http://gluetun:8080`.
+Sans cette correction, activer le VPN cassait tout le câblage en silence.
+
+### La propriété qui compte : aucune fuite possible
+
+Testé avec des identifiants volontairement faux :
+
+```
+gluetun      running  Up 47 seconds (unhealthy)
+qbittorrent  created  Created
+dependency failed to start: container arrsenal-gluetun is unhealthy
+```
+
+**Le client de téléchargement ne démarre pas tant que le tunnel n'est pas établi.** Ce
+n'est pas une intention, c'est le comportement observé : `depends_on` sur le healthcheck
+de Gluetun ferme la porte avant qu'un seul paquet puisse sortir hors du VPN.

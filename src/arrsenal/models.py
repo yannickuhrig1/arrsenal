@@ -53,6 +53,90 @@ class ServiceSpec(BaseModel):
         return self.config_dir is not None
 
 
+#: Fournisseurs acceptes par Gluetun. Liste obtenue de Gluetun LUI-MEME, en lui
+#: passant un nom invalide : il repond avec l'enumeration exacte. Verifie contre
+#: la v3.41.3, jamais recopiee d'un article.
+VPN_PROVIDERS = (
+    "airvpn", "cyberghost", "expressvpn", "fastestvpn", "giganews", "hidemyass",
+    "ipvanish", "ivpn", "mullvad", "nordvpn", "perfect privacy", "privado",
+    "private internet access", "privatevpn", "protonvpn", "purevpn", "slickvpn",
+    "surfshark", "torguard", "vpnsecure", "vpn unlimited", "vyprvpn", "windscribe",
+    "custom", "pia",
+)
+
+
+class VpnConfig(BaseModel):
+    """Reglages Gluetun.
+
+    Deux modes, et ils n'exigent pas les memes champs — constate en lancant
+    Gluetun a vide et en lisant ce qu'il reclame :
+
+    - `wireguard` : `WIREGUARD_PRIVATE_KEY` obligatoire, et la cle doit etre une
+      vraie cle base64 ; Gluetun refuse toute autre chaine ;
+    - `openvpn` : `OPENVPN_USER` et `OPENVPN_PASSWORD`.
+    """
+
+    enabled: bool = False
+    provider: str = ""
+    vpn_type: str = "wireguard"
+    openvpn_user: str = ""
+    openvpn_password: str = ""
+    wireguard_private_key: str = ""
+    wireguard_addresses: str = ""
+    #: Filtre de pays, facultatif. Ex : "Switzerland,Netherlands".
+    countries: str = ""
+
+    @field_validator("provider")
+    @classmethod
+    def _known_provider(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v and v not in VPN_PROVIDERS:
+            raise ValueError(
+                f"fournisseur VPN inconnu de Gluetun: {v!r}. "
+                f"Choix possibles : {', '.join(VPN_PROVIDERS)}"
+            )
+        return v
+
+    @field_validator("vpn_type")
+    @classmethod
+    def _known_type(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v not in ("wireguard", "openvpn"):
+            raise ValueError(f"type de VPN inconnu: {v!r} (attendu wireguard ou openvpn)")
+        return v
+
+    def missing(self) -> list[str]:
+        """Ce qui manque pour que Gluetun demarre. Vide = pret."""
+        if not self.enabled:
+            return []
+        gaps: list[str] = []
+        if not self.provider:
+            gaps.append("le fournisseur VPN (--vpn-provider)")
+        if self.vpn_type == "wireguard":
+            if not self.wireguard_private_key:
+                gaps.append("la cle privee WireGuard (--vpn-key)")
+        elif not self.openvpn_user or not self.openvpn_password:
+            gaps.append("les identifiants OpenVPN (--vpn-user et --vpn-pass)")
+        return gaps
+
+    def environment(self, timezone: str) -> dict[str, str]:
+        env = {
+            "VPN_SERVICE_PROVIDER": self.provider,
+            "VPN_TYPE": self.vpn_type,
+            "TZ": timezone,
+        }
+        if self.vpn_type == "wireguard":
+            env["WIREGUARD_PRIVATE_KEY"] = self.wireguard_private_key
+            if self.wireguard_addresses:
+                env["WIREGUARD_ADDRESSES"] = self.wireguard_addresses
+        else:
+            env["OPENVPN_USER"] = self.openvpn_user
+            env["OPENVPN_PASSWORD"] = self.openvpn_password
+        if self.countries:
+            env["SERVER_COUNTRIES"] = self.countries
+        return env
+
+
 class ServiceInstance(BaseModel):
     """Un service reellement selectionne, avec ses secrets et son port resolus."""
 
@@ -75,13 +159,18 @@ class ServiceInstance(BaseModel):
         base = f"http://{host}:{self.host_port}"
         return f"{base}/{self.url_base}" if self.url_base else base
 
-    def internal_url(self, spec: ServiceSpec, host: str = "localhost") -> str:
+    def internal_url(
+        self, spec: ServiceSpec, host: str = "localhost", *, behind_vpn: bool = False
+    ) -> str:
         """URL a utiliser quand un service en appelle un autre.
 
         Pour une stack geree par arrsenal, les conteneurs partagent un reseau
         compose : le nom de SERVICE resout, et c'est le plus robuste.
 
-        Pour un service ADOPTE, non. Les conteneurs existants vivent sur leurs
+        Sous VPN, un client de telechargement perd son alias DNS : il partage la
+        pile reseau de Gluetun. C'est `behind_vpn` qui l'exprime.
+
+        Pour un service ADOPTE, non plus. Les conteneurs existants vivent sur leurs
         propres reseaux, souvent differents les uns des autres : `http://sonarr:8989`
         ne resout pas d'un reseau a l'autre. Il faut passer par l'adresse de
         l'hote et le port publie, seul chemin garanti entre deux conteneurs
@@ -89,6 +178,12 @@ class ServiceInstance(BaseModel):
         """
         if self.adopted:
             return self.url(host)
+        if behind_vpn:
+            # Sous `network_mode: service:gluetun`, le conteneur n'a plus de pile
+            # reseau propre : il perd son alias DNS. `http://qbittorrent:8080` ne
+            # resout plus, il faut viser gluetun, qui porte desormais sa place
+            # dans le reseau ET ses ports.
+            return f"http://gluetun:{spec.internal_port}"
         return f"http://{spec.id}:{spec.internal_port}"
 
 
@@ -118,8 +213,12 @@ class StackConfig(BaseModel):
 
     services: dict[str, ServiceInstance] = Field(default_factory=dict)
 
-    #: Desactive = avertissement explicite au recapitulatif (PROMPT.md sec. 11.1).
-    vpn_enabled: bool = False
+    vpn: VpnConfig = Field(default_factory=VpnConfig)
+
+    @property
+    def vpn_enabled(self) -> bool:
+        """Raccourci de lecture. Desactive = avertissement au recapitulatif."""
+        return self.vpn.enabled
 
     @field_validator("config_root", "data_root")
     @classmethod

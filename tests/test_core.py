@@ -120,18 +120,6 @@ def test_compose_is_valid_yaml_and_pins_images(tmp_path):
         assert ":" in block["image"]
 
 
-def test_vpn_moves_torrent_client_into_gluetun_network(tmp_path):
-    cfg = make_cfg(tmp_path)
-    cfg.vpn_enabled = True
-    block = compose.build_compose(cfg)["services"]["transmission"]
-    # Avec VPN, le client perd son reseau et ses ports publies.
-    assert block["network_mode"] == "service:gluetun"
-    assert "ports" not in block
-    assert "networks" not in block
-    # Les autres services ne bougent pas.
-    assert "ports" in compose.build_compose(cfg)["services"]["sonarr"]
-
-
 def test_env_contains_secrets_and_compose_does_not(tmp_path):
     cfg = make_cfg(tmp_path)
     env = compose.render_env(cfg)
@@ -416,3 +404,98 @@ def test_autobrr_step_appears_only_when_selected(tmp_path):
     }
     assert "autobrr/clients" not in without
     assert "autobrr/clients" in with_it
+
+
+# --------------------------------------------------------------------- Gluetun
+
+
+def _vpn(cfg, **kw):
+    from arrsenal.models import VpnConfig
+
+    defaults = {"enabled": True, "provider": "nordvpn", "wireguard_private_key": "cle="}
+    cfg.vpn = VpnConfig(**{**defaults, **kw})
+    return cfg
+
+
+def test_the_torrent_client_ports_move_to_gluetun(tmp_path):
+    """Un service en network_mode: service:X ne PEUT plus publier de port. Sans
+    ce transfert, l'interface du client devient injoignable en silence."""
+    cfg = _vpn(make_cfg(tmp_path, services=("sonarr", "qbittorrent")))
+    doc = compose.build_compose(cfg)
+    assert doc["services"]["gluetun"]["ports"] == ["8080:8080"]
+    assert "ports" not in doc["services"]["qbittorrent"]
+    assert doc["services"]["qbittorrent"]["network_mode"] == "service:gluetun"
+
+
+def test_services_outside_the_vpn_keep_their_ports(tmp_path):
+    cfg = _vpn(make_cfg(tmp_path, services=("sonarr", "qbittorrent")))
+    doc = compose.build_compose(cfg)
+    assert doc["services"]["sonarr"]["ports"] == ["8989:8989"]
+    assert "network_mode" not in doc["services"]["sonarr"]
+
+
+def test_gluetun_gets_what_a_tunnel_needs(tmp_path):
+    cfg = _vpn(make_cfg(tmp_path, services=("qbittorrent",)))
+    block = compose.build_compose(cfg)["services"]["gluetun"]
+    assert block["cap_add"] == ["NET_ADMIN"]
+    assert "/dev/net/tun:/dev/net/tun" in block["devices"]
+
+
+def test_the_client_waits_for_a_healthy_tunnel(tmp_path):
+    """L'image fournit son propre healthcheck : on attend une connexion VPN
+    reellement etablie, pas seulement un conteneur demarre."""
+    cfg = _vpn(make_cfg(tmp_path, services=("qbittorrent",)))
+    block = compose.build_compose(cfg)["services"]["qbittorrent"]
+    assert block["depends_on"] == {"gluetun": {"condition": "service_healthy"}}
+
+
+def test_no_gluetun_without_the_vpn(tmp_path):
+    assert "gluetun" not in compose.build_compose(make_cfg(tmp_path))["services"]
+
+
+def test_an_incomplete_vpn_refuses_to_generate(tmp_path):
+    """Mieux vaut refuser que produire un compose qui ne demarrera pas."""
+    cfg = _vpn(make_cfg(tmp_path, services=("qbittorrent",)), wireguard_private_key="")
+    with pytest.raises(ValueError, match="incomplet"):
+        compose.build_compose(cfg)
+
+
+def test_wireguard_and_openvpn_do_not_need_the_same_fields():
+    from arrsenal.models import VpnConfig
+
+    wg = VpnConfig(enabled=True, provider="mullvad", vpn_type="wireguard")
+    assert "WireGuard" in wg.missing()[0]
+    wg.wireguard_private_key = "cle="
+    assert wg.missing() == []
+
+    ovpn = VpnConfig(enabled=True, provider="mullvad", vpn_type="openvpn")
+    assert "OpenVPN" in ovpn.missing()[0]
+    ovpn.openvpn_user, ovpn.openvpn_password = "u", "p"
+    assert ovpn.missing() == []
+
+
+def test_an_unknown_provider_is_refused_with_the_list():
+    from arrsenal.models import VpnConfig
+
+    with pytest.raises(ValueError, match="nordvpn"):
+        VpnConfig(provider="fournisseur-invente")
+
+
+def test_the_provider_list_comes_from_gluetun():
+    """Obtenue de Gluetun v3.41.3 en lui passant un nom invalide : il repond avec
+    l'enumeration exacte."""
+    from arrsenal.models import VPN_PROVIDERS
+
+    for expected in ("nordvpn", "mullvad", "protonvpn", "surfshark", "custom"):
+        assert expected in VPN_PROVIDERS
+
+
+def test_a_vpn_bound_client_is_reached_through_gluetun(tmp_path):
+    """Sous network_mode: service:X, le conteneur perd son alias DNS. Verifie
+    contre Docker : seul le nom du conteneur VPN resout."""
+    from arrsenal.wiring import Wirer
+
+    cfg = _vpn(make_cfg(tmp_path, services=("sonarr", "qbittorrent")))
+    wirer = Wirer(cfg)
+    assert wirer.internal_url("qbittorrent") == "http://gluetun:8080"
+    assert wirer.internal_url("sonarr") == "http://sonarr:8989"
