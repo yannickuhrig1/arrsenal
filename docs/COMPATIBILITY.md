@@ -348,3 +348,22 @@ réussi prouve que les identifiants fonctionnent.
 
 Vérification menée contre un **faux serveur Torznab local**, jamais contre un vrai
 tracker.
+
+## Seerr remplace Jellyseerr et Overseerr — vérifié le 2026-08-31
+
+Signalé par un utilisateur, vérifié plutôt que supposé. Ce n'est pas un renommage mais
+une **fusion des deux projets**, annoncée le 10 février 2026.
+
+| | |
+|---|---|
+| Dépôt canonique | `seerr-team/seerr` — 12 440 étoiles, actif |
+| Image | `seerr/seerr`, dernière version stable **v3.4.1** (30/07/2026) |
+| `sct/overseerr` | **archivé**, dernier push le 15/02/2026 |
+| `fallenbagel/jellyseerr` | redirige (HTTP 301) vers `seerr-team/seerr` |
+
+Seerr couvre Jellyfin, Emby **et** Plex — les deux projets d'origine se partageaient
+ces cibles — et migre automatiquement les données au premier démarrage.
+
+Conséquence pour arrsenal : la feuille de route ne vise plus qu'un seul service de
+demandes utilisateurs. Prévoir la reprise d'une installation Jellyseerr ou Overseerr
+existante est inutile : Seerr le fait lui-même.

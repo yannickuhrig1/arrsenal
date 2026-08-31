@@ -263,7 +263,7 @@ Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié**. Baza
 une API, et rien n'a encore été vérifié.
 
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
-Suite prévue : Bazarr, SABnzbd, Plex, Jellyseerr, Audiobookshelf, Shelfmark, Shelfarr
+Suite prévue : Bazarr, SABnzbd, Plex, Seerr, Audiobookshelf, Shelfmark, Shelfarr
 — voir [PROMPT.md](PROMPT.md) pour la feuille de route.
 
 **Readarr n'est pas au programme** : le projet est archivé depuis le 27 juin 2025.

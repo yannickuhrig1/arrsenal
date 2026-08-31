@@ -76,8 +76,12 @@ vérifié réellement (lire les README, pas de mémoire), avant la phase 1.
 - **Audiobookshelf** (livres audio / podcasts)
 
 ### Demandes utilisateurs
-- **Jellyseerr** (Jellyfin/Emby/Plex)
-- **Overseerr** (Plex)
+- **Seerr** ([`seerr-team/seerr`](https://github.com/seerr-team/seerr)) — Jellyfin, Emby
+  et Plex. Image `seerr/seerr`.
+- ~~Jellyseerr~~ et ~~Overseerr~~ — **fusionnes dans Seerr le 10 fevrier 2026**, tous
+  deux deprecies. `sct/overseerr` est archive ; `fallenbagel/jellyseerr` redirige vers
+  `seerr-team/seerr`. Seerr migre automatiquement les donnees au premier demarrage.
+  Ne pas les inclure.
 
 ### Livres / audiobooks (remplaçants de Readarr)
 - **Shelfmark** — `calibrain/shelfmark`. Interface de recherche/demande de livres et
@@ -197,8 +201,8 @@ Pas de `sleep 30`.
 | Sonarr / Radarr / Lidarr | système de fichiers | dossier racine `/data/media/...` |
 | Sonarr / Radarr | Jellyfin / Plex / Emby | notification « rafraîchir la bibliothèque » |
 | Bazarr | Sonarr / Radarr | via son fichier de config (ip, port, apikey) |
-| Jellyseerr / Overseerr | Sonarr / Radarr | serveurs + profils qualité + dossiers |
-| Jellyseerr / Overseerr | Jellyfin / Plex | serveur média + bibliothèques |
+| Seerr | Sonarr / Radarr | serveurs + profils qualité + dossiers |
+| Seerr | Jellyfin / Plex | serveur média + bibliothèques |
 | Jellyfin | système de fichiers | création des bibliothèques via l'API de wizard |
 | Plex | système de fichiers | claim token + bibliothèques |
 | Audiobookshelf | système de fichiers | bibliothèques livres / podcasts |
@@ -329,7 +333,7 @@ Génération compose, pré-semis des clés, câblage complet, vérification. CLI
 
 **Phase 2 — Largeur**
 Lidarr, Bazarr, SABnzbd / NZBGet, Transmission / Deluge, Plex, Emby,
-Jellyseerr / Overseerr, Audiobookshelf, Shelfmark, Shelfarr.
+Seerr, Audiobookshelf, Shelfmark, Shelfarr.
 
 **Phase 3 — TUI Textual**
 Le wizard. Enregistrer le GIF de démo ici. C'est lui qui fait les étoiles.
