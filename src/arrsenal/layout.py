@@ -102,8 +102,8 @@ def detect_ids() -> tuple[int, int] | None:
 def resolve_ids(profile: PlatformProfile) -> tuple[int, int, str, bool]:
     """Determine PUID/PGID pour un profil.
 
-    Renvoie (uid, gid, explication, sur). `sur` est False quand on a du se rabattre
-    sur une valeur par defaut faute de detection : l'appelant doit alors avertir.
+    Renvoie (uid, gid, explication, sur). `sur` a False signifie "l'utilisateur doit
+    regarder cette valeur avant de continuer" : l'explication dit pourquoi.
     """
     defaults = PROFILE_DEFAULTS[profile]
     if not defaults.prefer_detection:
@@ -115,6 +115,18 @@ def resolve_ids(profile: PlatformProfile) -> tuple[int, int, str, bool]:
             defaults.puid,
             defaults.pgid,
             "valeur par defaut : detection impossible sur cette plateforme",
+            False,
+        )
+    if detected[0] == 0:
+        # Constate lors du premier essai sur Linux natif : `sudo arrsenal install`
+        # detecte 0:0 et fait tourner TOUTE la stack en root, en silence. Les
+        # medias telecharges appartiennent alors a root, et l'utilisateur ne peut
+        # plus y toucher sans sudo. On propose la valeur, on ne l'impose pas, mais
+        # on ne la laisse pas passer sans le dire.
+        return (
+            0,
+            detected[1],
+            "lance en root : conteneurs et medias appartiendront a root",
             False,
         )
     return detected[0], detected[1], f"detecte ({defaults.source})", True

@@ -225,14 +225,46 @@ service (`http://sonarr:8989`), il n'est donc pas affecté.
 Les collisions de **ports** restent possibles (8989 est un défaut très répandu) : le
 préflight les détecte et refuse avant toute écriture.
 
+## Linux natif — vérifié le 2026-08-31
+
+Toutes les campagnes précédentes tournaient sous Docker Desktop / WSL2, où les
+permissions sont plus permissives qu'un vrai serveur. Vérification faite sur un **LXC
+Proxmox Debian 12.2** (PVE 9.2.6), ext4, Docker 29.7.2.
+
+| | |
+|---|---|
+| Installation complète (5 services) | **11/11 liens établis**, tous validés par le bouton Test |
+| Second passage | aucune création, tout « déjà présent » |
+| Hardlink `/data/torrents/tv` → `/data/media/tv`, **depuis l'intérieur du conteneur Sonarr** | `stat -c %h` = **2** |
+
+Le hardlink est la preuve qui manquait : sous Windows, seul `os.link` côté hôte avait
+été testé. Ici c'est Sonarr lui-même, dans son conteneur, sur ext4, qui partage l'inode
+entre les téléchargements et la médiathèque. C'est exactement ce que le montage `/data`
+unique doit garantir.
+
+### Docker dans un LXC : `nesting=1` suffit
+
+Contrairement à ce qui est souvent écrit, `keyctl=1` n'a pas été nécessaire — et il
+n'est de toute façon pas réglable via un jeton d'API Proxmox, seulement en `root@pam`
+direct. Avec `nesting=1` seul, `docker run hello-world` et la stack complète
+fonctionnent.
+
+### Le bug que seul Linux pouvait révéler
+
+`sudo arrsenal install` détectait `0:0` et faisait tourner **toute la stack en root**,
+en silence. Les médias téléchargés appartiennent alors à root, et l'utilisateur ne peut
+plus y toucher sans `sudo`.
+
+`resolve_ids` signale désormais explicitement le cas root, au même titre qu'une
+détection impossible. La valeur reste proposée — c'est un choix légitime sur certains
+NAS — mais elle n'est plus silencieuse.
+
 ## Non vérifié à ce jour
 
 - Bazarr est **volontairement absent du catalogue** : sa configuration passe par un
   fichier YAML et non par une API, et rien n'a encore été vérifié. Le projet ne livre
   pas de service qu'il ne sait pas câbler.
 - Flood n'a pas encore été démarré dans une campagne de test.
-- Aucun test sur Linux natif : la campagne a tourné sous Docker Desktop / WSL2.
-  Le comportement des permissions y est plus permissif que sur un NAS réel.
 
 ## Indexeurs — constats vérifiés (Prowlarr 2.5.2)
 

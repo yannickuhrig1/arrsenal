@@ -97,9 +97,9 @@ def install(
 
     if not cfg.ids_certain:
         console.print(
-            f"[yellow]PUID/PGID non detectables ici : repli sur {cfg.puid}:{cfg.pgid}.\n"
-            f"Sur un NAS, lancez `id` et passez les vraies valeurs. Des identifiants "
-            f"faux font ecrire toute la stack avec de mauvaises permissions.[/yellow]"
+            f"[yellow]PUID/PGID {cfg.puid}:{cfg.pgid} - {cfg.ids_source}.[/yellow]\n"
+            f"[dim]Cette valeur decide de qui possede vos medias. Verifiez-la : sur un "
+            f"NAS, lancez `id` en tant que l'utilisateur voulu.[/dim]"
         )
 
     if not report.print_checks(orchestrator.preflight(cfg)):

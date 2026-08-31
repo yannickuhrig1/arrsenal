@@ -294,3 +294,31 @@ def test_compose_service_keys_stay_bare(tmp_path):
     cfg = make_cfg(tmp_path)
     cfg.project_name = "maison"
     assert "sonarr" in compose.build_compose(cfg)["services"]
+
+
+def test_running_as_root_is_flagged(monkeypatch):
+    """Constate sur Linux natif : `sudo arrsenal install` detecte 0:0 et faisait
+    tourner toute la stack en root sans le dire. Les medias telecharges
+    appartiennent alors a root et l'utilisateur ne peut plus y toucher."""
+    import os as _os
+
+    from arrsenal.layout import resolve_ids
+
+    monkeypatch.setattr(_os, "getuid", lambda: 0, raising=False)
+    monkeypatch.setattr(_os, "getgid", lambda: 0, raising=False)
+    uid, _gid, source, certain = resolve_ids(PlatformProfile.GENERIC_LINUX)
+    assert uid == 0
+    assert not certain
+    assert "root" in source
+
+
+def test_a_normal_user_is_not_flagged(monkeypatch):
+    import os as _os
+
+    from arrsenal.layout import resolve_ids
+
+    monkeypatch.setattr(_os, "getuid", lambda: 1000, raising=False)
+    monkeypatch.setattr(_os, "getgid", lambda: 1000, raising=False)
+    uid, gid, _source, certain = resolve_ids(PlatformProfile.GENERIC_LINUX)
+    assert (uid, gid) == (1000, 1000)
+    assert certain
