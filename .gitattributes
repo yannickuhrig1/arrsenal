@@ -1,0 +1,3 @@
+# Le depot cible des NAS et serveurs Linux : on normalise en LF cote depot,
+# quelle que soit la plateforme de developpement.
+* text=auto eol=lf

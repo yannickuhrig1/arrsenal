@@ -1,0 +1,156 @@
+"""Generation de docker-compose.yml et .env.
+
+Artefacts derives de StackConfig, jamais edites a la main.
+
+Le rendu du client torrent existe en DEUX formes (PROMPT.md sec. 11.1) : avec et
+sans VPN. Avec Gluetun le service perd son propre reseau et ses ports publies
+migrent vers le conteneur VPN. La bascule est prevue ici des le depart pour ne pas
+etre une rustine plus tard, meme si la Phase 1 n'expose que la forme sans VPN.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+
+from . import catalog
+from .models import Category, StackConfig
+
+NETWORK_NAME = "arrsenal"
+_HEADER = (
+    "# Genere par arrsenal - NE PAS EDITER A LA MAIN.\n"
+    "# Modifiez stack.yml puis relancez `arrsenal generate`.\n"
+)
+
+
+def _service_block(cfg: StackConfig, service_id: str) -> dict:
+    spec = catalog.get(service_id)
+    inst = cfg.services[service_id]
+
+    block: dict = {
+        "image": spec.image,
+        "container_name": spec.id,
+        "restart": "unless-stopped",
+        "environment": {
+            "PUID": str(cfg.puid),
+            "PGID": str(cfg.pgid),
+            "TZ": cfg.timezone,
+            "UMASK": cfg.umask,
+        },
+        "volumes": [
+            f"${{CONFIG_ROOT}}/{spec.config_dir}:/config",
+            "${DATA_ROOT}:/data",
+        ],
+        "networks": [NETWORK_NAME],
+    }
+
+    if service_id == "flood":
+        # Flood n'est pas une image LinuxServer : pas de PUID/PGID/UMASK, et il lui
+        # faut l'URL du RPC Transmission. Il ne touche pas /config de la meme facon.
+        tr = catalog.get("transmission")
+        tr_inst = cfg.services["transmission"]
+        block["environment"] = {"HOME": "/config", "TZ": cfg.timezone}
+        block["command"] = [
+            "--port=3000",
+            "--host=0.0.0.0",
+            "--auth=none",
+            "--trurl",
+            f"http://{tr.id}:{tr.internal_port}/transmission/rpc",
+            "--truser",
+            tr_inst.username or "",
+            "--trpass",
+            tr_inst.password or "",
+        ]
+        block["depends_on"] = ["transmission"]
+
+    torrent_client = spec.category is Category.DOWNLOAD
+    if cfg.vpn_enabled and torrent_client:
+        # Forme VPN : le client perd son reseau et ses ports. Gluetun les porte.
+        block.pop("networks", None)
+        block["network_mode"] = "service:gluetun"
+        block["depends_on"] = {"gluetun": {"condition": "service_healthy"}}
+    else:
+        block["ports"] = [f"{inst.host_port}:{spec.internal_port}"]
+
+    return block
+
+
+def build_compose(cfg: StackConfig) -> dict:
+    services = {
+        sid: _service_block(cfg, sid)
+        for sid in catalog.STARTUP_ORDER
+        if cfg.enabled(sid)
+    }
+    if not services:
+        raise ValueError("aucun service selectionne")
+    return {
+        "name": cfg.project_name,
+        "services": services,
+        "networks": {NETWORK_NAME: {"driver": "bridge"}},
+    }
+
+
+def render_compose(cfg: StackConfig) -> str:
+    return _HEADER + yaml.safe_dump(
+        build_compose(cfg), sort_keys=False, default_flow_style=False, width=100
+    )
+
+
+def render_env(cfg: StackConfig) -> str:
+    lines = [
+        "# Genere par arrsenal. Contient des secrets : ne JAMAIS commiter.",
+        f"COMPOSE_PROJECT_NAME={cfg.project_name}",
+        f"CONFIG_ROOT={cfg.config_root}",
+        f"DATA_ROOT={cfg.data_root}",
+        f"PUID={cfg.puid}",
+        f"PGID={cfg.pgid}",
+        f"TZ={cfg.timezone}",
+        f"UMASK={cfg.umask}",
+        "",
+        "# Cles API pre-semees - utilisees par le cablage automatique.",
+    ]
+    for sid in catalog.STARTUP_ORDER:
+        inst = cfg.services.get(sid)
+        if inst is None:
+            continue
+        up = sid.upper()
+        if inst.api_key:
+            lines.append(f"{up}_API_KEY={inst.api_key}")
+        if inst.username:
+            lines.append(f"{up}_USER={inst.username}")
+        if inst.password:
+            lines.append(f"{up}_PASS={inst.password}")
+    return "\n".join(lines) + "\n"
+
+
+def write_artifacts(cfg: StackConfig, target_dir: Path) -> list[Path]:
+    """Ecrit docker-compose.yml, .env et stack.yml. Renvoie les chemins ecrits."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    compose_path = target_dir / "docker-compose.yml"
+    compose_path.write_text(render_compose(cfg), encoding="utf-8")
+    written.append(compose_path)
+
+    env_path = target_dir / ".env"
+    env_path.write_text(render_env(cfg), encoding="utf-8")
+    _restrict(env_path)
+    written.append(env_path)
+
+    stack_path = target_dir / "stack.yml"
+    stack_path.write_text(
+        _HEADER.replace("docker-compose.yml", "stack.yml")
+        + yaml.safe_dump(cfg.model_dump(mode="json"), sort_keys=False),
+        encoding="utf-8",
+    )
+    written.append(stack_path)
+    return written
+
+
+def _restrict(path: Path) -> None:
+    """chmod 600. Sans effet utile sur Windows, silencieux plutot que bruyant."""
+    try:
+        path.chmod(0o600)
+    except (OSError, NotImplementedError):
+        pass

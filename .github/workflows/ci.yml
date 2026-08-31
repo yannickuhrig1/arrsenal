@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Tests unitaires
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: pytest -q
+
+  integration:
+    name: Cablage reel (Prowlarr + Sonarr + Radarr + Transmission + Jellyfin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "."
+
+      - name: Installation complete
+        run: |
+          sudo mkdir -p /srv/data /opt/arrsenal/config
+          sudo chown -R "$(id -u):$(id -g)" /srv/data /opt/arrsenal
+          arrsenal install --yes \
+            --data-root /srv/data \
+            --config-root /opt/arrsenal/config \
+            --project-dir "$RUNNER_TEMP/stack"
+
+      - name: Idempotence - le second passage ne doit rien creer
+        run: |
+          arrsenal wire --project-dir "$RUNNER_TEMP/stack" | tee /tmp/second.log
+          if grep -q "cree (id=" /tmp/second.log; then
+            echo "ECHEC : le second passage a cree des ressources, le cablage n'est pas idempotent"
+            exit 1
+          fi
+
+      - name: Journaux en cas d'echec
+        if: failure()
+        run: docker compose -p arrsenal -f "$RUNNER_TEMP/stack/docker-compose.yml" logs --tail 100
