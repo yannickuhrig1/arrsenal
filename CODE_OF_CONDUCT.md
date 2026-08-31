@@ -28,9 +28,8 @@ protege le projet et ses utilisateurs. Voir [DISCLAIMER.md](DISCLAIMER.md).
 
 ## Signaler
 
-Ecrivez aux mainteneurs a l'adresse indiquee dans le profil du depot, ou ouvrez une
-issue si le sujet peut etre traite publiquement. Les signalements sont traites de facon
-confidentielle.
+Ecrivez a **yannick.uhrig@gmail.com**, ou ouvrez une issue si le sujet peut etre traite
+publiquement. Les signalements sont traites de facon confidentielle.
 
 Les mainteneurs peuvent editer, masquer ou supprimer les contributions qui ne respectent
 pas ce document, et expliqueront leur decision quand c'est possible.
