@@ -1,0 +1,58 @@
+name: Bug
+description: Quelque chose ne marche pas comme annonce
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci. La sortie de `arrsenal doctor` repond a la moitie des questions
+        ci-dessous : lancez-la d'abord, ca ira plus vite pour tout le monde.
+
+        **Ne collez aucune cle API ni mot de passe.** `arrsenal doctor` ne les
+        affiche pas, mais `.env` et la page d'acces en contiennent.
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que vous attendiez, et ce qui s'est passe
+      placeholder: |
+        J'attendais que Sonarr soit rattache a qBittorrent.
+        Le rapport affiche "test de connexion echoue".
+    validations:
+      required: true
+  - type: textarea
+    id: commande
+    attributes:
+      label: La commande exacte
+      render: shell
+      placeholder: arrsenal install --services sonarr,qbittorrent --data-root /srv/data
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Sortie de `arrsenal doctor`
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: plateforme
+    attributes:
+      label: Plateforme
+      placeholder: Unraid 7.0 / Debian 12 / Synology DSM 7.2 / Docker Desktop Windows
+    validations:
+      required: true
+  - type: input
+    id: docker
+    attributes:
+      label: Versions Docker
+      description: "Sortie de `docker --version` et `docker compose version --short`"
+    validations:
+      required: true
+  - type: checkboxes
+    id: verifs
+    attributes:
+      label: Avant d'envoyer
+      options:
+        - label: Aucune cle API ni mot de passe dans ce rapport
+          required: true
+        - label: Le preflight signalait-il quelque chose ? Si oui, c'est dans la sortie ci-dessus

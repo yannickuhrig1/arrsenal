@@ -1,0 +1,52 @@
+name: Ajouter un service
+description: Proposer un service pour le catalogue
+labels: ["service"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Le catalogue s'etend, mais chaque service ajoute une surface a maintenir et a
+        verifier. Ces questions servent a estimer le cout reel, pas a decourager.
+  - type: input
+    id: nom
+    attributes:
+      label: Nom du service
+    validations:
+      required: true
+  - type: input
+    id: image
+    attributes:
+      label: Image Docker et tag stable
+      description: "Tag EPINGLE, jamais `latest` : un tag flottant rend le cablage non reproductible."
+      placeholder: lscr.io/linuxserver/bazarr:1.6.0
+    validations:
+      required: true
+  - type: textarea
+    id: cablage
+    attributes:
+      label: A quoi doit-il etre cable ?
+      placeholder: |
+        Bazarr -> Sonarr et Radarr (adresse, port, cle API)
+        Bazarr -> systeme de fichiers (dossiers de sous-titres)
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Comment se configure-t-il ?
+      description: |
+        API REST ? Fichier de configuration ? Assistant de premier demarrage ?
+        Si vous connaissez les endpoints, donnez-les : c'est le point le plus couteux
+        a decouvrir.
+    validations:
+      required: true
+  - type: dropdown
+    id: preseme
+    attributes:
+      label: Sa configuration peut-elle etre pre-semee avant le premier demarrage ?
+      options:
+        - "Oui, verifie"
+        - "Non, il faut passer par son API apres demarrage"
+        - "Je ne sais pas"
+    validations:
+      required: true

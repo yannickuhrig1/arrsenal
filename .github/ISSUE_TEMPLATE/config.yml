@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question sur la configuration des *arr elles-memes
+    url: https://wiki.servarr.com/
+    about: Le wiki Servarr couvre le fonctionnement de Sonarr, Radarr et Prowlarr.
+  - name: Profils de qualite et custom formats
+    url: https://trash-guides.info/
+    about: Les TRaSH Guides sont la reference. arrsenal vise a les appliquer, pas a les remplacer.

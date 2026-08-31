@@ -258,6 +258,16 @@ Vérifiez contre la doc officielle ou contre une instance réelle. Quand ce n'es
 vérifiable, marquez `TODO(verify)` plutôt que d'écrire du code plausible mais faux.
 La fiabilité du câblage est la seule raison d'être de ce projet.
 
+Pendant la seule phase 1, cinq hypothèses parfaitement raisonnables se sont révélées
+fausses au premier contact avec un vrai conteneur. Elles sont toutes consignées, avec
+leurs codes HTTP, dans [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) — c'est le
+document le plus utile du dépôt.
+
+Le reste est dans [CONTRIBUTING.md](CONTRIBUTING.md) : mise en place, découpage du code,
+comment ajouter un service. Et [docs/PRIOR-ART.md](docs/PRIOR-ART.md) explique où
+`arrsenal` se situe par rapport à DockSTARTer, Saltbox et Recyclarr, et pourquoi il ne
+cherche pas à les remplacer.
+
 ## Remerciements
 
 [TRaSH Guides](https://trash-guides.info/), [Servarr](https://wiki.servarr.com/) et
