@@ -59,15 +59,18 @@ async def test_summary_counts_the_links_that_will_be_wired(app):
 
 
 @pytest.mark.asyncio
-async def test_checking_flood_pulls_in_transmission(app):
-    """La dependance est resolue et ANNONCEE, pas silencieuse."""
+async def test_checking_flood_pulls_in_a_download_client(app):
+    """La dependance est resolue et ANNONCEE, pas silencieuse.
+
+    Flood pilote qBittorrent OU Transmission : seul le premier est ajoute."""
     async with app.run_test() as pilot:
         screen = await _goto_services(pilot)
         for box in screen.query(Checkbox):
             box.value = box.id == "svc-flood"
         await pilot.pause()
         text = str(screen.query_one("#selection-summary", Static).content)
-        assert "Transmission" in text
+        assert "qBittorrent" in text
+        assert "Transmission" not in text
         assert "prerequis" in text
 
 

@@ -24,6 +24,45 @@ _HEADER = (
 )
 
 
+def _flood_block(cfg: StackConfig) -> dict:
+    """Options de Flood, selon le client de telechargement present.
+
+    Flood n'est pas une image LinuxServer : ni PUID/PGID, ni UMASK. Il se
+    configure entierement par ligne de commande.
+
+    Les options ont ete relevees sur `flood --help` de l'image 4.16.1, pas
+    supposees : `--qburl/--qbuser/--qbpass` pour qBittorrent,
+    `--trurl/--truser/--trpass` pour Transmission.
+
+    Quand les deux clients sont installes, qBittorrent gagne : son API est plus
+    riche et Flood n'en pilote qu'un a la fois.
+    """
+    block: dict = {
+        "environment": {"HOME": "/config", "TZ": cfg.timezone},
+        "command": ["--port=3000", "--host=0.0.0.0", "--auth=none"],
+    }
+    for client_id, options in (
+        ("qbittorrent", ("--qburl", "--qbuser", "--qbpass")),
+        ("transmission", ("--trurl", "--truser", "--trpass")),
+    ):
+        if not cfg.enabled(client_id):
+            continue
+        spec, inst = catalog.get(client_id), cfg.services[client_id]
+        base = f"http://{spec.id}:{spec.internal_port}"
+        url_option, user_option, pass_option = options
+        block["command"] += [
+            url_option,
+            base if client_id == "qbittorrent" else f"{base}/transmission/rpc",
+            user_option,
+            inst.username or "",
+            pass_option,
+            inst.password or "",
+        ]
+        block["depends_on"] = [client_id]
+        break
+    return block
+
+
 def _service_block(cfg: StackConfig, service_id: str) -> dict:
     spec = catalog.get(service_id)
     inst = cfg.services[service_id]
@@ -52,23 +91,7 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
     }
 
     if service_id == "flood":
-        # Flood n'est pas une image LinuxServer : pas de PUID/PGID/UMASK, et il lui
-        # faut l'URL du RPC Transmission. Il ne touche pas /config de la meme facon.
-        tr = catalog.get("transmission")
-        tr_inst = cfg.services["transmission"]
-        block["environment"] = {"HOME": "/config", "TZ": cfg.timezone}
-        block["command"] = [
-            "--port=3000",
-            "--host=0.0.0.0",
-            "--auth=none",
-            "--trurl",
-            f"http://{tr.id}:{tr.internal_port}/transmission/rpc",
-            "--truser",
-            tr_inst.username or "",
-            "--trpass",
-            tr_inst.password or "",
-        ]
-        block["depends_on"] = ["transmission"]
+        block.update(_flood_block(cfg))
 
     torrent_client = spec.category is Category.DOWNLOAD
     if cfg.vpn_enabled and torrent_client:

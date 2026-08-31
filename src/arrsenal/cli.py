@@ -12,7 +12,7 @@ from pathlib import Path
 import typer
 import yaml
 
-from . import catalog, compose, dashboard, indexers_cli, orchestrator, report
+from . import admin, catalog, compose, dashboard, indexers_cli, orchestrator, report
 from .clients.arr import ArrClient
 from .models import PlatformProfile, StackConfig
 from .orchestrator import InstallAborted, Progress
@@ -165,6 +165,48 @@ def wire(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.y
     compose.write_artifacts(cfg, project_dir)
     report.print_final(cfg, results)
     raise typer.Exit(0 if all(r.ok for r in results) else 2)
+
+
+@app.command()
+def serve(
+    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
+    host: str = typer.Option("127.0.0.1", help="Adresse d'ecoute."),
+    port: int = typer.Option(7373, help="Port d'ecoute."),
+    open_page: bool = typer.Option(True, "--open/--no-open", help="Ouvrir le navigateur."),
+) -> None:
+    """Page d'administration : etat des services, demarrer / arreter / redemarrer.
+
+    Ecoute sur 127.0.0.1 par defaut. L'acces exige un jeton tire au hasard a
+    chaque demarrage : il est dans l'URL affichee ci-dessous.
+    """
+    cfg = _load_config(project_dir)
+    token = admin.generate_token()
+
+    if host not in ("127.0.0.1", "localhost"):
+        console.print(
+            f"[yellow]Ecoute sur {host} : la page sera joignable depuis le reseau.[/yellow]\n"
+            f"[dim]Elle permet d'arreter vos services et affiche vos identifiants. "
+            f"Le jeton est la seule protection ; ne partagez pas l'URL.[/dim]"
+        )
+
+    def ready(url: str, _token: str) -> None:
+        console.print(f"\nAdministration : [bold]{url}[/bold]")
+        console.print("[dim]Le jeton change a chaque demarrage. Ctrl+C pour arreter.[/dim]")
+        if open_page:
+            import webbrowser
+
+            try:
+                webbrowser.open(url)
+            except Exception:  # noqa: BLE001
+                # Pas de navigateur ici : cas normal sur un NAS. L'URL est affichee.
+                console.print("[dim]Aucun navigateur : ouvrez l'URL ci-dessus.[/dim]")
+
+    try:
+        admin.serve(cfg, project_dir, host=host, port=port, token=token, on_ready=ready)
+    except OSError as exc:
+        console.print(f"[red]Impossible d'ecouter sur {host}:{port} : {exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print("Serveur arrete.")
 
 
 @app.command()

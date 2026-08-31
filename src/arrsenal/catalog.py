@@ -111,9 +111,12 @@ CATALOG: dict[str, ServiceSpec] = {
         internal_port=3000,
         default_host_port=3001,
         config_dir="flood",
-        requires=("transmission",),
+        #: Flood pilote qBittorrent OU Transmission. `requires` ne sait exprimer
+        #: qu'un ET : l'alternative est verifiee par `missing_requirements`.
+        requires=(),
+        requires_one_of=("qbittorrent", "transmission"),
         api_family=None,
-        notes="UI web pour Transmission. N'est pas un client.",
+        notes="UI web pour qBittorrent ou Transmission. N'est pas un client.",
     ),
 }
 
@@ -149,14 +152,23 @@ def get(service_id: str) -> ServiceSpec:
 
 
 def resolve_dependencies(selection: list[str]) -> list[str]:
-    """Ajoute les prerequis manquants et renvoie la selection dans l'ordre de demarrage."""
+    """Ajoute les prerequis manquants et renvoie la selection dans l'ordre de demarrage.
+
+    Pour un service qui accepte plusieurs backends (`requires_one_of`), on n'ajoute
+    le premier de la liste que si AUCUN n'est deja selectionne : cocher Flood a cote
+    de qBittorrent ne doit pas tirer Transmission en plus.
+    """
     wanted = set(selection)
     changed = True
     while changed:
         changed = False
         for sid in list(wanted):
-            for dep in get(sid).requires:
+            spec = get(sid)
+            for dep in spec.requires:
                 if dep not in wanted:
                     wanted.add(dep)
                     changed = True
+            if spec.requires_one_of and not (set(spec.requires_one_of) & wanted):
+                wanted.add(spec.requires_one_of[0])
+                changed = True
     return [sid for sid in STARTUP_ORDER if sid in wanted]

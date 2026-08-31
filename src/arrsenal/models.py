@@ -37,8 +37,11 @@ class ServiceSpec(BaseModel):
     default_host_port: int
     #: Sous-dossier sous CONFIG_ROOT. None = le service n'a pas de config persistante.
     config_dir: str | None = None
-    #: Services requis pour que celui-ci ait un sens.
+    #: Services requis pour que celui-ci ait un sens. Tous obligatoires.
     requires: tuple[str, ...] = ()
+    #: Au moins UN de ces services est necessaire. Sert aux interfaces qui
+    #: acceptent plusieurs backends, comme Flood.
+    requires_one_of: tuple[str, ...] = ()
     #: Famille d'API, pilote le cablage. Voir wiring.py.
     api_family: str | None = None
     #: Version d'API des *arr : v3 pour Sonarr/Radarr, v1 pour Prowlarr.

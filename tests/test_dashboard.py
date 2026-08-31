@@ -184,3 +184,10 @@ def test_page_is_a_standalone_document(marker):
     assert marker in page
     assert "http://cdn" not in page
     assert "https://" not in page.split("<style>")[0]
+
+
+def test_no_vpn_warning_without_a_download_client():
+    """Sans client torrent il n'y a pas de trafic BitTorrent : l'avertissement
+    serait du bruit, et le bruit fait ignorer les vrais avertissements."""
+    assert "Aucun VPN" not in dashboard.render(make(services=("sonarr", "jellyfin")))
+    assert "Aucun VPN" in dashboard.render(make(services=("sonarr", "qbittorrent")))

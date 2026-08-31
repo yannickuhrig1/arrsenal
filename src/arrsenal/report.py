@@ -58,7 +58,7 @@ def print_summary(cfg: StackConfig) -> None:
         )
     )
 
-    if not cfg.vpn_enabled:
+    if not cfg.vpn_enabled and any(cfg.enabled(s) for s in catalog.DOWNLOAD_CLIENTS):
         console.print(
             Panel(
                 "Aucun VPN n'est configure pour le client torrent.\n"

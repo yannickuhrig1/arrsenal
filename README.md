@@ -116,6 +116,7 @@ Autres commandes :
 ```bash
 arrsenal             # assistant interactif
 arrsenal list        # catalogue des services
+arrsenal serve       # page d'administration : etat, demarrer / arreter
 arrsenal indexers    # chercher et ajouter vos indexeurs
 arrsenal wire        # rejoue le câblage sur une stack déjà démarrée
 arrsenal doctor      # diagnostique une installation existante
@@ -159,6 +160,24 @@ Trois détails qui comptent :
   d'installation ; c'est écrit sur la page plutôt que découvert par un lien mort.
 
 `--no-open` génère la page sans ouvrir le navigateur.
+
+### Piloter les services
+
+```bash
+arrsenal serve
+```
+
+La même page, mais **servie** : état de chaque service en direct, et des boutons pour
+démarrer, arrêter ou redémarrer. Le fichier statique ne peut pas faire ça — un HTML
+n'exécute rien, il faut un serveur.
+
+Une page capable d'arrêter vos conteneurs mérite d'être prise au sérieux :
+
+- **écoute sur `127.0.0.1`** par défaut ; `--host` pour l'exposer, avec un avertissement ;
+- **un jeton aléatoire par démarrage**, jamais écrit sur disque, transmis par l'URL puis
+  gardé en cookie `HttpOnly` ; comparaison à temps constant ;
+- **listes fermées** : le nom de service est validé contre votre configuration et
+  l'action contre trois valeurs, avant d'atteindre une ligne de commande.
 
 ---
 

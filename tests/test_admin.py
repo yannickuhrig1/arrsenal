@@ -1,0 +1,238 @@
+"""Tests du serveur d'administration.
+
+Le serveur est reellement demarre, sur un port ephemere de la boucle locale, mais
+Docker n'est jamais appele : `Compose` est remplace par un double. Une page
+capable d'arreter des conteneurs merite d'etre testee sur ses refus autant que
+sur ses succes.
+"""
+
+from __future__ import annotations
+
+import json
+import threading
+import urllib.error
+import urllib.request
+
+import pytest
+
+from arrsenal import admin, orchestrator
+from arrsenal.models import PlatformProfile
+
+TOKEN = "jeton-de-test"
+
+
+class FakeCompose:
+    """Double de Compose : enregistre les appels, ne lance jamais Docker."""
+
+    def __init__(self, running=("sonarr",)):
+        self.running = set(running)
+        self.calls: list[tuple[str, str]] = []
+
+    def ps_json(self):
+        return [
+            {
+                "Service": name,
+                "State": "running" if name in self.running else "exited",
+                "Status": "Up 3 minutes" if name in self.running else "Exited (0)",
+                "Health": "",
+            }
+            for name in ("sonarr", "prowlarr")
+        ]
+
+    def control(self, action, service):
+        self.calls.append((action, service))
+        return True, f"{action} {service}"
+
+
+@pytest.fixture
+def cfg():
+    return orchestrator.build_config(
+        services=["prowlarr", "sonarr", "qbittorrent"],
+        data_root="/srv/data",
+        config_root="/opt/c",
+        platform=PlatformProfile.GENERIC_LINUX,
+    )
+
+
+@pytest.fixture
+def server(cfg, tmp_path):
+    fake = FakeCompose()
+    srv = admin.build_server(cfg, tmp_path, host="127.0.0.1", port=0, token=TOKEN)
+    srv.RequestHandlerClass.compose = fake
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    yield base, fake
+    srv.shutdown()
+    srv.server_close()
+
+
+def call(url, *, token=TOKEN, method="GET", payload=None, cookie=False):
+    if token and not cookie:
+        url += ("&" if "?" in url else "?") + f"t={token}"
+    data = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    if data:
+        req.add_header("Content-Type", "application/json")
+    if cookie and token:
+        req.add_header("Cookie", f"{admin.COOKIE}={token}")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status, resp.read().decode(), resp.headers
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode(), exc.headers
+
+
+# ------------------------------------------------------------- authentification
+
+
+def test_without_a_token_nothing_is_served(server):
+    base, _ = server
+    for url, method in (("/", "GET"), ("/api/status", "GET"), ("/api/action", "POST")):
+        status, _body, _h = call(base + url, token=None, method=method, payload={} if method == "POST" else None)
+        assert status == 401, url
+
+
+def test_a_wrong_token_is_refused(server):
+    base, _ = server
+    status, _b, _h = call(base + "/api/status", token="pas-le-bon")
+    assert status == 401
+
+
+def test_a_wrong_token_cannot_act(server):
+    """Le point le plus important : un inconnu ne doit pas pouvoir arreter un service."""
+    base, fake = server
+    status, _b, _h = call(
+        base + "/api/action",
+        token="pas-le-bon",
+        method="POST",
+        payload={"service": "sonarr", "action": "stop"},
+    )
+    assert status == 401
+    assert fake.calls == []
+
+
+def test_the_token_can_arrive_by_cookie(server):
+    base, _ = server
+    status, _b, _h = call(base + "/api/status", cookie=True)
+    assert status == 200
+
+
+def test_loading_the_page_sets_an_httponly_cookie(server):
+    """Sans cela, le jeton resterait dans l'URL a chaque appel."""
+    base, _ = server
+    status, _body, headers = call(base + "/")
+    assert status == 200
+    cookie = headers.get("Set-Cookie", "")
+    assert admin.COOKIE in cookie
+    assert "HttpOnly" in cookie
+    assert "SameSite=Strict" in cookie
+
+
+def test_tokens_are_not_predictable():
+    tokens = {admin.generate_token() for _ in range(50)}
+    assert len(tokens) == 50
+    assert all(len(t) >= 24 for t in tokens)
+
+
+# -------------------------------------------------------------------- etat
+
+
+def test_status_lists_every_selected_service(server, cfg):
+    base, _ = server
+    _s, body, _h = call(base + "/api/status")
+    ids = {s["id"] for s in json.loads(body)["services"]}
+    assert ids == set(cfg.services)
+
+
+def test_a_service_docker_does_not_know_is_shown_as_absent(server):
+    """qBittorrent est selectionne mais absent du double : il doit apparaitre
+    quand meme, sinon l'utilisateur ne comprend pas qu'il manque."""
+    base, _ = server
+    _s, body, _h = call(base + "/api/status")
+    services = {s["id"]: s for s in json.loads(body)["services"]}
+    assert services["qbittorrent"]["state"] == "absent"
+    assert services["qbittorrent"]["up"] is False
+
+
+def test_running_state_is_reported(server):
+    base, _ = server
+    _s, body, _h = call(base + "/api/status")
+    services = {s["id"]: s for s in json.loads(body)["services"]}
+    assert services["sonarr"]["up"] is True
+    assert services["prowlarr"]["up"] is False
+
+
+# ------------------------------------------------------------------- actions
+
+
+@pytest.mark.parametrize("action", ["start", "stop", "restart"])
+def test_the_three_actions_reach_compose(server, action):
+    base, fake = server
+    status, _b, _h = call(
+        base + "/api/action", method="POST", payload={"service": "sonarr", "action": action}
+    )
+    assert status == 200
+    assert fake.calls == [(action, "sonarr")]
+
+
+def test_an_unknown_action_is_refused_before_reaching_the_shell(server):
+    base, fake = server
+    status, body, _h = call(
+        base + "/api/action", method="POST", payload={"service": "sonarr", "action": "rm -rf /"}
+    )
+    assert status == 400
+    assert "refusee" in body
+    assert fake.calls == []
+
+
+def test_a_service_outside_the_config_is_refused(server):
+    """Le nom de service finit dans une ligne de commande : il doit venir de la
+    configuration, jamais du client."""
+    base, fake = server
+    for name in ("jellyfin", "; rm -rf /", "../../etc", ""):
+        status, _b, _h = call(
+            base + "/api/action", method="POST", payload={"service": name, "action": "stop"}
+        )
+        assert status == 400, name
+    assert fake.calls == []
+
+
+def test_malformed_json_does_not_crash_the_server(server):
+    base, fake = server
+    req = urllib.request.Request(
+        base + f"/api/action?t={TOKEN}", data=b"{pas du json", method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            status = resp.status
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+    assert status == 400
+    assert fake.calls == []
+    # Le serveur repond toujours apres coup.
+    assert call(base + "/api/status")[0] == 200
+
+
+def test_an_unknown_route_is_a_404_not_a_crash(server):
+    base, _ = server
+    assert call(base + "/api/inconnu")[0] == 404
+
+
+# ---------------------------------------------------------- page servie
+
+
+def test_the_served_page_carries_the_controls(server):
+    base, _ = server
+    _s, body, _h = call(base + "/")
+    assert 'data-action="stop"' in body
+    assert "rafraichir" in body
+
+
+def test_compose_control_refuses_an_action_outside_the_list(tmp_path):
+    """Deuxieme barriere, cote runner : meme appele directement, `control` ne
+    laisse pas passer autre chose que start/stop/restart."""
+    from arrsenal.runner import Compose
+
+    with pytest.raises(ValueError, match="non autorisee"):
+        Compose(tmp_path, "test").control("down", "sonarr")

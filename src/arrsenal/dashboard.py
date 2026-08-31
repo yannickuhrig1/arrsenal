@@ -81,7 +81,18 @@ def _secret(value: str | None, label: str) -> str:
     )
 
 
-def _cards(cfg: StackConfig, host: str) -> str:
+_CONTROLS = """        <div class="state" data-service="{sid}">
+          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="actions">
+            <button class="act" data-service="{sid}" data-action="start">demarrer</button>
+            <button class="act" data-service="{sid}" data-action="restart">redemarrer</button>
+            <button class="act danger" data-service="{sid}" data-action="stop">arreter</button>
+          </span>
+        </div>
+"""
+
+
+def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
     blocks = []
     for sid in catalog.STARTUP_ORDER:
         if not cfg.enabled(sid):
@@ -105,6 +116,7 @@ def _cards(cfg: StackConfig, host: str) -> str:
                 f'<div class="row"><span class="k">Cle API</span>'
                 f'<span class="v">{_secret(inst.api_key, "la cle API")}</span></div>'
             )
+        controls = _CONTROLS.format(sid=spec.id) if live else ""
         blocks.append(
             f"""      <article class="card" style="--accent:{accent}">
         <a class="title" href="{url}" target="_blank" rel="noopener">
@@ -115,10 +127,14 @@ def _cards(cfg: StackConfig, host: str) -> str:
           </span>
         </a>
         <p class="note">{html.escape(spec.notes)}</p>
-        <div class="creds">{rows}</div>
+{controls}        <div class="creds">{rows}</div>
       </article>"""
         )
     return "\n".join(blocks)
+
+
+def _has_download_client(cfg: StackConfig) -> bool:
+    return any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS)
 
 
 def _paths(cfg: StackConfig) -> str:
@@ -144,7 +160,14 @@ def _paths(cfg: StackConfig) -> str:
     return rows
 
 
-def render(cfg: StackConfig, *, failed: int = 0) -> str:
+def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
+    """Rend la page.
+
+    `live=False` produit le fichier statique ecrit apres l'installation.
+    `live=True` ajoute l'etat des services et les boutons de controle ; cette
+    forme n'est servie que par `arrsenal serve`, qui apporte le serveur capable
+    de repondre aux appels.
+    """
     host, host_note = resolve_host(cfg)
     generated = datetime.now().astimezone().strftime("%d/%m/%Y a %H:%M")
     count = sum(1 for sid in catalog.STARTUP_ORDER if cfg.enabled(sid))
@@ -157,7 +180,7 @@ def render(cfg: StackConfig, *, failed: int = 0) -> str:
         )
     if host_note:
         banner += f'<div class="banner info">{html.escape(host_note)}</div>'
-    if not cfg.vpn_enabled:
+    if not cfg.vpn_enabled and _has_download_client(cfg):
         banner += (
             '<div class="banner warn"><strong>Aucun VPN.</strong> Le trafic BitTorrent '
             "sort sur l'adresse IP publique de cette machine.</div>"
@@ -169,13 +192,22 @@ def render(cfg: StackConfig, *, failed: int = 0) -> str:
             "</div>"
         )
 
+    if not live:
+        banner += (
+            "<div class=\"banner info\">Cette page est un fichier fige. Pour voir l'etat "
+            "des services et les demarrer ou les arreter, lancez "
+            "<code>arrsenal serve</code>.</div>"
+        )
+
     return _TEMPLATE.format(
         generated=generated,
         count=count,
-        cards=_cards(cfg, host),
+        cards=_cards(cfg, host, live=live),
         paths=_paths(cfg),
         banner=banner,
         data_root=html.escape(cfg.data_root),
+        live_script=_LIVE_SCRIPT if live else "",
+        title="Administration" if live else "Acces",
     )
 
 
@@ -208,7 +240,7 @@ _TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Acces a votre stack media</title>
+<title>{title} — stack media</title>
 <style>
   :root {{
     --bg: #f6f7f9; --panel: #fff; --text: #16181d; --muted: #6b7280;
@@ -278,6 +310,22 @@ _TEMPLATE = """<!doctype html>
             border-top: 1px solid var(--line); padding-top: 1.2rem; }}
   code {{ font-family: ui-monospace, monospace; background: var(--bg);
           padding: .1rem .35rem; border-radius: 4px; }}
+  .state {{ display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
+            margin: .6rem 0 .2rem; font-size: .84rem; }}
+  .dot {{ width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; flex: none; }}
+  .dot.up {{ background: #22c55e; }}
+  .dot.down {{ background: #ef4444; }}
+  .dot.busy {{ background: #f59e0b; }}
+  .state .label {{ color: var(--muted); }}
+  .state .actions {{ margin-left: auto; display: flex; gap: .3rem; }}
+  button.act {{
+    font: inherit; font-size: .75rem; padding: .15rem .5rem; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 5px;
+  }}
+  button.act:hover:not(:disabled) {{ color: var(--text); border-color: var(--accent); }}
+  button.act.danger:hover:not(:disabled) {{ color: #ef4444; border-color: #ef4444; }}
+  button.act:disabled {{ opacity: .4; cursor: not-allowed; }}
 </style>
 </head>
 <body>
@@ -335,6 +383,59 @@ _TEMPLATE = """<!doctype html>
     }});
   }});
 </script>
-</body>
+{live_script}</body>
 </html>
+"""
+
+_LIVE_SCRIPT = """<script>
+  // Sert uniquement quand la page vient de `arrsenal serve` : c'est ce serveur
+  // qui expose /api/status et /api/action. Le jeton voyage en cookie HttpOnly,
+  // pose lors du chargement de la page.
+  var LIBELLES = {running: 'en marche', exited: 'arrete', created: 'cree',
+                  paused: 'en pause', absent: 'conteneur absent'};
+
+  function peindre(services) {
+    services.forEach(function (s) {
+      var bloc = document.querySelector('.state[data-service="' + s.id + '"]');
+      if (!bloc) return;
+      var dot = bloc.querySelector('.dot');
+      dot.className = 'dot ' + (s.up ? 'up' : 'down');
+      dot.title = s.status;
+      bloc.querySelector('.label').textContent =
+        (LIBELLES[s.state] || s.state) + (s.status ? ' — ' + s.status : '');
+      bloc.querySelectorAll('button.act').forEach(function (b) {
+        b.disabled = (b.dataset.action === 'start') ? s.up : !s.up;
+      });
+    });
+  }
+
+  function rafraichir() {
+    fetch('/api/status', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { peindre(d.services); })
+      .catch(function () {});
+  }
+
+  document.querySelectorAll('button.act').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var bloc = btn.closest('.state');
+      bloc.querySelector('.dot').className = 'dot busy';
+      bloc.querySelector('.label').textContent = 'en cours…';
+      bloc.querySelectorAll('button.act').forEach(function (b) { b.disabled = true; });
+      fetch('/api/action', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: btn.dataset.service, action: btn.dataset.action})
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) { bloc.querySelector('.label').textContent = 'echec : ' + (d.message || d.error); }
+          setTimeout(rafraichir, 900);
+        })
+        .catch(function () { bloc.querySelector('.label').textContent = 'serveur injoignable'; });
+    });
+  });
+
+  rafraichir();
+  setInterval(rafraichir, 5000);
+</script>
 """

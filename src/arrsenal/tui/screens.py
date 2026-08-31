@@ -334,7 +334,7 @@ class SummaryScreen(WizardScreen):
             "[dim]Le trafic BitTorrent sortira sur l'adresse IP publique de cette "
             "machine, visible par les autres pairs.[/dim]"
         )
-        warnings = [vpn_warning]
+        warnings = [vpn_warning] if orchestrator.has_download_client(cfg) else []
         if not cfg.ids_certain:
             warnings.append(
                 f"[yellow]PUID/PGID non detectables ici : repli sur "

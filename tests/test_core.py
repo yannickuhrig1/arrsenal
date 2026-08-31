@@ -35,10 +35,6 @@ def make_cfg(tmp_path, services=("prowlarr", "sonarr", "radarr", "transmission",
 # ------------------------------------------------------------------- catalogue
 
 
-def test_dependencies_pull_in_transmission_for_flood():
-    assert catalog.resolve_dependencies(["flood"]) == ["transmission", "flood"]
-
-
 def test_startup_order_places_prowlarr_after_the_arrs():
     order = catalog.STARTUP_ORDER
     assert order.index("prowlarr") > order.index("sonarr")
@@ -322,3 +318,51 @@ def test_a_normal_user_is_not_flagged(monkeypatch):
     uid, gid, _source, certain = resolve_ids(PlatformProfile.GENERIC_LINUX)
     assert (uid, gid) == (1000, 1000)
     assert certain
+
+
+# ------------------------------------------------------------ Flood, deux clients
+
+
+def test_flood_alone_pulls_in_the_first_client():
+    assert catalog.resolve_dependencies(["flood"]) == ["qbittorrent", "flood"]
+
+
+def test_flood_next_to_qbittorrent_does_not_also_pull_transmission():
+    """Cocher Flood a cote d'un client deja choisi ne doit pas en installer un second."""
+    assert catalog.resolve_dependencies(["qbittorrent", "flood"]) == ["qbittorrent", "flood"]
+
+
+def test_flood_next_to_transmission_does_not_also_pull_qbittorrent():
+    assert catalog.resolve_dependencies(["transmission", "flood"]) == ["transmission", "flood"]
+
+
+def test_flood_targets_qbittorrent_with_the_right_flags(tmp_path):
+    """Options relevees sur `flood --help` de l'image 4.16.1, pas supposees."""
+    cfg = make_cfg(tmp_path, services=("qbittorrent", "flood"))
+    command = compose.build_compose(cfg)["services"]["flood"]["command"]
+    assert "--qburl" in command
+    assert "http://qbittorrent:8080" in command
+    assert "--trurl" not in command
+
+
+def test_flood_targets_transmission_with_the_right_rpc_path(tmp_path):
+    cfg = make_cfg(tmp_path, services=("transmission", "flood"))
+    command = compose.build_compose(cfg)["services"]["flood"]["command"]
+    assert "--trurl" in command
+    assert "http://transmission:9091/transmission/rpc" in command
+    assert "--qburl" not in command
+
+
+def test_with_both_clients_flood_picks_qbittorrent(tmp_path):
+    """Flood ne pilote qu'un client a la fois : l'API de qBittorrent est plus riche."""
+    cfg = make_cfg(tmp_path, services=("transmission", "qbittorrent", "flood"))
+    block = compose.build_compose(cfg)["services"]["flood"]
+    assert "--qburl" in block["command"]
+    assert block["depends_on"] == ["qbittorrent"]
+
+
+def test_flood_gets_no_puid_pgid(tmp_path):
+    """Flood n'est pas une image LinuxServer : ces variables n'y font rien."""
+    cfg = make_cfg(tmp_path, services=("qbittorrent", "flood"))
+    env = compose.build_compose(cfg)["services"]["flood"]["environment"]
+    assert "PUID" not in env

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import socket
 import subprocess
@@ -127,6 +128,42 @@ class Compose:
 
     def ps(self) -> str:
         return _run(self._cmd("ps"), cwd=self.dir).stdout
+
+    def ps_json(self) -> list[dict]:
+        """Etat de chaque service.
+
+        Docker Compose 5.x emet un objet JSON PAR LIGNE ; les versions plus
+        anciennes emettent un tableau unique. Les deux formes sont acceptees.
+        """
+        proc = _run(self._cmd("ps", "--all", "--format", "json"), cwd=self.dir)
+        raw = (proc.stdout or "").strip()
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            entries = []
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            return entries
+        return parsed if isinstance(parsed, list) else [parsed]
+
+    def control(self, action: str, service: str) -> tuple[bool, str]:
+        """Demarre, arrete ou redemarre UN service.
+
+        `action` et `service` sont valides par l'appelant contre des listes
+        fermees : ils finissent dans une ligne de commande.
+        """
+        if action not in ("start", "stop", "restart"):
+            raise ValueError(f"action non autorisee: {action!r}")
+        proc = _run(self._cmd(action, service), cwd=self.dir, timeout=180)
+        return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
 
     def logs(self, service: str, tail: int = 50) -> str:
         return _run(self._cmd("logs", "--tail", str(tail), service), cwd=self.dir).stdout

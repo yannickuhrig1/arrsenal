@@ -220,6 +220,15 @@ def install(
 # ------------------------------------------------------------------ inspection
 
 
+def has_download_client(cfg: StackConfig) -> bool:
+    """Un client de telechargement est-il installe ?
+
+    Sans lui, l'avertissement VPN n'a aucun sens : il n'y a pas de trafic
+    BitTorrent a proteger.
+    """
+    return any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS)
+
+
 def planned_links(cfg: StackConfig) -> int:
     """Nombre de liens que le cablage va poser. Sert au recapitulatif."""
     return len(Wirer(cfg).build_plan())
