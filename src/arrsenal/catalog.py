@@ -32,7 +32,7 @@ CATALOG: dict[str, ServiceSpec] = {
         config_dir="prowlarr",
         api_family="arr",
         api_version="v1",
-        notes="Pivot du cablage : pousse les indexeurs vers Sonarr/Radarr.",
+        notes="Pivot du cablage : alimente les autres en indexeurs.",
     ),
     "sonarr": ServiceSpec(
         id="sonarr",
@@ -67,7 +67,7 @@ CATALOG: dict[str, ServiceSpec] = {
         default_host_port=9091,
         config_dir="transmission",
         api_family="transmission",
-        notes="Client torrent par defaut (PROMPT.md sec. 11).",
+        notes="Client torrent par defaut.",
     ),
     "lidarr": ServiceSpec(
         id="lidarr",
@@ -79,7 +79,7 @@ CATALOG: dict[str, ServiceSpec] = {
         config_dir="lidarr",
         api_family="arr",
         api_version="v1",
-        notes="Musique. API en v1, contrairement a Sonarr et Radarr qui sont en v3.",
+        notes="Musique. Son API est en v1, pas en v3.",
     ),
     "qbittorrent": ServiceSpec(
         id="qbittorrent",
@@ -90,7 +90,7 @@ CATALOG: dict[str, ServiceSpec] = {
         default_host_port=8080,
         config_dir="qbittorrent",
         api_family="qbittorrent",
-        notes="Alternative a Transmission. Categories natives avec chemin par categorie.",
+        notes="Categories natives avec chemin dedie.",
     ),
     "jellyfin": ServiceSpec(
         id="jellyfin",
@@ -101,7 +101,7 @@ CATALOG: dict[str, ServiceSpec] = {
         default_host_port=8096,
         config_dir="jellyfin",
         api_family="jellyfin",
-        notes="Serveur media. Assistant de demarrage automatisable par API.",
+        notes="Serveur media. Bibliotheques creees pour vous.",
     ),
     "flood": ServiceSpec(
         id="flood",
@@ -113,10 +113,7 @@ CATALOG: dict[str, ServiceSpec] = {
         config_dir="flood",
         requires=("transmission",),
         api_family=None,
-        notes=(
-            "UI web pour Transmission. N'est PAS un client. Les *arr parlent au RPC "
-            "Transmission, jamais a Flood : zero impact sur la matrice de cablage."
-        ),
+        notes="UI web pour Transmission. N'est pas un client.",
     ),
 }
 

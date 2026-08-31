@@ -15,16 +15,18 @@ dependencies = [
     "pydantic>=2.7",
     "PyYAML>=6.0",
     "rich>=13.7",
+    "textual>=0.80",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-httpx>=0.30", "ruff>=0.5"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-httpx>=0.30", "ruff>=0.5"]
 
 [project.scripts]
 arrsenal = "arrsenal.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/arrsenal"]
+artifacts = ["*.tcss"]
 
 [tool.ruff]
 line-length = 100
@@ -33,6 +35,10 @@ target-version = "py311"
 [tool.ruff.lint]
 # B008 : passer typer.Option en valeur par defaut EST l'idiome officiel de Typer.
 ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# BINDINGS est un attribut de classe mutable impose par Textual.
+"src/arrsenal/tui/*.py" = ["RUF012"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

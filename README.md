@@ -3,14 +3,24 @@
 **Déploie *et câble* une stack média complète. Une commande, zéro clic dans huit interfaces web.**
 
 ```bash
-arrsenal install --data-root /srv/data --config-root /opt/arrsenal/config
+arrsenal
 ```
 
-À la fin de cette commande, Prowlarr pousse déjà ses indexeurs vers Sonarr, Radarr et
-Lidarr, les trois savent parler à votre client de téléchargement, leurs dossiers racine
-existent, et Jellyfin a ses bibliothèques et se rafraîchit tout seul après chaque import.
+<p align="center">
+  <img src="docs/screenshots/2-services.svg" alt="Sélection des services" width="49%">
+  <img src="docs/screenshots/5-installation.svg" alt="Câblage en cours" width="49%">
+</p>
 
-> *(GIF de démonstration à insérer ici — voir `docs/DEMO.md`.)*
+Vous cochez ce que vous voulez. À la fin, Prowlarr pousse déjà ses indexeurs vers Sonarr,
+Radarr et Lidarr, les trois savent parler à votre client de téléchargement, leurs dossiers
+racine existent, et Jellyfin a ses bibliothèques et se rafraîchit tout seul après chaque
+import.
+
+Pas d'assistant ? La même chose en une ligne, pour un script ou une CI :
+
+```bash
+arrsenal install --yes --data-root /srv/data --config-root /opt/arrsenal/config
+```
 
 ---
 
@@ -104,12 +114,27 @@ arrsenal install --services prowlarr,sonarr,radarr,qbittorrent,jellyfin
 Autres commandes :
 
 ```bash
+arrsenal             # assistant interactif
 arrsenal list        # catalogue des services
 arrsenal wire        # rejoue le câblage sur une stack déjà démarrée
 arrsenal doctor      # diagnostique une installation existante
 arrsenal generate    # régénère docker-compose.yml depuis stack.yml
 arrsenal uninstall   # arrête la stack, ne touche jamais à vos médias
 ```
+
+Toutes les captures de ce README sont **générées automatiquement** par
+`python scripts/screenshots.py`, sans terminal ni Docker. Elles sont versionnées : une
+régression visuelle apparaît dans le diff d'une pull request.
+
+<details>
+<summary>Les autres écrans de l'assistant</summary>
+
+| | |
+|---|---|
+| ![Accueil](docs/screenshots/1-accueil.svg) | ![Chemins](docs/screenshots/3-chemins.svg) |
+| ![Récapitulatif](docs/screenshots/4-recapitulatif.svg) | ![Rapport](docs/screenshots/6-rapport.svg) |
+
+</details>
 
 ---
 

@@ -1,0 +1,131 @@
+/* Feuille de style de l'assistant. */
+
+Screen {
+    background: $surface;
+}
+
+Header {
+    background: $primary-darken-2;
+}
+
+#welcome, #paths, #services, #summary, #report {
+    padding: 1 2;
+    height: 1fr;
+}
+
+#pitch {
+    padding: 1 2;
+    background: $panel;
+    border-left: thick $primary;
+    margin-bottom: 1;
+}
+
+.group-title {
+    text-style: bold;
+    color: $accent;
+    margin: 1 0 0 0;
+}
+
+.service {
+    margin-left: 2;
+}
+
+#docker-status {
+    padding: 1 2;
+    background: $panel;
+    margin: 1 0;
+}
+
+#selection-summary, #summary-paths, #summary-warnings, #paths-check, #report-next {
+    padding: 1 2;
+    background: $panel;
+    margin-top: 1;
+}
+
+#summary-warnings {
+    border-left: thick $warning;
+}
+
+#install-phase {
+    padding: 1 2;
+    background: $panel;
+    border-left: thick $primary;
+    margin: 1 2;
+}
+
+#install-log {
+    height: 1fr;
+    margin: 0 2;
+    border: round $primary-darken-2;
+    padding: 0 1;
+}
+
+.actions {
+    height: auto;
+    padding: 1 2;
+    align: left middle;
+}
+
+.actions Button {
+    margin-right: 2;
+}
+
+DataTable {
+    height: auto;
+    max-height: 20;
+    margin-bottom: 1;
+}
+
+Input {
+    margin-left: 2;
+}
+
+RadioSet {
+    margin-left: 2;
+    border: none;
+}
+
+/* -- selection des services ------------------------------------------------ */
+
+#services {
+    height: 1fr;
+    padding: 0 1;
+}
+
+.service-column {
+    width: 1fr;
+    padding: 0 1;
+}
+
+Checkbox.service {
+    border: none;
+    padding: 0 1;
+    background: transparent;
+    margin-left: 1;
+}
+
+Checkbox.service:focus {
+    background: $primary-darken-3;
+}
+
+/* Coche bien lisible : c'est l'element que l'oeil doit trouver en premier. */
+Checkbox.service > .toggle--button {
+    background: $panel-lighten-2;
+    color: $primary-darken-3;
+}
+
+Checkbox.service.-on > .toggle--button {
+    background: $success;
+    color: $success-darken-3;
+}
+
+.service-note {
+    color: $text-muted;
+    margin: 0 0 1 5;
+}
+
+/* Les descriptions doivent passer a la ligne plutot qu'etre coupees. */
+.service-note {
+    width: 1fr;
+    text-wrap: wrap;
+}

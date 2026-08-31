@@ -15,8 +15,16 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
-      - run: ruff check src tests
+      - run: ruff check src tests scripts
       - run: pytest -q
+
+      - name: Les captures du README sont a jour
+        run: |
+          python scripts/screenshots.py
+          if ! git diff --exit-code -- docs/screenshots; then
+            echo "Les captures ont change. Relancez scripts/screenshots.py et commitez le resultat."
+            exit 1
+          fi
 
   integration:
     name: Cablage reel (7 services, deux clients de telechargement)
