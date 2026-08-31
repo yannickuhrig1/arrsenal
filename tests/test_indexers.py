@@ -248,3 +248,64 @@ def test_failure_returns_a_readable_message_not_a_stack_trace():
     assert not ok
     assert "Unable to connect" in message
     assert "\n" not in message
+
+
+# ------------------------------------------------- regle structurelle (audit)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected", "why"),
+    [
+        # Trouves par l'audit des 626 definitions : aucun marqueur, aucun nom
+        # connu, mais ce sont bien des identifiants.
+        ({"name": "mamId", "type": "textbox", "privacy": "normal", "value": ""}, True, "MyAnonamouse"),
+        ({"name": "2facode", "type": "textbox", "privacy": "normal", "value": None}, True, "2FA"),
+        ({"name": "staffpass", "type": "textbox", "privacy": "normal", "value": None}, True, "cle"),
+        ({"name": "useragent", "type": "textbox", "privacy": "normal", "value": None}, True, "UA lie a la session"),
+        # Reglages de comportement : jamais des textbox vides.
+        ({"name": "useFreeleechToken", "type": "select", "value": 0}, False, "liste"),
+        ({"name": "authorisedOnly", "type": "checkbox", "value": False}, False, "case a cocher"),
+        ({"name": "passid", "type": "select", "value": 0}, False, "liste malgre son nom"),
+        # Une zone de texte DEJA remplie n'attend rien de l'utilisateur.
+        ({"name": "apiPath", "type": "textbox", "value": "/api"}, False, "valeur par defaut"),
+    ],
+)
+def test_structural_rule_catches_what_no_name_list_could(raw, expected, why):
+    """Un textbox sans valeur par defaut est, par construction, quelque chose que
+    seul l'utilisateur peut fournir."""
+    assert is_credential(raw) is expected, why
+
+
+@pytest.mark.parametrize("name", ["vipExpiration", "additionalParameters", "thankyou", "sub_lang"])
+def test_known_free_text_fields_are_not_treated_as_credentials(name):
+    """Ce sont des textbox vides comme les identifiants : sans liste explicite,
+    la regle structurelle les remonterait et noierait le formulaire."""
+    assert not is_credential({"name": name, "type": "textbox", "value": None})
+
+
+def test_no_credential_name_is_also_listed_as_a_credential():
+    """Les deux listes doivent rester disjointes, sinon l'ordre des regles decide."""
+    from arrsenal.clients.prowlarr import NON_CREDENTIAL_NAMES
+
+    assert not (CREDENTIAL_NAMES & NON_CREDENTIAL_NAMES)
+
+
+def test_non_credential_names_are_lowercase():
+    from arrsenal.clients.prowlarr import NON_CREDENTIAL_NAMES
+
+    assert all(n == n.lower() for n in NON_CREDENTIAL_NAMES)
+
+
+def test_a_private_indexer_without_credentials_stays_possible():
+    """BitMagnet, comicat, MioBT et ConCen sont prives mais n'exigent aucun
+    compte : ne pas leur inventer de champ."""
+    d = definition(
+        "IndexLocal",
+        [
+            {"name": "definitionFile", "type": "textbox", "value": "local.yml"},
+            {"name": "baseUrl", "type": "select", "value": None},
+            {"name": "baseSettings.queryLimit", "type": "number", "value": None},
+        ],
+        urls=["https://local.invalid/"],
+    )
+    assert [f.name for f in d.editable_fields()] == ["baseUrl"]

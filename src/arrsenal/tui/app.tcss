@@ -179,3 +179,14 @@ Checkbox.service.-on > .toggle--button {
     margin: 0 2;
     background: $panel;
 }
+
+/* -- bandeau de titre ------------------------------------------------------ */
+
+#wizard-header {
+    dock: top;
+    height: 1;
+    background: $primary;
+    color: $text;
+    text-align: center;
+    text-style: bold;
+}

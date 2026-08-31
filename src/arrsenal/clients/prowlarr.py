@@ -50,6 +50,22 @@ CREDENTIAL_NAMES = frozenset(
 #: Prefixes de champs de reglage fin, jamais demandes a l'utilisateur.
 _TUNING_PREFIXES = ("baseSettings.", "torrentBaseSettings.", "usenetBaseSettings.")
 
+#: Zones de texte libres qui ne sont PAS des identifiants. Sans cette liste, la
+#: regle structurelle ci-dessous les remonterait : ce sont des textbox sans valeur
+#: par defaut, comme les vrais identifiants. Liste etablie par l'audit des 626
+#: definitions (scripts/audit_indexers.py), pas devinee.
+NON_CREDENTIAL_NAMES = frozenset(
+    {
+        "additionalparameters",  # parametres de requete optionnels
+        "vipexpiration",  # date, purement informatif
+        "thankyou",  # message de remerciement
+        "audio_lang",  # preferences de recherche
+        "fansub_lang",
+        "sub_lang",
+        "group_id",
+    }
+)
+
 
 @dataclass(frozen=True)
 class IndexerField:
@@ -122,7 +138,18 @@ def is_secret(raw: dict) -> bool:
 
 
 def is_credential(raw: dict) -> bool:
-    """Un champ est-il un identifiant a saisir ?"""
+    """Un champ est-il un identifiant a saisir ?
+
+    Quatre regles, de la plus sure a la plus large. La derniere est structurelle
+    et rattrape ce qu'aucune liste de noms ne peut prevoir : un audit des 626
+    definitions a montre que les manques (`mamId` de MyAnonamouse,
+    `twoFactorAuthCode`, `alt2fatoken`, `passan`, `staffpass`, `csrf_token`)
+    etaient TOUS des zones de texte sans valeur par defaut.
+
+    Une zone de texte vide est, par construction, quelque chose que seul
+    l'utilisateur peut fournir. Les reglages de comportement sont des cases a
+    cocher ou des listes, jamais des textbox vides : la regle ne les attrape pas.
+    """
     name = raw.get("name", "")
     if is_tuning(name) or raw.get("type") == "info":
         return False
@@ -130,7 +157,11 @@ def is_credential(raw: dict) -> bool:
         return True
     if raw.get("type") == "password":
         return True
-    return name.lower() in CREDENTIAL_NAMES
+    if name.lower() in CREDENTIAL_NAMES:
+        return True
+    if name.lower() in NON_CREDENTIAL_NAMES:
+        return False
+    return raw.get("type") == "textbox" and raw.get("value") in (None, "")
 
 
 class ProwlarrIndexers:

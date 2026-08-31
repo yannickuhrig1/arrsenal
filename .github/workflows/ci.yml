@@ -55,6 +55,16 @@ jobs:
             exit 1
           fi
 
+      # Prowlarr embarque plus de 600 definitions d'indexeurs, dont la forme change
+      # a chaque version. Cet audit echoue si une nouvelle definition expose un
+      # champ d'identifiant que l'heuristique ne saurait pas reconnaitre.
+      - name: Audit de l'heuristique sur toutes les definitions Prowlarr
+        run: |
+          set -a; . "$RUNNER_TEMP/stack/.env"; set +a
+          curl -sf -H "X-Api-Key: $PROWLARR_API_KEY" \
+            http://localhost:9696/api/v1/indexer/schema -o "$RUNNER_TEMP/schema.json"
+          python scripts/audit_indexers.py "$RUNNER_TEMP/schema.json"
+
       - name: Journaux en cas d'echec
         if: failure()
         run: docker compose -p arrsenal -f "$RUNNER_TEMP/stack/docker-compose.yml" logs --tail 100

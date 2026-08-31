@@ -235,8 +235,37 @@ clés en `privacy: normal`. Une heuristique combinée est nécessaire :
 1. `privacy` ∈ (`apiKey`, `password`, `userName`)
 2. ou `type == "password"`
 3. ou nom connu (`apikey`, `passkey`, `cookie`, `rsskey`, …)
-4. en excluant les préfixes de réglage (`baseSettings.`, `torrentBaseSettings.`,
-   `usenetBaseSettings.`) et les 882 champs `type: "info"`, purement décoratifs
+4. ou — **règle structurelle** — `type == "textbox"` avec une valeur par défaut vide
+5. en excluant les préfixes de réglage (`baseSettings.`, `torrentBaseSettings.`,
+   `usenetBaseSettings.`), les 882 champs `type: "info"` purement décoratifs, et une
+   courte liste de zones de texte libres qui n'en sont pas (`vipExpiration`,
+   `additionalParameters`, préférences de langue)
+
+### L'audit qui a produit la règle 4
+
+Les règles 1 à 3 ont été confrontées aux **626 définitions** par
+[`scripts/audit_indexers.py`](../scripts/audit_indexers.py). Elles laissaient passer
+six identifiants : `mamId` (MyAnonamouse), `twoFactorAuthCode`, `alt2fatoken`, `passan`,
+`staffpass`, `csrf_token`.
+
+Tous étaient des **zones de texte sans valeur par défaut**. D'où la règle structurelle,
+qui vaut mieux qu'une liste de noms à rallonge : une textbox vide est, par construction,
+quelque chose que seul l'utilisateur peut fournir. Les réglages de comportement sont des
+cases à cocher ou des listes, jamais des textbox vides.
+
+Effet mesuré : **58 champs** rattrapés sur les 626 définitions, tous de vrais
+identifiants (26 codes 2FA, 17 `useragent`, 8 `pin`, `mamId`, `passan`, `staffpass`…).
+Aucun formulaire ne dépasse **3 identifiants**.
+
+Deux familles de cas ont été examinées puis jugées correctes :
+
+- **4 index privés sans aucun identifiant** — `BitMagnet (Local DHT)`, `comicat`,
+  `MioBT`, `ConCen`. Ce sont des moteurs de recherche qui n'exigent pas de compte.
+- **6 champs au nom trompeur** — `useFreeleechToken`, `usetoken`, `passid`… tous des
+  cases à cocher ou des listes, donc des réglages.
+
+L'audit tourne en CI contre le Prowlarr de la stack de test : **il échoue si une future
+version introduit un champ d'identifiant d'une forme non prévue.**
 
 ### Les URL ne sont pas dans le champ `baseUrl`
 

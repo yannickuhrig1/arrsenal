@@ -22,7 +22,6 @@ MAX_RESULTS = 40
 
 
 class IndexersScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Etape optionnelle - vos indexeurs"
 
     def __init__(self) -> None:

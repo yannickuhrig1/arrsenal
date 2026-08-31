@@ -18,7 +18,6 @@ from textual.widgets import (
     Checkbox,
     DataTable,
     Footer,
-    Header,
     Input,
     Label,
     RadioButton,
@@ -42,13 +41,29 @@ CATEGORY_TITLES = {
 }
 
 
+class WizardHeader(Static):
+    """Bandeau de titre maison.
+
+    Le `Header` de Textual monte ses enfants de facon asynchrone et met a jour son
+    titre depuis l'application : enchainer deux `push_screen` rapidement le fait
+    lever `NoMatches: No nodes match 'HeaderTitle'`. Un simple Static rend la meme
+    chose sans course, et sans dependre d'un detail interne du framework.
+    """
+
+    def __init__(self, subtitle: str) -> None:
+        super().__init__(f"arrsenal  —  {subtitle}", id="wizard-header")
+
+
 class WizardScreen(Screen):
     """Socle commun : entete, pied de page, navigation."""
 
     BINDINGS = [("escape", "app.pop_screen", "Retour"), ("ctrl+q", "app.quit", "Quitter")]
 
+    #: Sous-titre affiche dans le bandeau.
+    SUB_TITLE = ""
+
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield WizardHeader(self.SUB_TITLE)
         yield from self.content()
         yield Footer()
 
@@ -60,7 +75,6 @@ class WizardScreen(Screen):
 
 
 class WelcomeScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Deploie ET cable une stack media complete"
 
     def content(self) -> ComposeResult:
@@ -112,7 +126,6 @@ class WelcomeScreen(WizardScreen):
 
 
 class ServicesScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Etape 1/3 - Quels services installer ?"
 
     #: Repartition en deux colonnes. La mediatheque, la plus fournie, occupe la
@@ -189,7 +202,6 @@ class ServicesScreen(WizardScreen):
 
 
 class PathsScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Etape 2/3 - Chemins et plateforme"
 
     def content(self) -> ComposeResult:
@@ -288,7 +300,6 @@ class PathsScreen(WizardScreen):
 
 
 class SummaryScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Etape 3/3 - Recapitulatif (rien n'est encore ecrit)"
 
     def content(self) -> ComposeResult:
@@ -346,7 +357,6 @@ class SummaryScreen(WizardScreen):
 
 
 class InstallScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Installation et cablage"
     BINDINGS = [("ctrl+q", "app.quit", "Quitter")]
 
@@ -421,7 +431,6 @@ class InstallScreen(WizardScreen):
 
 
 class ReportScreen(WizardScreen):
-    TITLE = "arrsenal"
     SUB_TITLE = "Acces"
     BINDINGS = [("ctrl+q", "app.quit", "Quitter")]
 
