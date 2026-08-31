@@ -11,6 +11,7 @@ build/
 
 # Artefacts generes par l'outil - ne JAMAIS commiter
 .env
+acces-arrsenal.html
 docker-compose.yml
 stack.local.yml
 /config/

@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import catalog, compose, seed
+from . import catalog, compose, dashboard, seed
 from .clients.arr import ArrClient
 from .layout import PROFILE_DEFAULTS, create_tree, resolve_ids
 from .models import PlatformProfile, ServiceInstance, StackConfig
@@ -209,6 +209,10 @@ def install(
     # assistant de demarrage. On repersiste pour que .env et stack.yml soient
     # complets et que `wire` reste rejouable seul.
     compose.write_artifacts(cfg, project_dir)
+
+    page = dashboard.write(cfg, project_dir, failed=sum(1 for r in results if not r.ok))
+    on_progress(Progress("page d'acces", str(page)))
+
     on_progress(Progress("cablage", "termine", ok=all(r.ok for r in results), done=True))
     return results
 

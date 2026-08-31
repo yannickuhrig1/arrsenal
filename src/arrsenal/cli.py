@@ -12,7 +12,7 @@ from pathlib import Path
 import typer
 import yaml
 
-from . import catalog, compose, indexers_cli, orchestrator, report
+from . import catalog, compose, dashboard, indexers_cli, orchestrator, report
 from .clients.arr import ArrClient
 from .models import PlatformProfile, StackConfig
 from .orchestrator import InstallAborted, Progress
@@ -48,6 +48,21 @@ def _load_config(project_dir: Path) -> StackConfig:
     return StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
+def _announce_page(path: Path, open_page: bool) -> None:
+    """Signale la page d'acces, et l'ouvre si un navigateur existe.
+
+    L'echec d'ouverture est normal sur un NAS sans environnement graphique : le
+    chemin reste affiche, c'est lui qui compte.
+    """
+    if not path.exists():
+        return
+    console.print(f"\nPage d'acces : [bold]{path}[/bold]")
+    if open_page and dashboard.open_in_browser(path):
+        console.print("[dim]Ouverte dans votre navigateur.[/dim]")
+    elif open_page:
+        console.print("[dim]Aucun navigateur disponible ici : ouvrez ce fichier a la main.[/dim]")
+
+
 def _echo(progress: Progress) -> None:
     mark = "[green]OK[/green]" if progress.ok else "[red]ECHEC[/red]"
     console.print(f"  {mark} {progress.phase} : {progress.message}")
@@ -80,6 +95,9 @@ def install(
     project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
     dry_run: bool = typer.Option(False, "--dry-run", help="N'ecrit rien, montre tout."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Ne pas demander confirmation."),
+    open_page: bool = typer.Option(
+        True, "--open/--no-open", help="Ouvrir la page d'acces dans le navigateur."
+    ),
 ) -> None:
     """Deploie et cable la stack de bout en bout, sans interaction."""
     selection = [s.strip() for s in services.split(",") if s.strip()]
@@ -124,6 +142,7 @@ def install(
         raise typer.Exit(1) from exc
 
     report.print_final(cfg, results)
+    _announce_page(project_dir / dashboard.FILENAME, open_page)
     raise typer.Exit(0 if all(r.ok for r in results) else 2)
 
 

@@ -438,7 +438,11 @@ class ReportScreen(WizardScreen):
         with VerticalScroll(id="report"):
             yield DataTable(id="report-table", cursor_type="row")
             yield Static(id="report-next")
-        yield Horizontal(Button("Fermer", variant="primary", id="close"), classes="actions")
+        yield Horizontal(
+            Button("Ouvrir la page d'acces", variant="success", id="open-page"),
+            Button("Fermer", variant="primary", id="close"),
+            classes="actions",
+        )
 
     def on_mount(self) -> None:
         cfg = self.app.stack_config
@@ -469,6 +473,26 @@ class ReportScreen(WizardScreen):
             f"{self.app.project_dir / '.env'} (chmod 600).[/dim]"
         )
         self.query_one("#report-next", Static).update(body)
+
+    @on(Button.Pressed, "#open-page")
+    def open_page(self) -> None:
+        from .. import dashboard
+
+        path = self.app.project_dir / dashboard.FILENAME
+        target = self.query_one("#report-next", Static)
+        if not path.exists():
+            target.update(f"[yellow]Page introuvable : {path}[/yellow]")
+            return
+        if dashboard.open_in_browser(path):
+            target.update(
+                f"[green]Page ouverte dans votre navigateur.[/green]\n[dim]{path}[/dim]"
+            )
+        else:
+            # Cas normal sur un NAS sans environnement graphique.
+            target.update(
+                f"[yellow]Aucun navigateur disponible ici.[/yellow]\n"
+                f"[dim]Ouvrez ce fichier depuis un autre appareil : {path}[/dim]"
+            )
 
     @on(Button.Pressed, "#close")
     def close(self) -> None:

@@ -140,6 +140,28 @@ régression visuelle apparaît dans le diff d'une pull request.
 
 ---
 
+## La page d'accès
+
+À la fin de l'installation, `arrsenal` génère une page HTML locale et l'ouvre dans votre
+navigateur. Plus besoin de retrouver quel service écoute sur quel port : une carte par
+service, les dossiers de téléchargement et de médiathèque, les identifiants.
+
+Trois détails qui comptent :
+
+- **Les mots de passe et clés API sont masqués** jusqu'à un clic. La page reste un
+  fichier local en `chmod 600`, exclu du dépôt — mais on la montre parfois à quelqu'un,
+  et elle ne doit pas afficher votre clé Sonarr d'entrée.
+- **Les liens n'utilisent pas `localhost`.** Installée sur un NAS, une URL en localhost
+  pointerait vers la machine qui consulte. `arrsenal` détecte l'adresse de la machine
+  sur le réseau local et génère les liens avec.
+- **Les raccourcis vers les dossiers sont donnés en chemin copiable *et* en lien.**
+  Un lien `file://` ne fonctionne que si le navigateur tourne sur la machine
+  d'installation ; c'est écrit sur la page plutôt que découvert par un lien mort.
+
+`--no-open` génère la page sans ouvrir le navigateur.
+
+---
+
 ## Comment ça marche
 
 **Les clés API sont pré-semées, pas devinées.** Plutôt que de démarrer les conteneurs
