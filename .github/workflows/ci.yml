@@ -19,7 +19,7 @@ jobs:
       - run: pytest -q
 
   integration:
-    name: Cablage reel (Prowlarr + Sonarr + Radarr + Transmission + Jellyfin)
+    name: Cablage reel (7 services, deux clients de telechargement)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -34,6 +34,7 @@ jobs:
           sudo mkdir -p /srv/data /opt/arrsenal/config
           sudo chown -R "$(id -u):$(id -g)" /srv/data /opt/arrsenal
           arrsenal install --yes \
+            --services prowlarr,sonarr,radarr,lidarr,transmission,qbittorrent,jellyfin \
             --data-root /srv/data \
             --config-root /opt/arrsenal/config \
             --project-dir "$RUNNER_TEMP/stack"

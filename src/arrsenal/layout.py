@@ -19,10 +19,12 @@ DATA_SUBDIRS = (
     "torrents",
     "torrents/movies",
     "torrents/tv",
+    "torrents/music",
     "torrents/.incomplete",
     "media",
     "media/movies",
     "media/tv",
+    "media/music",
 )
 
 #: Correspondance categorie *arr -> chemin conteneur.
@@ -31,8 +33,10 @@ CONTAINER_PATHS = {
     "torrents_incomplete": "/data/torrents/.incomplete",
     "torrents_tv": "/data/torrents/tv",
     "torrents_movies": "/data/torrents/movies",
+    "torrents_music": "/data/torrents/music",
     "media_tv": "/data/media/tv",
     "media_movies": "/data/media/movies",
+    "media_music": "/data/media/music",
 }
 
 

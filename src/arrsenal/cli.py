@@ -63,7 +63,7 @@ def _build_config(
             inst.api_key = seed.generate_api_key()
             inst.username = "arrsenal"
             inst.password = seed.generate_password()
-        elif spec.api_family in ("transmission", "jellyfin"):
+        elif spec.api_family in ("transmission", "qbittorrent", "jellyfin"):
             inst.username = "arrsenal"
             inst.password = seed.generate_password()
         cfg.services[sid] = inst
@@ -112,6 +112,14 @@ def _seed_all(cfg: StackConfig) -> list[str]:
             actions.append(
                 f"{sid}: config.xml {'pre-seme' if written else 'existant, cle reprise'}"
             )
+        elif spec.api_family == "qbittorrent":
+            written, message = seed.seed_qbittorrent(
+                cfg_dir,
+                username=inst.username or "arrsenal",
+                password=inst.password or "",
+                port=spec.internal_port,
+            )
+            actions.append(f"{sid}: {message}")
         elif spec.api_family == "transmission":
             written, message = seed.seed_transmission(
                 cfg_dir,

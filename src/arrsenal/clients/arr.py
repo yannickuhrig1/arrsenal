@@ -164,11 +164,35 @@ class ArrClient:
         created = self.post(resource, payload)
         return created, True, skipped
 
-    def ensure_root_folder(self, path: str) -> tuple[dict, bool]:
+    def ensure_root_folder(self, path: str, extra: dict[str, Any] | None = None) -> tuple[dict, bool]:
+        """Cree le dossier racine s'il n'existe pas.
+
+        `extra` couvre les applications plus exigeantes : Sonarr et Radarr se
+        contentent de `path`, alors que Lidarr impose en plus `name`,
+        `defaultQualityProfileId` et `defaultMetadataProfileId`.
+        """
         for entry in self.get("rootfolder") or []:
             if entry.get("path", "").rstrip("/") == path.rstrip("/"):
                 return entry, False
-        return self.post("rootfolder", {"path": path}), True
+        return self.post("rootfolder", {"path": path, **(extra or {})}), True
+
+    def profile_id(self, resource: str, preferred: str) -> int:
+        """Identifiant d'un profil par nom, avec repli sur le premier disponible.
+
+        Les identifiants ne sont pas stables d'une version a l'autre : on les
+        resout toujours par nom plutot que de les coder en dur.
+        """
+        profiles = self.get(resource) or []
+        if not profiles:
+            raise WiringError(
+                f"{self.name}: aucun profil dans {resource}",
+                "la liste est vide",
+                "l'application a-t-elle fini son initialisation ?",
+            )
+        for entry in profiles:
+            if entry.get("name") == preferred:
+                return int(entry["id"])
+        return int(profiles[0]["id"])
 
     def test_resource(self, resource: str, payload: dict) -> tuple[bool, str]:
         """Declenche le bouton "Test" de l'application. Verification reelle,

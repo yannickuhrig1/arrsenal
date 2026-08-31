@@ -10,6 +10,8 @@ deja installee ne doit pas casser une configuration que l'utilisateur a modifiee
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import secrets
 import string
@@ -161,6 +163,69 @@ def render_transmission_settings(*, rpc_username: str, rpc_password: str) -> dic
         "watch-dir-enabled": False,
         "umask": 2,
     }
+
+
+# -------------------------------------------------------------------- qBittorrent
+
+
+def qbittorrent_password_hash(password: str) -> str:
+    """Produit la valeur de `WebUI\\Password_PBKDF2`.
+
+    Format : @ByteArray(<sel base64>:<empreinte base64>), PBKDF2-HMAC-SHA512,
+    100000 iterations, cle de 64 octets, sel de 16 octets.
+
+    Sans ce pre-semis, qBittorrent genere depuis la 4.6.1 un mot de passe temporaire
+    aleatoire ecrit sur sa sortie standard : impossible a cabler automatiquement.
+    Verifie contre qBittorrent 5.2.3 (image LinuxServer).
+    """
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha512", password.encode(), salt, 100000, dklen=64)
+    value = base64.b64encode(salt).decode() + ":" + base64.b64encode(digest).decode()
+    return f"@ByteArray({value})"
+
+
+def render_qbittorrent_conf(*, username: str, password: str, port: int = 8080) -> str:
+    """qBittorrent.conf minimal.
+
+    `HostHeaderValidation=false` est indispensable : sans lui, qBittorrent rejette
+    les requetes de Sonarr et Radarr, qui l'appellent par son nom de conteneur
+    (`http://qbittorrent:8080`) et non par une adresse IP.
+    """
+    lines = [
+        "[LegalNotice]",
+        "Accepted=true",
+        "",
+        "[Preferences]",
+        f"WebUI\\Username={username}",
+        f'WebUI\\Password_PBKDF2="{qbittorrent_password_hash(password)}"',
+        f"WebUI\\Port={port}",
+        "WebUI\\HostHeaderValidation=false",
+        "WebUI\\CSRFProtection=false",
+        f"Downloads\\SavePath={CONTAINER_PATHS['torrents_root']}/",
+        f"Downloads\\TempPath={CONTAINER_PATHS['torrents_incomplete']}/",
+        "Downloads\\TempPathEnabled=true",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def seed_qbittorrent(
+    config_dir: Path, *, username: str, password: str, port: int = 8080
+) -> tuple[bool, str]:
+    """Ecrit qBittorrent.conf s'il n'existe pas.
+
+    Chemin impose par l'image LinuxServer : /config/qBittorrent/qBittorrent.conf.
+    """
+    target_dir = config_dir / "qBittorrent"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / "qBittorrent.conf"
+    if target.exists():
+        return False, "qBittorrent.conf existe deja, conserve tel quel"
+    target.write_text(
+        render_qbittorrent_conf(username=username, password=password, port=port),
+        encoding="utf-8",
+    )
+    return True, "qBittorrent.conf pre-seme (mot de passe hashe PBKDF2)"
 
 
 def seed_transmission(

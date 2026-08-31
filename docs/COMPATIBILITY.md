@@ -15,7 +15,9 @@ Docker Compose v5.3.0, Docker Desktop sous Windows 11 (backend WSL2).
 | Prowlarr | `lscr.io/linuxserver/prowlarr` | `2.5.2` | vérifié au démarrage |
 | Transmission | `lscr.io/linuxserver/transmission` | `4.1.3` | — |
 | Jellyfin | `lscr.io/linuxserver/jellyfin` | `10.11.11` | 10.11.11 |
-| Flood | `jesec/flood` | `4.16.1` | non testé en Phase 1 |
+| Lidarr | `lscr.io/linuxserver/lidarr` | `3.1.0` | 3.1.0.4875 |
+| qBittorrent | `lscr.io/linuxserver/qbittorrent` | `5.2.3` | v5.2.3 |
+| Flood | `jesec/flood` | `4.16.1` | pas encore testé |
 
 ## Constats vérifiés expérimentalement
 
@@ -103,9 +105,83 @@ code de retour du POST :
 
 Installation propre depuis zéro : **10/10 liens établis**.
 
+## Phase 2 — constats vérifiés
+
+Campagne du **2026-08-31**, même environnement. Installation propre à 7 services
+avec **les deux clients de téléchargement en parallèle** : **18/18 liens établis**.
+
+### Le pré-semis du mot de passe qBittorrent fonctionne
+
+Depuis la 4.6.1, qBittorrent génère au premier démarrage un mot de passe temporaire
+aléatoire écrit sur sa sortie standard — impossible à câbler automatiquement.
+
+Écrire `WebUI\Password_PBKDF2` dans `/config/qBittorrent/qBittorrent.conf` avant le
+premier démarrage résout le problème. Format confirmé contre 5.2.3 :
+
+```
+@ByteArray(<sel base64>:<empreinte base64>)
+PBKDF2-HMAC-SHA512, 100000 itérations, clé 64 octets, sel 16 octets
+```
+
+Résultat : `POST /api/v2/auth/login` répond `204` avec un cookie `QBT_SID`, et aucun
+mot de passe temporaire n'apparaît dans les logs.
+
+**Attention au code de retour** : qBittorrent 5.x renvoie `204` en cas de succès et
+`200` avec le corps `Fails.` en cas d'échec. C'est donc la présence du cookie qui fait
+foi, jamais le code HTTP seul.
+
+### `HostHeaderValidation` doit être désactivé
+
+Sonarr et Radarr appellent qBittorrent par son nom de conteneur
+(`http://qbittorrent:8080`), pas par une adresse IP. Sans
+`WebUI\HostHeaderValidation=false`, qBittorrent rejette ces requêtes.
+
+### qBittorrent route par catégorie, Transmission par répertoire
+
+Transmission n'a pas de vraies catégories : on lui passe un `Directory`.
+qBittorrent a des catégories natives avec chemin de sauvegarde par catégorie : on lui
+passe une `Category`, créée en amont via `POST /api/v2/torrents/createCategory`.
+
+Ordre imposé : les catégories doivent exister **avant** que les *arr n'y pointent,
+sinon qBittorrent les crée lui-même sans chemin de sauvegarde. Prowlarr fait de même
+avec une catégorie `prowlarr` : elle est donc pré-créée aussi.
+
+Vérifié après installation :
+
+```
+movies   -> /data/torrents/movies
+music    -> /data/torrents/music
+prowlarr -> /data/torrents
+tv       -> /data/torrents/tv
+```
+
+### Lidarr n'est pas un Sonarr comme les autres
+
+Trois différences qui cassent le code écrit pour Sonarr et Radarr :
+
+1. **Son API est en `v1`**, pas `v3`.
+2. **Son dossier racine exige plus de champs.** Là où Sonarr accepte `{"path": ...}`,
+   Lidarr répond `400` :
+
+   ```
+   Name                     : 'Name' must not be empty.
+   DefaultQualityProfileId  : must be greater than '0'.
+   DefaultMetadataProfileId : must be greater than '0'.
+   ```
+
+   Il n'existe pas de `/schema` pour `rootfolder`. Les identifiants de profils ne sont
+   pas stables entre versions : ils sont résolus **par nom** (`Standard`), avec repli
+   sur le premier profil disponible.
+
+3. Lidarr n'expose **pas** l'implémentation de notification `MediaBrowser` : aucun lien
+   Lidarr vers Jellyfin n'est tenté.
+
 ## Non vérifié à ce jour
 
 - `TODO(verify)` — PUID/PGID par défaut sur Unraid et Synology (`layout.py`).
+- Bazarr est **volontairement absent du catalogue** : sa configuration passe par un
+  fichier YAML et non par une API, et rien n'a encore été vérifié. Le projet ne livre
+  pas de service qu'il ne sait pas câbler.
 - Flood n'a pas encore été démarré dans une campagne de test.
 - Aucun test sur Linux natif : la campagne a tourné sous Docker Desktop / WSL2.
   Le comportement des permissions y est plus permissif que sur un NAS réel.

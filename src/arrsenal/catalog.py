@@ -15,6 +15,8 @@ _TAGS = {
     "radarr": "6.3.0",
     "prowlarr": "2.5.2",
     "transmission": "4.1.3",
+    "qbittorrent": "5.2.3",
+    "lidarr": "3.1.0",
     "jellyfin": "10.11.11",
     "flood": "4.16.1",
 }
@@ -67,6 +69,29 @@ CATALOG: dict[str, ServiceSpec] = {
         api_family="transmission",
         notes="Client torrent par defaut (PROMPT.md sec. 11).",
     ),
+    "lidarr": ServiceSpec(
+        id="lidarr",
+        display_name="Lidarr",
+        category=Category.ARR,
+        image=f"lscr.io/linuxserver/lidarr:{_TAGS['lidarr']}",
+        internal_port=8686,
+        default_host_port=8686,
+        config_dir="lidarr",
+        api_family="arr",
+        api_version="v1",
+        notes="Musique. API en v1, contrairement a Sonarr et Radarr qui sont en v3.",
+    ),
+    "qbittorrent": ServiceSpec(
+        id="qbittorrent",
+        display_name="qBittorrent",
+        category=Category.DOWNLOAD,
+        image=f"lscr.io/linuxserver/qbittorrent:{_TAGS['qbittorrent']}",
+        internal_port=8080,
+        default_host_port=8080,
+        config_dir="qbittorrent",
+        api_family="qbittorrent",
+        notes="Alternative a Transmission. Categories natives avec chemin par categorie.",
+    ),
     "jellyfin": ServiceSpec(
         id="jellyfin",
         display_name="Jellyfin",
@@ -97,7 +122,22 @@ CATALOG: dict[str, ServiceSpec] = {
 
 #: Ordre de demarrage et de cablage. Prowlarr en dernier : il a besoin que
 #: Sonarr/Radarr repondent deja pour enregistrer ses Applications.
-STARTUP_ORDER = ("transmission", "sonarr", "radarr", "prowlarr", "jellyfin", "flood")
+STARTUP_ORDER = (
+    "transmission",
+    "qbittorrent",
+    "sonarr",
+    "radarr",
+    "lidarr",
+    "prowlarr",
+    "jellyfin",
+    "flood",
+)
+
+#: Applications *arr pilotables par Prowlarr et rattachables a un client de download.
+MANAGED_ARRS = ("sonarr", "radarr", "lidarr")
+
+#: Services jouant le role de client de telechargement.
+DOWNLOAD_CLIENTS = ("transmission", "qbittorrent")
 
 #: Selection par defaut du profil "Debutant tout-en-un" en Phase 1.
 DEFAULT_SELECTION = ("prowlarr", "sonarr", "radarr", "transmission", "jellyfin")

@@ -6,9 +6,9 @@
 arrsenal install --data-root /srv/data --config-root /opt/arrsenal/config
 ```
 
-À la fin de cette commande, Prowlarr pousse déjà ses indexeurs vers Sonarr et Radarr,
-les deux savent parler à Transmission, leurs dossiers racine existent, Jellyfin a ses
-bibliothèques et se rafraîchit tout seul après chaque import.
+À la fin de cette commande, Prowlarr pousse déjà ses indexeurs vers Sonarr, Radarr et
+Lidarr, les trois savent parler à votre client de téléchargement, leurs dossiers racine
+existent, et Jellyfin a ses bibliothèques et se rafraîchit tout seul après chaque import.
 
 > *(GIF de démonstration à insérer ici — voir `docs/DEMO.md`.)*
 
@@ -38,12 +38,17 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 
 | Source | Cible | Ce qui est posé |
 |---|---|---|
-| Prowlarr | Sonarr, Radarr | enregistrement en *Application*, `fullSync` des indexeurs |
-| Prowlarr | Transmission | client de téléchargement |
-| Sonarr, Radarr | Transmission | client + répertoire de catégorie |
-| Sonarr, Radarr | système de fichiers | dossier racine sous `/data/media` |
+| Prowlarr | Sonarr, Radarr, Lidarr | enregistrement en *Application*, `fullSync` des indexeurs |
+| Prowlarr | client de téléchargement | rattachement + catégorie |
+| Sonarr, Radarr, Lidarr | client de téléchargement | rattachement + routage par catégorie ou répertoire |
+| Sonarr, Radarr, Lidarr | système de fichiers | dossier racine sous `/data/media` |
+| qBittorrent | lui-même | catégories créées avec leur chemin de sauvegarde |
 | Sonarr, Radarr | Jellyfin | notification de rafraîchissement après import |
-| Jellyfin | système de fichiers | assistant de démarrage + bibliothèques Films et Séries |
+| Jellyfin | système de fichiers | assistant de démarrage + bibliothèques Films, Séries, Musique |
+
+Les deux clients de téléchargement peuvent coexister : chaque *arr est rattaché aux
+deux, et le routage s'adapte tout seul — qBittorrent a des catégories natives,
+Transmission n'en a pas.
 
 Chaque lien est **relu depuis l'API cible** après création. Le rapport final ne dit pas
 « j'ai envoyé un POST », il dit « le lien existe ».
@@ -63,10 +68,12 @@ ${DATA_ROOT}/                    ->  /data   (dans TOUS les conteneurs)
 ├── torrents/
 │   ├── movies/
 │   ├── tv/
+│   ├── music/
 │   └── .incomplete/
 └── media/
     ├── movies/                  <- dossier racine Radarr + bibliothèque Jellyfin
-    └── tv/                      <- dossier racine Sonarr  + bibliothèque Jellyfin
+    ├── tv/                      <- dossier racine Sonarr + bibliothèque Jellyfin
+    └── music/                   <- dossier racine Lidarr + bibliothèque Jellyfin
 ```
 
 Le préflight ne se contente pas de l'espérer : il **crée un vrai hardlink** entre
@@ -91,7 +98,7 @@ arrsenal install --dry-run
 Sélection à la carte :
 
 ```bash
-arrsenal install --services prowlarr,sonarr,transmission,jellyfin
+arrsenal install --services prowlarr,sonarr,radarr,qbittorrent,jellyfin
 ```
 
 Autres commandes :
@@ -150,13 +157,18 @@ Ce que vous y branchez, et sa légalité, vous regardent. Voir [DISCLAIMER.md](D
 
 ---
 
-## Périmètre actuel (phase 1)
+## Périmètre actuel
 
-Prowlarr · Sonarr · Radarr · Transmission · Jellyfin · Flood *(UI optionnelle)*
+Prowlarr · Sonarr · Radarr · **Lidarr** · Transmission · **qBittorrent** · Jellyfin
+· Flood *(UI optionnelle)*
+
+Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié**. Bazarr a déjà
+été étudié mais reste absent : sa configuration passe par un fichier YAML et non par
+une API, et rien n'a encore été vérifié.
 
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
-Suite prévue : Lidarr, Bazarr, SABnzbd, qBittorrent, Plex, Jellyseerr, Audiobookshelf,
-Shelfmark, Shelfarr — voir [PROMPT.md](PROMPT.md) pour la feuille de route.
+Suite prévue : Bazarr, SABnzbd, Plex, Jellyseerr, Audiobookshelf, Shelfmark, Shelfarr
+— voir [PROMPT.md](PROMPT.md) pour la feuille de route.
 
 **Readarr n'est pas au programme** : le projet est archivé depuis le 27 juin 2025.
 

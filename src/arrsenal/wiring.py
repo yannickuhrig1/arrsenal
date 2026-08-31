@@ -18,12 +18,25 @@ from . import catalog
 from .clients.arr import ArrClient
 from .clients.base import WiringError
 from .clients.jellyfin import JellyfinClient
+from .clients.qbittorrent import QBittorrentClient
+from .downloadclients import ARR_ROUTING, profile_for
 from .layout import CONTAINER_PATHS
 from .models import StackConfig
 
-#: Categories d'indexeurs Prowlarr poussees vers chaque application.
-#: 5000 = TV, 2000 = Movies (conventions Newznab).
-SYNC_CATEGORIES = {"sonarr": [5000, 5010, 5020, 5030, 5040, 5045, 5050], "radarr": [2000, 2010, 2020, 2030, 2040, 2045, 2050]}
+#: Categories d'indexeurs Prowlarr poussees vers chaque application (conventions Newznab).
+#: 2000 = Movies, 3000 = Audio, 5000 = TV.
+SYNC_CATEGORIES = {
+    "sonarr": [5000, 5010, 5020, 5030, 5040, 5045, 5050],
+    "radarr": [2000, 2010, 2020, 2030, 2040, 2045, 2050],
+    "lidarr": [3000, 3010, 3030, 3040, 3050, 3060],
+}
+
+#: Dossier racine de bibliotheque de chaque application.
+ROOT_FOLDERS = {
+    "sonarr": CONTAINER_PATHS["media_tv"],
+    "radarr": CONTAINER_PATHS["media_movies"],
+    "lidarr": CONTAINER_PATHS["media_music"],
+}
 
 
 @dataclass
@@ -101,7 +114,17 @@ class Wirer:
 
     def step_root_folder(self, arr_id: str, path: str) -> StepResult:
         client = self.arr(arr_id)
-        _folder, created = client.ensure_root_folder(path)
+        extra: dict[str, object] = {}
+        if arr_id == "lidarr":
+            # Lidarr refuse un dossier racine sans nom ni profils par defaut, la ou
+            # Sonarr et Radarr se contentent du chemin. Les identifiants de profils
+            # ne sont pas stables entre versions : on les resout par nom.
+            extra = {
+                "name": "Musique",
+                "defaultQualityProfileId": client.profile_id("qualityprofile", "Standard"),
+                "defaultMetadataProfileId": client.profile_id("metadataprofile", "Standard"),
+            }
+        _folder, created = client.ensure_root_folder(path, extra)
         present = any(
             f.get("path", "").rstrip("/") == path.rstrip("/")
             for f in client.get("rootfolder") or []
@@ -113,46 +136,31 @@ class Wirer:
             created=created,
         )
 
-    def step_download_client(self, arr_id: str) -> StepResult:
-        """Rattache Transmission a un *arr.
+    def step_download_client(self, arr_id: str, dl_id: str) -> StepResult:
+        """Rattache un client de telechargement a un *arr.
 
-        Le nom des champs varie selon l'application : Sonarr expose `tvDirectory`,
-        Radarr `movieDirectory`. On ne pousse que le prefixe pertinent, pour ne pas
-        generer d'avertissement de champ inconnu a chaque passage.
+        Les noms de champs et le mode de routage varient selon le client et selon
+        l'application : toute cette variabilite est isolee dans downloadclients.py,
+        pour que cette etape reste identique quel que soit le couple.
         """
         client = self.arr(arr_id)
-        tr_spec = catalog.get("transmission")
-        tr = self.cfg.services["transmission"]
-        directory = CONTAINER_PATHS["torrents_tv" if arr_id == "sonarr" else "torrents_movies"]
+        profile = profile_for(dl_id)
+        dl_spec = catalog.get(dl_id)
+        dl = self.cfg.services[dl_id]
 
-        # Category et Directory sont MUTUELLEMENT EXCLUSIFS : renseigner les deux
-        # fait echouer la validation avec "Cannot use Category and Directory"
-        # (verifie contre Sonarr 4.0.19 et Radarr 6.3.0).
-        #
-        # Piege : le gabarit arrive avec une categorie PAR DEFAUT deja remplie
-        # ("tv-sonarr", "radarr"). Il ne suffit donc pas d'omettre le champ, il
-        # faut le VIDER explicitement, sinon la valeur par defaut entre en conflit
-        # avec le repertoire qu'on pose.
-        #
-        # On garde Directory : un chemin explicite sous /data/torrents correspond a
-        # l'arborescence creee par arrsenal et garde les hardlinks possibles.
-        prefix = "tv" if arr_id == "sonarr" else "movie"
-        values = {
-            "host": tr_spec.id,
-            "port": tr_spec.internal_port,
-            "urlBase": "/transmission/",
-            "username": tr.username,
-            "password": tr.password,
-            "useSsl": False,
-            f"{prefix}Directory": directory,
-            f"{prefix}Category": "",
-        }
+        values = profile.arr_values(
+            host=dl_spec.id,
+            port=dl_spec.internal_port,
+            username=dl.username or "",
+            password=dl.password or "",
+            arr_id=arr_id,
+        )
         obj, created, skipped = client.ensure_resource(
             "downloadclient",
-            name="Transmission",
-            implementation="Transmission",
+            name=dl_spec.display_name,
+            implementation=profile.implementation,
             values=values,
-            extra={"enable": True, "protocol": "torrent", "priority": 1},
+            extra={"enable": True, "protocol": profile.protocol, "priority": 1},
         )
         warnings = (
             [f"champs absents du gabarit {arr_id}, ignores: {', '.join(skipped)}"]
@@ -160,13 +168,39 @@ class Wirer:
             else []
         )
         result = StepResult(
-            f"{arr_id}: client de telechargement Transmission",
-            ok=client.find_by_name("downloadclient", "Transmission") is not None,
+            f"{arr_id}: client de telechargement {dl_spec.display_name}",
+            ok=client.find_by_name("downloadclient", dl_spec.display_name) is not None,
             detail=("cree" if created else "deja present") + f" (id={obj.get('id', '?')})",
             created=created,
             warnings=warnings,
         )
-        return self._verify(client, "downloadclient", "Transmission", result)
+        return self._verify(client, "downloadclient", dl_spec.display_name, result)
+
+    def step_qbittorrent_categories(self) -> StepResult:
+        """Cree les categories qBittorrent avec leur chemin de sauvegarde."""
+        inst = self.cfg.services["qbittorrent"]
+        url = f"http://{self.cfg.host}:{inst.host_port}"
+        with QBittorrentClient(url, inst.username or "", inst.password or "") as qb:
+            qb.wait_ready()
+            wanted = {
+                category: path
+                for arr_id, (category, path) in ARR_ROUTING.items()
+                if self.cfg.enabled(arr_id)
+            }
+            if self.cfg.enabled("prowlarr"):
+                # Prowlarr cree sinon lui-meme une categorie "prowlarr" SANS chemin
+                # de sauvegarde. On la pose d'abord, avec le bon chemin : nos etapes
+                # Prowlarr passent apres celle-ci dans le plan.
+                wanted["prowlarr"] = CONTAINER_PATHS["torrents_root"]
+            made = [c for c, path in wanted.items() if qb.ensure_category(c, path)]
+            present = set(qb.categories())
+        expected = set(wanted)
+        return StepResult(
+            "qbittorrent: categories avec chemin de sauvegarde",
+            ok=expected <= present,
+            detail=f"creees: {', '.join(made) or 'aucune (deja presentes)'}",
+            created=bool(made),
+        )
 
     def step_prowlarr_application(self, arr_id: str) -> StepResult:
         """Enregistre Sonarr/Radarr comme Application dans Prowlarr.
@@ -205,34 +239,33 @@ class Wirer:
         )
         return self._verify(prowlarr, "applications", implementation, result)
 
-    def step_prowlarr_download_client(self) -> StepResult:
+    def step_prowlarr_download_client(self, dl_id: str) -> StepResult:
         prowlarr = self.arr("prowlarr")
-        tr_spec = catalog.get("transmission")
-        tr = self.cfg.services["transmission"]
-        values = {
-            "host": tr_spec.id,
-            "port": tr_spec.internal_port,
-            "urlBase": "/transmission/",
-            "username": tr.username,
-            "password": tr.password,
-            "useSsl": False,
-        }
+        profile = profile_for(dl_id)
+        dl_spec = catalog.get(dl_id)
+        dl = self.cfg.services[dl_id]
+
         obj, created, skipped = prowlarr.ensure_resource(
             "downloadclient",
-            name="Transmission",
-            implementation="Transmission",
-            values=values,
-            extra={"enable": True, "protocol": "torrent", "priority": 1},
+            name=dl_spec.display_name,
+            implementation=profile.implementation,
+            values=profile.prowlarr_values(
+                host=dl_spec.id,
+                port=dl_spec.internal_port,
+                username=dl.username or "",
+                password=dl.password or "",
+            ),
+            extra={"enable": True, "protocol": profile.protocol, "priority": 1},
         )
         warnings = [f"champs ignores: {', '.join(skipped)}"] if skipped else []
         result = StepResult(
-            "prowlarr: client de telechargement Transmission",
-            ok=prowlarr.find_by_name("downloadclient", "Transmission") is not None,
+            f"prowlarr: client de telechargement {dl_spec.display_name}",
+            ok=prowlarr.find_by_name("downloadclient", dl_spec.display_name) is not None,
             detail=("cree" if created else "deja present") + f" (id={obj.get('id', '?')})",
             created=created,
             warnings=warnings,
         )
-        return self._verify(prowlarr, "downloadclient", "Transmission", result)
+        return self._verify(prowlarr, "downloadclient", dl_spec.display_name, result)
 
     def step_jellyfin_notification(self, arr_id: str) -> StepResult:
         """Fait rafraichir la bibliotheque Jellyfin apres chaque import."""
@@ -290,16 +323,20 @@ class Wirer:
             # qui refusent un apiKey vide. Elle est reinjectee dans la config
             # pour etre persistee dans .env et stack.yml.
             inst.api_key = jf.ensure_api_key("arrsenal")
-            made = [
-                name
-                for name, ctype, path in (
-                    ("Films", "movies", CONTAINER_PATHS["media_movies"]),
-                    ("Series", "tvshows", CONTAINER_PATHS["media_tv"]),
+            wanted = [
+                (arr_id, name, ctype, path)
+                for arr_id, name, ctype, path in (
+                    ("radarr", "Films", "movies", CONTAINER_PATHS["media_movies"]),
+                    ("sonarr", "Series", "tvshows", CONTAINER_PATHS["media_tv"]),
+                    ("lidarr", "Musique", "music", CONTAINER_PATHS["media_music"]),
                 )
-                if jf.ensure_library(name, ctype, path)
+                if self.cfg.enabled(arr_id)
+            ]
+            made = [
+                name for _a, name, ctype, path in wanted if jf.ensure_library(name, ctype, path)
             ]
             names = {lib.get("Name") for lib in jf.libraries()}
-        ok = {"Films", "Series"} <= names
+        ok = {name for _a, name, _c, _p in wanted} <= names
         detail = ("assistant execute" if ran else "assistant deja termine")
         detail += f", bibliotheques creees: {', '.join(made) or 'aucune (deja presentes)'}"
         return StepResult("jellyfin: assistant + bibliotheques", ok=ok, detail=detail, created=ran)
@@ -307,58 +344,67 @@ class Wirer:
     # -- graphe --------------------------------------------------------------
 
     def build_plan(self) -> list[WiringStep]:
+        """Construit le graphe a partir de la selection, sans liste codee en dur.
+
+        Ajouter un *arr ou un client de telechargement au catalogue suffit a le
+        faire apparaitre ici : c'est ce qui rend la phase 2 peu couteuse.
+        """
         cfg = self.cfg
         steps: list[WiringStep] = []
+        arrs = [a for a in catalog.MANAGED_ARRS if cfg.enabled(a)]
+        clients = [d for d in catalog.DOWNLOAD_CLIENTS if cfg.enabled(d)]
 
-        if cfg.enabled("sonarr"):
+        for arr_id in arrs:
             steps.append(
                 WiringStep(
-                    "sonarr/rootfolder",
-                    lambda: self.step_root_folder("sonarr", CONTAINER_PATHS["media_tv"]),
-                )
-            )
-        if cfg.enabled("radarr"):
-            steps.append(
-                WiringStep(
-                    "radarr/rootfolder",
-                    lambda: self.step_root_folder("radarr", CONTAINER_PATHS["media_movies"]),
+                    f"{arr_id}/rootfolder",
+                    lambda a=arr_id: self.step_root_folder(a, ROOT_FOLDERS[a]),
                 )
             )
 
-        if cfg.enabled("transmission"):
-            for arr_id in ("sonarr", "radarr"):
-                if cfg.enabled(arr_id):
-                    steps.append(
-                        WiringStep(
-                            f"{arr_id}/downloadclient",
-                            lambda a=arr_id: self.step_download_client(a),
-                        )
+        if cfg.enabled("qbittorrent"):
+            # Les categories doivent exister avant que les *arr n'y envoient quoi
+            # que ce soit : sinon qBittorrent les cree sans chemin de sauvegarde.
+            steps.append(
+                WiringStep("qbittorrent/categories", self.step_qbittorrent_categories)
+            )
+
+        for dl_id in clients:
+            for arr_id in arrs:
+                steps.append(
+                    WiringStep(
+                        f"{arr_id}/downloadclient/{dl_id}",
+                        lambda a=arr_id, d=dl_id: self.step_download_client(a, d),
                     )
+                )
             if cfg.enabled("prowlarr"):
                 steps.append(
-                    WiringStep("prowlarr/downloadclient", self.step_prowlarr_download_client)
+                    WiringStep(
+                        f"prowlarr/downloadclient/{dl_id}",
+                        lambda d=dl_id: self.step_prowlarr_download_client(d),
+                    )
                 )
 
         if cfg.enabled("prowlarr"):
-            for arr_id in ("sonarr", "radarr"):
-                if cfg.enabled(arr_id):
-                    steps.append(
-                        WiringStep(
-                            f"prowlarr/application/{arr_id}",
-                            lambda a=arr_id: self.step_prowlarr_application(a),
-                        )
+            for arr_id in arrs:
+                steps.append(
+                    WiringStep(
+                        f"prowlarr/application/{arr_id}",
+                        lambda a=arr_id: self.step_prowlarr_application(a),
                     )
+                )
 
         if cfg.enabled("jellyfin"):
             steps.append(WiringStep("jellyfin/setup", self.step_jellyfin_setup))
-            for arr_id in ("sonarr", "radarr"):
-                if cfg.enabled(arr_id):
-                    steps.append(
-                        WiringStep(
-                            f"{arr_id}/notification/jellyfin",
-                            lambda a=arr_id: self.step_jellyfin_notification(a),
-                        )
+            for arr_id in arrs:
+                if arr_id == "lidarr":
+                    continue  # la notification MediaBrowser n'existe pas dans Lidarr
+                steps.append(
+                    WiringStep(
+                        f"{arr_id}/notification/jellyfin",
+                        lambda a=arr_id: self.step_jellyfin_notification(a),
                     )
+                )
         return steps
 
     def execute(self, *, on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:
