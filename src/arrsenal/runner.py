@@ -165,5 +165,22 @@ class Compose:
         proc = _run(self._cmd(action, service), cwd=self.dir, timeout=180)
         return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
 
+    def pull(self, service: str, timeout: int = 900) -> tuple[bool, str]:
+        proc = _run(self._cmd("pull", service), cwd=self.dir, timeout=timeout)
+        return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
+
+    def recreate(self, service: str, timeout: int = 600) -> tuple[bool, str]:
+        """Recree UN service avec son image a jour.
+
+        `--no-deps` evite de toucher aux autres : mettre a jour Sonarr ne doit pas
+        redemarrer le client de telechargement au passage.
+        """
+        proc = _run(
+            self._cmd("up", "-d", "--no-deps", "--force-recreate", service),
+            cwd=self.dir,
+            timeout=timeout,
+        )
+        return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
+
     def logs(self, service: str, tail: int = 50) -> str:
         return _run(self._cmd("logs", "--tail", str(tail), service), cwd=self.dir).stdout

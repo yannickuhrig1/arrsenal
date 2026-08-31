@@ -191,3 +191,46 @@ def test_no_vpn_warning_without_a_download_client():
     serait du bruit, et le bruit fait ignorer les vrais avertissements."""
     assert "Aucun VPN" not in dashboard.render(make(services=("sonarr", "jellyfin")))
     assert "Aucun VPN" in dashboard.render(make(services=("sonarr", "qbittorrent")))
+
+
+# ------------------------------------------------- integrite du script servi
+
+
+def _script_of(page: str) -> str:
+    import re
+
+    blocks = re.findall(r"<script>(.*?)</script>", page, re.S)
+    assert blocks, "aucun bloc script dans la page"
+    return blocks[-1]
+
+
+def test_no_javascript_string_spans_a_line_break():
+    """Une chaine JS ne peut pas franchir une ligne : elle casse le script ENTIER,
+    silencieusement. Un `\n` mal echappe dans le source Python a deja produit
+    exactement cela - la page se chargeait, et plus rien ne se mettait a jour.
+    """
+    for line in _script_of(dashboard.render(make(), live=True)).splitlines():
+        stripped = line.replace("\'", "").replace('\\"', "")
+        assert stripped.count("'") % 2 == 0, f"apostrophe non fermee : {line.strip()[:80]}"
+        assert stripped.count('"') % 2 == 0, f"guillemet non ferme : {line.strip()[:80]}"
+
+
+def test_the_live_script_braces_are_balanced():
+    script = _script_of(dashboard.render(make(), live=True))
+    assert script.count("{") == script.count("}")
+    assert script.count("(") == script.count(")")
+
+
+def test_the_update_zone_exists_for_every_service():
+    cfg = make(services=("sonarr", "qbittorrent"))
+    page = dashboard.render(cfg, live=True)
+    for sid in cfg.services:
+        assert f'class="upd" data-service="{sid}"' in page
+
+
+def test_the_static_page_carries_no_update_machinery():
+    """Le fichier fige ne peut rien mettre a jour : lui donner des boutons serait
+    un mensonge."""
+    page = dashboard.render(make())
+    assert "verifierMaj" not in page
+    assert 'class="upd"' not in page

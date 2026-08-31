@@ -207,6 +207,23 @@ Une page capable d'arrêter vos conteneurs mérite d'être prise au sérieux :
 - **listes fermées** : le nom de service est validé contre votre configuration et
   l'action contre trois valeurs, avant d'atteindre une ligne de commande.
 
+### Mises à jour
+
+La page signale les mises à jour disponibles et les applique en un clic. Deux choses
+distinctes, présentées séparément parce qu'elles n'ont pas les mêmes conséquences :
+
+- **une version plus récente existe** — le tag déployé change, `stack.yml` est réécrit ;
+- **l'image a été reconstruite** — même version, contenu republié en amont. LinuxServer
+  le fait très souvent, pour les correctifs de sécurité de l'image de base.
+
+Le tag déployé vit dans `stack.yml`, pas dans le code d'`arrsenal` : vous pouvez donc
+mettre Sonarr à jour sans attendre une nouvelle version de l'outil, ou rester
+délibérément sur une version ancienne.
+
+Une seule mise à jour à la fois, avec confirmation, et `--no-deps` : mettre Sonarr à jour
+ne redémarre pas votre client de téléchargement au passage. Si le téléchargement échoue,
+le tag est remis comme il était.
+
 ---
 
 ## Comment ça marche

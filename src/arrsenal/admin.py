@@ -21,6 +21,7 @@ from __future__ import annotations
 import hmac
 import json
 import secrets
+import sys
 import threading
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -28,11 +29,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import catalog, dashboard
+from . import catalog, compose, dashboard, updates
 from .models import StackConfig
 from .runner import Compose
 
 ACTIONS = ("start", "stop", "restart")
+
+#: Le controle interroge les registres : quelques secondes. On garde le resultat
+#: brievement pour que l'ouverture de la page ne le relance pas a chaque fois.
+UPDATE_CACHE_SECONDS = 300
 COOKIE = "arrsenal_token"
 
 
@@ -86,11 +91,60 @@ def status_payload(cfg: StackConfig, compose: Compose) -> dict:
     return {"services": services}
 
 
+def updates_payload(cfg: StackConfig) -> dict:
+    """Etat des mises a jour, service par service."""
+    entries = []
+    for info in updates.check(cfg):
+        entries.append(
+            {
+                "id": info.service,
+                "name": catalog.get(info.service).display_name,
+                "current": info.current_tag,
+                "latest": info.latest_tag,
+                "rebuilt": info.rebuilt,
+                "available": info.has_update,
+                "problems": info.problems,
+            }
+        )
+    return {"services": entries}
+
+
+def apply_update(
+    cfg: StackConfig, runner: Compose, project_dir: Path, service: str, target: str | None
+) -> tuple[bool, str]:
+    """Met a jour UN service.
+
+    Sans `target`, on retire la meme image reconstruite. Avec, on change le tag
+    deploye : `stack.yml` et le compose sont reecrits AVANT le pull, sinon Docker
+    retirerait l'ancienne version.
+    """
+    inst = cfg.services[service]
+    previous = inst.image or catalog.get(service).image
+
+    if target:
+        reference = previous.rpartition(":")[0]
+        inst.image = f"{reference}:{target}"
+        compose.write_artifacts(cfg, project_dir)
+
+    ok, message = runner.pull(service)
+    if not ok:
+        if target:
+            inst.image = previous
+            compose.write_artifacts(cfg, project_dir)
+        return False, f"telechargement echoue, version inchangee : {message[:300]}"
+
+    ok, message = runner.recreate(service)
+    if not ok:
+        return False, f"image a jour mais recreation echouee : {message[:300]}"
+    return True, f"{previous.rpartition(':')[2]} -> {inst.image.rpartition(':')[2]}"
+
+
 class _Handler(BaseHTTPRequestHandler):
     # Renseignes par serve()
     cfg: StackConfig
     compose: Compose
     token: str
+    project_dir: Path
 
     server_version = "arrsenal"
     sys_version = ""
@@ -151,6 +205,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.OK, page, "text/html; charset=utf-8", cookie=True)
         elif route == "/api/status":
             self._json(status_payload(self.cfg, self.compose))
+        elif route == "/api/updates":
+            self._json(updates_payload(self.cfg))
         else:
             self._json({"error": "route inconnue"}, HTTPStatus.NOT_FOUND)
 
@@ -158,7 +214,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authorised():
             self._deny()
             return
-        if urlparse(self.path).path != "/api/action":
+        route = urlparse(self.path).path
+        if route not in ("/api/action", "/api/update"):
             self._json({"error": "route inconnue"}, HTTPStatus.NOT_FOUND)
             return
 
@@ -169,8 +226,30 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"error": "corps JSON invalide"}, HTTPStatus.BAD_REQUEST)
             return
 
-        action = str(payload.get("action", ""))
         service = str(payload.get("service", ""))
+        if route == "/api/update":
+            if not self.cfg.enabled(service):
+                self._json({"error": f"service inconnu: {service}"}, HTTPStatus.BAD_REQUEST)
+                return
+            target = payload.get("target")
+            if target is not None and updates.parse_version(str(target)) is None:
+                # Le tag finit dans une image Docker : il doit ressembler a une
+                # version, jamais a ce que le client veut bien envoyer.
+                self._json(
+                    {"error": f"tag refuse: {target}"}, HTTPStatus.BAD_REQUEST
+                )
+                return
+            ok, message = apply_update(
+                self.cfg, self.compose, self.project_dir, service,
+                str(target) if target else None,
+            )
+            self._json(
+                {"ok": ok, "service": service, "message": message},
+                HTTPStatus.OK if ok else HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            return
+
+        action = str(payload.get("action", ""))
 
         # Listes fermees : ces deux valeurs finissent dans une ligne de commande.
         if action not in ACTIONS:
@@ -187,6 +266,22 @@ class _Handler(BaseHTTPRequestHandler):
         )
 
 
+class _Server(ThreadingHTTPServer):
+    """Serveur qui refuse de partager son port.
+
+    `HTTPServer` active `allow_reuse_address`. Sous Linux, SO_REUSEADDR n'autorise
+    pas deux ecoutes simultanees. Sous Windows, SI : un second `bind` reussit en
+    silence et les requetes partent au hasard vers l'un ou l'autre processus.
+
+    Constate en conditions reelles — deux `arrsenal serve` lances de suite, et la
+    page renvoyait « jeton invalide » une fois sur deux, chaque processus ayant
+    tire son propre jeton. Mieux vaut un echec net au demarrage, que la CLI sait
+    deja rapporter.
+    """
+
+    allow_reuse_address = sys.platform != "win32"
+
+
 def build_server(
     cfg: StackConfig, project_dir: Path, *, host: str, port: int, token: str
 ) -> ThreadingHTTPServer:
@@ -197,9 +292,10 @@ def build_server(
             "cfg": cfg,
             "compose": Compose(project_dir, cfg.project_name),
             "token": token,
+            "project_dir": project_dir,
         },
     )
-    server = ThreadingHTTPServer((host, port), handler)
+    server = _Server((host, port), handler)
     server.daemon_threads = True
     return server
 

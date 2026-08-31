@@ -236,3 +236,34 @@ def test_compose_control_refuses_an_action_outside_the_list(tmp_path):
 
     with pytest.raises(ValueError, match="non autorisee"):
         Compose(tmp_path, "test").control("down", "sonarr")
+
+
+# ------------------------------------------------------------- mises a jour
+
+
+def test_an_update_target_that_is_not_a_version_is_refused(server, monkeypatch):
+    """Le tag finit dans une reference d'image Docker : il doit ressembler a une
+    version, jamais a ce que le client veut bien envoyer."""
+    base, _ = server
+    for bad in ("; rm -rf /", "latest", "../../etc", "4.0.19 && curl evil", ""):
+        status, body, _h = call(
+            base + "/api/update", method="POST", payload={"service": "sonarr", "target": bad}
+        )
+        assert status == 400, bad
+        assert "refuse" in body or "inconnu" in body
+
+
+def test_updating_a_service_outside_the_config_is_refused(server):
+    base, _ = server
+    status, _b, _h = call(
+        base + "/api/update", method="POST", payload={"service": "jellyfin", "target": "1.0.0"}
+    )
+    assert status == 400
+
+
+def test_a_valid_version_is_accepted_by_the_validator():
+    from arrsenal import updates
+
+    assert updates.parse_version("4.0.19") == (4, 0, 19)
+    assert updates.parse_version("v1.85.0") == (1, 85, 0)
+    assert updates.parse_version("latest") is None

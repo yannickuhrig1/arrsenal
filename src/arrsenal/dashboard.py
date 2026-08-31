@@ -83,6 +83,7 @@ def _secret(value: str | None, label: str) -> str:
 
 _CONTROLS = """        <div class="state" data-service="{sid}">
           <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="upd" data-service="{sid}" hidden></span>
           <span class="actions">
             <button class="act" data-service="{sid}" data-action="start">demarrer</button>
             <button class="act" data-service="{sid}" data-action="restart">redemarrer</button>
@@ -326,6 +327,18 @@ _TEMPLATE = """<!doctype html>
   button.act:hover:not(:disabled) {{ color: var(--text); border-color: var(--accent); }}
   button.act.danger:hover:not(:disabled) {{ color: #ef4444; border-color: #ef4444; }}
   button.act:disabled {{ opacity: .4; cursor: not-allowed; }}
+  .upd {{ display: inline-flex; align-items: center; gap: .35rem; }}
+  .upd .tag {{
+    font-size: .7rem; padding: .05rem .4rem; border-radius: 999px;
+    background: var(--warn-bg); color: var(--warn-line);
+    border: 1px solid var(--warn-line); font-weight: 600;
+  }}
+  button.upgrade {{
+    font: inherit; font-size: .75rem; padding: .15rem .5rem; cursor: pointer;
+    background: var(--warn-line); color: #1b1200; border: none; border-radius: 5px;
+    font-weight: 600;
+  }}
+  button.upgrade:disabled {{ opacity: .5; cursor: not-allowed; }}
 </style>
 </head>
 <body>
@@ -435,7 +448,57 @@ _LIVE_SCRIPT = """<script>
     });
   });
 
+  function peindreMaj(services) {
+    services.forEach(function (s) {
+      var zone = document.querySelector('.upd[data-service="' + s.id + '"]');
+      if (!zone) return;
+      if (!s.available) { zone.hidden = true; zone.innerHTML = ''; return; }
+      var libelle = s.latest
+        ? 'v' + s.latest.replace(/^v/, '') + ' disponible'
+        : 'image reconstruite';
+      var titre = s.latest
+        ? 'Version ' + s.current + ' installee, ' + s.latest + ' disponible'
+        : 'Meme version, image republiee en amont (correctifs de securite)';
+      zone.hidden = false;
+      zone.innerHTML =
+        '<span class="tag" title="' + titre + '">' + libelle + '</span>' +
+        '<button class="upgrade">mettre a jour</button>';
+      zone.querySelector('button').addEventListener('click', function () {
+        lancerMaj(s, zone);
+      });
+    });
+  }
+
+  function lancerMaj(s, zone) {
+    var quoi = s.latest ? ('passer de ' + s.current + ' a ' + s.latest) : 'retirer la meme version';
+    var question = s.name + ' : ' + quoi + ' ?'
+      + '\\n\\nLe conteneur sera recree. Les autres services ne bougent pas.';
+    if (!confirm(question)) return;
+    zone.innerHTML = '<span class="tag">mise a jour…</span>';
+    fetch('/api/update', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({service: s.id, target: s.latest || null})
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        zone.innerHTML = '<span class="tag">' + (d.ok ? 'fait : ' + d.message : 'echec') + '</span>';
+        if (!d.ok) { alert(s.name + ' : ' + (d.message || d.error)); }
+        setTimeout(function () { rafraichir(); verifierMaj(); }, 1500);
+      })
+      .catch(function () { zone.innerHTML = '<span class="tag">serveur injoignable</span>'; });
+  }
+
+  function verifierMaj() {
+    fetch('/api/updates', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { peindreMaj(d.services); })
+      .catch(function () {});
+  }
+
   rafraichir();
   setInterval(rafraichir, 5000);
+  // Le controle interroge les registres : lent, et sans urgence.
+  verifierMaj();
+  setInterval(verifierMaj, 900000);
 </script>
 """

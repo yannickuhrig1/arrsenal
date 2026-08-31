@@ -514,3 +514,69 @@ dependency failed to start: container arrsenal-gluetun is unhealthy
 **Le client de téléchargement ne démarre pas tant que le tunnel n'est pas établi.** Ce
 n'est pas une intention, c'est le comportement observé : `depends_on` sur le healthcheck
 de Gluetun ferme la porte avant qu'un seul paquet puisse sortir hors du VPN.
+
+
+## Détection des mises à jour — vérifié le 2026-08-31
+
+### Deux choses différentes s'appellent « mise à jour »
+
+| | Comment on la voit | Ce qu'elle demande |
+|---|---|---|
+| **Reconstruction** | digest local != digest distant, même tag | `pull` + recréation |
+| **Nouvelle version** | un tag plus récent existe | changer le tag, donc réécrire `stack.yml` |
+
+LinuxServer republie ses images très souvent. Confondre les deux rendrait l'information
+inutile.
+
+### Le tag déployé devait sortir du code
+
+`arrsenal` épinglait ses tags dans `catalog.py`. Conséquence non voulue : **personne
+n'aurait pu mettre Sonarr à jour sans attendre une nouvelle version de l'outil.**
+Le tag vit désormais dans `stack.yml` ; le catalogue ne fournit que la valeur initiale.
+
+### Lister les tags : la pagination n'est pas un détail
+
+Le protocole registry v2 renvoie les tags dans l'ordre de **publication** — les plus
+anciens d'abord, par pages de 200. Mesuré sur `linuxserver/sonarr` : 25 pages et
+**6,2 secondes** ne suffisaient pas à atteindre la version courante ; le listage
+s'arrêtait encore sur des tags de Sonarr 3.x.
+
+Solution retenue : quand le dépôt est aussi sur Docker Hub, son API accepte
+`ordering=last_updated` et donne les plus récents d'abord — une page suffit. Le protocole
+générique reste le repli pour les autres registres.
+
+**`lscr.io` est bien un miroir de Docker Hub**, vérifié par comparaison de digests :
+`lscr.io/linuxserver/sonarr:4.0.19` et `linuxserver/sonarr:4.0.19` renvoient le même
+sha256. C'est ce qui autorise ce raccourci.
+
+Mesures après correction, sur les trois registres :
+
+| Image | Temps | Résultat |
+|---|---|---|
+| `lscr.io/linuxserver/sonarr:4.0.15` | 1,3 s | 4.0.19 |
+| `qmcgaw/gluetun:v3.40.0` | 0,9 s | v3.41.3 |
+| `ghcr.io/autobrr/autobrr:v1.80.0` | 2,1 s | v1.85.0 |
+
+### Comparer des versions, pas des chaînes
+
+`4.9.5` vient **avant** `4.16.1`, ce que le tri alphabétique inverse. Les tags sont
+convertis en tuples d'entiers, et seuls ceux de la même convention sont comparés — un
+dépôt mélange `v1.85.0`, `1.85`, `version-1.85.0` et `latest`.
+
+### Le bug qui rendait la page muette
+
+Un retour à la ligne mal échappé dans le source Python s'est retrouvé **au milieu d'une
+chaîne JavaScript**. La chaîne n'était pas terminée : le script entier mourait, la page
+se chargeait normalement et plus rien ne se mettait à jour — ni l'état, ni les versions.
+
+Un test vérifie désormais qu'aucune chaîne du script servi ne franchit une ligne.
+
+### Deux serveurs sur le même port, en silence
+
+`HTTPServer` active `allow_reuse_address`. Sous Linux, `SO_REUSEADDR` n'autorise pas deux
+écoutes simultanées ; **sous Windows, si** : un second `bind` réussit sans un mot, et les
+requêtes partent au hasard vers l'un ou l'autre processus. Chacun ayant tiré son propre
+jeton, la page répondait « jeton invalide » une fois sur deux.
+
+Le serveur refuse désormais de partager son port. Vérifié : le second démarrage échoue
+avec `WinError 10048`, et il ne reste qu'une écoute.

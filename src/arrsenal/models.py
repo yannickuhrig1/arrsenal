@@ -155,6 +155,12 @@ class ServiceInstance(BaseModel):
     #: `UrlBase` du service, quand il n'est pas servi a la racine.
     url_base: str = ""
 
+    #: Image REELLEMENT deployee, tag compris. Le catalogue ne fournit que la
+    #: valeur par defaut : sans ce champ, la version serait figee dans le code
+    #: d'arrsenal et personne ne pourrait mettre a jour Sonarr sans attendre une
+    #: nouvelle version de l'outil.
+    image: str = ""
+
     def url(self, host: str = "localhost") -> str:
         base = f"http://{host}:{self.host_port}"
         return f"{base}/{self.url_base}" if self.url_base else base

@@ -106,7 +106,9 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
     inst = cfg.services[service_id]
 
     block: dict = {
-        "image": spec.image,
+        # L'image vient de l'INSTANCE, pas du catalogue : c'est ce qui permet de
+        # mettre a jour un service sans attendre une nouvelle version d'arrsenal.
+        "image": inst.image or spec.image,
         # Prefixe par le nom de projet, pour ne PAS entrer en collision avec une
         # stack existante. Beaucoup de NAS font deja tourner un conteneur nomme
         # `sonarr` : sans ce prefixe, `docker compose up` echoue ou, pire, prend

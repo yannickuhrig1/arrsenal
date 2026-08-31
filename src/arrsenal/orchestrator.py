@@ -80,7 +80,7 @@ def build_config(
     )
     for sid in catalog.resolve_dependencies(services):
         spec = catalog.get(sid)
-        inst = ServiceInstance(spec_id=sid, host_port=spec.default_host_port)
+        inst = ServiceInstance(spec_id=sid, host_port=spec.default_host_port, image=spec.image)
         if spec.api_family == "arr":
             inst.api_key = seed.generate_api_key()
         if spec.api_family in ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr"):
