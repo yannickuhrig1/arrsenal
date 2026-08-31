@@ -203,6 +203,28 @@ Deux conséquences dans le code :
 Sources : [forums Unraid](https://forums.unraid.net/topic/117661-docker-user-puid-and-group-pgid-settings/)
 · [Marius Hosting, UID/GID sur Synology](https://mariushosting.com/synology-how-to-find-uid-userid-and-gid-groupid/)
 
+## Coexistence avec une stack existante — vérifié
+
+Observation faite sur un Unraid réel faisant tourner 75 conteneurs, dont un
+`sonarr` sur le port 8989 avec `/mnt/user/appdata/sonarr` en configuration :
+**arrsenal codait `container_name` en dur**, donc il ne pouvait ni cohabiter avec une
+stack existante, ni être déployé deux fois sur la même machine.
+
+Les noms de conteneurs sont désormais préfixés par le nom de projet
+(`arrsenal-sonarr`). Vérifié contre Docker Compose v5.3 que cela ne casse rien :
+
+```
+depuis le service "sonarr" :
+  getent hosts prowlarr           -> 172.18.0.3  prowlarr
+  getent hosts dnsprobe-prowlarr  -> 172.18.0.3  dnsprobe-prowlarr
+```
+
+Le **nom de service** résout indépendamment de `container_name`. Le câblage vise le
+service (`http://sonarr:8989`), il n'est donc pas affecté.
+
+Les collisions de **ports** restent possibles (8989 est un défaut très répandu) : le
+préflight les détecte et refuse avant toute écriture.
+
 ## Non vérifié à ce jour
 
 - Bazarr est **volontairement absent du catalogue** : sa configuration passe par un

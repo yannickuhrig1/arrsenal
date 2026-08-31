@@ -30,7 +30,13 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
 
     block: dict = {
         "image": spec.image,
-        "container_name": spec.id,
+        # Prefixe par le nom de projet, pour ne PAS entrer en collision avec une
+        # stack existante. Beaucoup de NAS font deja tourner un conteneur nomme
+        # `sonarr` : sans ce prefixe, `docker compose up` echoue ou, pire, prend
+        # la place du conteneur de production.
+        # Le cablage n'est pas affecte : les conteneurs se joignent par leur nom de
+        # SERVICE compose (`http://sonarr:8989`), pas par container_name.
+        "container_name": f"{cfg.project_name}-{spec.id}",
         "restart": "unless-stopped",
         "environment": {
             "PUID": str(cfg.puid),

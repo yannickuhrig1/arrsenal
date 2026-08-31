@@ -255,3 +255,42 @@ def test_config_records_where_the_ids_came_from(tmp_path):
 
     cfg = orchestrator.build_config(services=["sonarr"], data_root=str(tmp_path))
     assert cfg.ids_source and cfg.ids_source != "non renseigne"
+
+
+# -------------------------------------------------- coexistence avec l'existant
+
+
+def test_container_names_are_prefixed_by_the_project(tmp_path):
+    """Beaucoup de NAS font deja tourner un conteneur nomme `sonarr`. Sans
+    prefixe, `docker compose up` entre en collision avec la production."""
+    cfg = make_cfg(tmp_path)
+    cfg.project_name = "arrsenal"
+    names = {b["container_name"] for b in compose.build_compose(cfg)["services"].values()}
+    assert "sonarr" not in names
+    assert "arrsenal-sonarr" in names
+
+
+def test_two_stacks_can_coexist(tmp_path):
+    a, b = make_cfg(tmp_path), make_cfg(tmp_path)
+    a.project_name, b.project_name = "maison", "labo"
+    names_a = {x["container_name"] for x in compose.build_compose(a)["services"].values()}
+    names_b = {x["container_name"] for x in compose.build_compose(b)["services"].values()}
+    assert not (names_a & names_b)
+
+
+def test_wiring_targets_service_names_not_container_names(tmp_path):
+    """Verifie contre Docker Compose v5.3 : le nom de SERVICE resout meme quand
+    container_name differe. Le cablage doit donc viser le service."""
+    from arrsenal.wiring import Wirer
+
+    cfg = make_cfg(tmp_path)
+    cfg.project_name = "prefixe-quelconque"
+    assert Wirer(cfg).internal_url("sonarr") == "http://sonarr:8989"
+
+
+def test_compose_service_keys_stay_bare(tmp_path):
+    """Les cles de service sont ce que le DNS interne resout : elles ne doivent
+    jamais porter le prefixe."""
+    cfg = make_cfg(tmp_path)
+    cfg.project_name = "maison"
+    assert "sonarr" in compose.build_compose(cfg)["services"]
