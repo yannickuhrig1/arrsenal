@@ -5,20 +5,28 @@ l'application en memoire et exporte chaque ecran en SVG.
 
     python scripts/screenshots.py
 
-Les fichiers sont regeneres a l'identique a chaque execution, ce qui permet de
-les versionner et de voir les regressions visuelles dans une pull request.
+Les fichiers sont regeneres a l'identique a chaque execution ET sur n'importe
+quelle machine, ce qui permet de les versionner et de voir les regressions
+visuelles dans une pull request. La CI le verifie.
+
+Quatre sources de variation sont donc neutralisees ici, et il a fallu les
+trouver : les identifiants Unix detectes (differents sous Windows et sous
+Linux), les secrets generes (tires au hasard a chaque execution), le repertoire
+du projet (le chemin personnel de qui lance le script se retrouvait dans une
+capture publiee) et la liste des templates Recyclarr (elle vient du depot amont
+et bouge sans nous).
 """
 
 from __future__ import annotations
 
 import asyncio
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from textual.widgets import Label, ListItem, ListView, Static
+from textual.widgets import Footer, Label, ListItem, ListView, Static
 
 from arrsenal.clients.prowlarr import IndexerDefinition
 from arrsenal.tui.app import ArrsenalApp
@@ -35,6 +43,54 @@ from arrsenal.wiring import StepResult
 
 OUT = ROOT / "docs" / "screenshots"
 SIZE = (104, 34)
+
+#: Repertoire affiche dans les captures. Surtout PAS celui d'ou l'on lance le
+#: script : le chemin personnel de l'auteur finirait dans une image publiee.
+SHOWN_PROJECT_DIR = PurePosixPath("/opt/arrsenal")
+
+#: Secrets d'illustration. Les vrais sont tires au hasard a chaque execution :
+#: sans cela, deux captures ne seraient jamais identiques.
+SHOWN_API_KEY = "0123456789abcdef0123456789abcdef"
+SHOWN_PASSWORD = "MotDePasseGenere42"
+
+#: Templates figes pour l'illustration. La liste reelle vient du depot Recyclarr
+#: et change quand il en publie : une capture comparee a l'octet pres ne peut pas
+#: en dependre. Les noms sont vrais, seul l'instantane est fige.
+SHOWN_TEMPLATES = {
+    "sonarr": [
+        "french-multi-vf-bluray-web-1080p",
+        "french-multi-vf-bluray-web-2160p",
+        "french-multi-vo-bluray-web-1080p",
+        "sonarr-german-hd-bluray-web",
+        "web-1080p",
+        "web-2160p",
+        "web-simple-1080p",
+    ],
+    "radarr": [
+        "french-multi-vf-hd-bluray-web",
+        "french-multi-vf-uhd-bluray-web",
+        "french-multi-vo-hd-bluray-web",
+        "hd-bluray-web",
+        "radarr-german-hd-bluray-web",
+        "remux-web-1080p",
+        "uhd-bluray-web",
+    ],
+}
+
+
+def freeze_environment() -> None:
+    """Rend la capture independante de la machine qui la produit."""
+    from arrsenal import orchestrator, seed
+    from arrsenal.tui import screens
+
+    fixed_ids = (1000, 1000, "profil generic-linux", True)
+    orchestrator.resolve_ids = lambda profile: fixed_ids  # type: ignore[assignment]
+    screens.resolve_ids = lambda profile: fixed_ids  # type: ignore[assignment]
+    seed.generate_api_key = lambda: SHOWN_API_KEY  # type: ignore[assignment]
+    seed.generate_password = lambda *a, **kw: SHOWN_PASSWORD  # type: ignore[assignment]
+    screens.recyclarr_cfg.available_templates = (  # type: ignore[assignment]
+        lambda config_dir=None, **kw: (dict(SHOWN_TEMPLATES), None)
+    )
 
 
 #: Resultats fictifs pour illustrer l'ecran de rapport sans rien demarrer.
@@ -70,13 +126,26 @@ FAKE_DEFINITION = IndexerDefinition(
 
 async def capture() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    freeze_environment()
 
     async def shot(app: ArrsenalApp, pilot, name: str) -> None:
+        # Le `Footer` monte ses raccourcis de facon asynchrone. Exporter sans
+        # l'attendre donne, selon l'ordonnancement, une capture avec pied de page
+        # et une capture sans : deux executions de suite ne coincidaient pas.
+        for _ in range(20):
+            footer = app.screen.query(Footer)
+            if footer and footer.first().children:
+                break
+            await pilot.pause()
         path = OUT / f"{name}.svg"
-        path.write_text(app.export_screenshot(), encoding="utf-8")
+        # newline="" : sans cela Python traduit les sauts de ligne en CRLF sous
+        # Windows. Git le rattrape a la normalisation, mais un depot configure
+        # autrement verrait le controle de la CI echouer sans rien de reel.
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            handle.write(app.export_screenshot())
         print(f"  {path.relative_to(ROOT)}")
 
-    app = ArrsenalApp(project_dir=ROOT)
+    app = ArrsenalApp(project_dir=SHOWN_PROJECT_DIR)
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
         await shot(app, pilot, "1-accueil")
