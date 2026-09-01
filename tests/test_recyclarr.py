@@ -384,7 +384,9 @@ def test_la_page_d_acces_ne_propose_pas_de_lien_vers_le_port_0(tmp_path):
     cfg.host = "192.168.1.10"
     page = dashboard.render(cfg)
 
-    assert ":0" not in page.replace("rgba(0", "").replace("#0", "")
+    # Viser le lien, pas la page entiere : elle porte un horodatage, et « 08:02 »
+    # contient « :0 ». Une assertion trop large echouait une minute sur dix.
+    assert "192.168.1.10:0" not in page
     assert "Recyclarr" in page
     assert "tache de fond, sans interface" in page
     # Sonarr, lui, garde son lien.
