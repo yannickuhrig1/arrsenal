@@ -1158,3 +1158,43 @@ appel HTTP, mais pas `configured()` ni `app_profile_id()`, qui interrogent Prowl
 aussi : une exception dans un worker Textual arrête l'application, et l'utilisateur perd
 sa saisie **et** l'explication. Les quatre workers de l'assistant sont désormais
 étanches, et la trace part dans le journal.
+
+---
+
+## Trois demandes d'utilisateur — 2026-09-01
+
+### « Demander si on garde ou si on supprime »
+
+La détection d'une configuration héritée ne servait qu'à afficher un
+avertissement. L'assistant propose désormais le choix, et la ligne de commande
+pose la question (`--reset-config` / `--keep-config` pour y répondre d'avance).
+
+Sans réponse explicite, **on conserve** : effacer la configuration de quelqu'un
+par défaut serait inacceptable. `--yes` répond aux questions, pas aux
+suppressions.
+
+La suppression est bornée par trois verrous, écrits pour être lisibles d'un coup
+d'œil : seuls des services du catalogue sont acceptés, le dossier doit se
+trouver sous `config_root` **après résolution des liens symboliques**, et
+`data_root` n'est jamais parcouru. Un test crée un lien qui sort de la racine et
+vérifie que la suppression est refusée, le fichier visé toujours là.
+
+### « Un menu avec des choix sélectionnables par clic »
+
+L'écran des profils de qualité demandait de **taper** un nom, en n'en montrant
+que six sur vingt-deux. Personne ne peut deviner les seize autres.
+
+Une liste déroulante cliquable les remplace, remplie depuis le manifeste :
+22 profils pour Sonarr, 35 pour Radarr. Le contrôle de nom reste, mais il ne
+peut plus se déclencher par une faute de frappe.
+
+### « Ouvrir automatiquement la page HTML à la fin »
+
+La ligne de commande le faisait déjà ; l'assistant se contentait d'un bouton.
+C'est pourtant là que la page sert : elle porte les adresses et les identifiants
+qui viennent d'être annoncés. Elle s'ouvre maintenant seule, et le bouton reste
+pour les machines sans navigateur — un NAS en ligne de commande, par exemple.
+
+Deux garde-fous : rien ne s'ouvre si le fichier n'existe pas, et le générateur
+de captures comme les tests désactivent l'ouverture. Lancer un navigateur
+pendant une CI n'aurait aucun sens.

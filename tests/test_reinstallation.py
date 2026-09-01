@@ -18,6 +18,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from arrsenal import orchestrator, seed
 
 
@@ -166,3 +168,72 @@ def test_un_dossier_vide_ne_compte_pas(tmp_path):
     Path(cfg.config_path("jellyfin")).mkdir(parents=True)
 
     assert orchestrator.check_existing_config(cfg).ok
+
+
+# ------------------------------------------------- choix garder ou repartir
+
+
+def test_un_lien_qui_sort_de_config_root_est_refuse(tmp_path):
+    """Verrou principal : le chemin est verifie APRES resolution des liens.
+
+    Sans cela, un `config_root` contenant un lien vers ailleurs — un montage
+    reseau, un autre disque — ferait supprimer un dossier qui n'a rien a voir.
+    """
+    cfg = _cfg(tmp_path, ["jellyfin"])
+    dehors = tmp_path / "dehors"
+    dehors.mkdir()
+    (dehors / "precieux.txt").write_text("a garder", encoding="utf-8")
+
+    racine = Path(cfg.config_root)
+    racine.mkdir(parents=True, exist_ok=True)
+    try:
+        (racine / "jellyfin").symlink_to(dehors, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("liens symboliques indisponibles sur cette machine")
+
+    with pytest.raises(ValueError, match="suppression refusee"):
+        orchestrator.reset_configs(cfg, ["jellyfin"])
+
+    assert (dehors / "precieux.txt").exists(), "rien ne doit avoir ete supprime"
+
+
+def test_la_suppression_refuse_un_service_inconnu(tmp_path):
+    cfg = _cfg(tmp_path, ["jellyfin"])
+    with pytest.raises(KeyError):
+        orchestrator.reset_configs(cfg, ["../../etc"])
+
+
+def test_les_medias_ne_sont_jamais_touches(tmp_path):
+    """La garantie qui compte le plus : data_root n'est meme pas parcouru."""
+    cfg = _cfg(tmp_path, ["jellyfin"])
+    dossier = Path(cfg.config_path("jellyfin"))
+    dossier.mkdir(parents=True)
+    (dossier / "data.db").write_text("x", encoding="utf-8")
+    medias = Path(cfg.data_root) / "media" / "films"
+    medias.mkdir(parents=True)
+    (medias / "film.mkv").write_text("precieux", encoding="utf-8")
+
+    orchestrator.reset_configs(cfg, ["jellyfin"])
+
+    assert not dossier.exists()
+    assert (medias / "film.mkv").read_text(encoding="utf-8") == "precieux"
+
+
+def test_seuls_les_services_demandes_sont_supprimes(tmp_path):
+    cfg = _cfg(tmp_path, ["jellyfin", "sonarr"])
+    for sid in ("jellyfin", "sonarr"):
+        chemin = Path(cfg.config_path(sid))
+        chemin.mkdir(parents=True)
+        (chemin / "fichier").write_text("x", encoding="utf-8")
+
+    efface = orchestrator.reset_configs(cfg, ["jellyfin"])
+
+    assert [p.name for p in efface] == ["jellyfin"]
+    assert Path(cfg.config_path("sonarr")).exists()
+
+
+def test_un_dossier_absent_n_est_pas_une_erreur(tmp_path):
+    """Rejouer la suppression doit rester sans effet, pas lever."""
+    cfg = _cfg(tmp_path, ["jellyfin"])
+
+    assert orchestrator.reset_configs(cfg, ["jellyfin"]) == []

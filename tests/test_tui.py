@@ -181,3 +181,44 @@ def test_app_build_config_matches_the_collected_state(tmp_path):
     assert set(cfg.services) == {"sonarr", "qbittorrent"}
     assert cfg.timezone == "Europe/Paris"
     assert cfg.services["sonarr"].api_key
+
+
+@pytest.mark.asyncio
+async def test_la_page_d_acces_s_ouvre_toute_seule(app, tmp_path, monkeypatch):
+    """Demande a l'usage : la ligne de commande l'ouvrait, l'assistant non.
+
+    C'est pourtant la que la page sert : elle porte les adresses et les
+    identifiants que l'utilisateur vient de se voir annoncer.
+    """
+    from arrsenal import dashboard
+    from arrsenal.tui.screens import ReportScreen
+
+    ouvertes = []
+    monkeypatch.setattr(dashboard, "open_in_browser", lambda p: ouvertes.append(p) or True)
+
+    async with app.run_test() as pilot:
+        cfg = pilot.app.build_config()
+        pilot.app.stack_config = cfg
+        pilot.app.results = []
+        (tmp_path / dashboard.FILENAME).write_text("<html></html>", encoding="utf-8")
+        pilot.app.push_screen(ReportScreen())
+        await pilot.pause()
+
+    assert ouvertes == [tmp_path / dashboard.FILENAME]
+
+
+@pytest.mark.asyncio
+async def test_aucune_ouverture_si_la_page_manque(app, tmp_path, monkeypatch):
+    from arrsenal import dashboard
+    from arrsenal.tui.screens import ReportScreen
+
+    ouvertes = []
+    monkeypatch.setattr(dashboard, "open_in_browser", lambda p: ouvertes.append(p) or True)
+
+    async with app.run_test() as pilot:
+        pilot.app.stack_config = pilot.app.build_config()
+        pilot.app.results = []
+        pilot.app.push_screen(ReportScreen())
+        await pilot.pause()
+
+    assert ouvertes == []

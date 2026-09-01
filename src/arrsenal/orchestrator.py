@@ -7,6 +7,7 @@ le wizard et la ligne de commande ne divergeront jamais.
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -185,6 +186,43 @@ def check_existing_config(cfg: StackConfig) -> Check:
 #: Services dont le mot de passe n'est stocke que sous forme hachee : impossible
 #: a relire, donc impossible a reprendre.
 _HASHED_PASSWORDS = ("qbittorrent", "transmission", "jellyfin", "autobrr", "qui")
+
+
+def unusable_configs(cfg: StackConfig) -> list[str]:
+    """Services dont la configuration existante empeche une reprise propre.
+
+    Ceux-la seulement : les *arr se reprennent tres bien, leur cle API se relit
+    dans leur `config.xml`.
+    """
+    return [
+        sid for sid in existing_configs(cfg) if catalog.get(sid).api_family in _HASHED_PASSWORDS
+    ]
+
+
+def reset_configs(cfg: StackConfig, services: list[str]) -> list[Path]:
+    """Supprime la configuration des services indiques. Renvoie ce qui a ete efface.
+
+    Fonction destructrice, donc bornee de trois facons, et il faut que ces trois
+    verrous se lisent d'un coup d'oeil :
+
+    1. seuls des services du CATALOGUE sont acceptes, jamais un chemin libre ;
+    2. le dossier doit se trouver sous `config_root`, verifie APRES resolution
+       des liens symboliques et des `..` ;
+    3. `data_root` n'est jamais parcouru : les medias ne sont pas en jeu, meme
+       si l'appelant se trompe.
+    """
+    racine = Path(cfg.config_root).resolve()
+    efface: list[Path] = []
+    for sid in services:
+        catalog.get(sid)  # leve une erreur lisible si le service est inconnu
+        dossier = Path(cfg.config_path(sid)).resolve()
+        if not dossier.is_dir():
+            continue
+        if racine not in dossier.parents:
+            raise ValueError(f"{dossier} n'est pas sous {racine} : suppression refusee")
+        shutil.rmtree(dossier)
+        efface.append(dossier)
+    return efface
 
 
 def blocking_failures(checks: list[Check]) -> list[Check]:

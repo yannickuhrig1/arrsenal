@@ -190,3 +190,7 @@ Checkbox.service.-on > .toggle--button {
     text-align: center;
     text-style: bold;
 }
+
+.hidden {
+    display: none;
+}

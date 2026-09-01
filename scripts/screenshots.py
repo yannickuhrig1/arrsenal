@@ -170,6 +170,7 @@ async def capture() -> None:
         print(f"  {path.relative_to(ROOT)}")
 
     app = ArrsenalApp(project_dir=SHOWN_PROJECT_DIR)
+    app.auto_open_page = False
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
         await shot(app, pilot, "1-accueil")

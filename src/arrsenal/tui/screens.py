@@ -25,6 +25,7 @@ from textual.widgets import (
     RadioSet,
     RichLog,
     Rule,
+    Select,
     Static,
 )
 
@@ -390,9 +391,13 @@ class TemplatesScreen(WizardScreen):
                 spec = catalog.get(sid)
                 default = recyclarr_cfg.DEFAULT_TEMPLATES.get(sid, "")
                 yield Label(spec.display_name, classes="group-title")
-                yield Input(
-                    value=default,
-                    placeholder=f"nom du template pour {sid}",
+                # Une LISTE, pas un champ libre. Il y a 22 profils pour Sonarr et
+                # 35 pour Radarr : demander de taper un nom obligeait a le
+                # connaitre par coeur, et l'ecran n'en montrait que six.
+                yield Select(
+                    [(default, default)] if default else [],
+                    value=default or Select.BLANK,
+                    allow_blank=not default,
                     id=f"tpl-{sid}",
                 )
                 yield Static(id=f"tpl-choices-{sid}", classes="service-note")
@@ -434,22 +439,28 @@ class TemplatesScreen(WizardScreen):
         status.update("")
         for sid in self._targets():
             available = names.get(sid, [])
+            defaut = recyclarr_cfg.DEFAULT_TEMPLATES.get(sid, "")
+            liste = self.query_one(f"#tpl-{sid}", Select)
+            liste.set_options((nom, nom) for nom in available)
+            if defaut in available:
+                liste.value = defaut
             self.query_one(f"#tpl-choices-{sid}", Static).update(
-                f"[dim]{len(available)} disponibles : {', '.join(available[:6])}"
-                f"{'…' if len(available) > 6 else ''}[/dim]"
+                f"[dim]{len(available)} profils proposes par les TRaSH Guides. "
+                f"Cliquez pour derouler la liste.[/dim]"
             )
         self._validate()
 
-    @on(Input.Changed)
+    @on(Select.Changed)
     def _on_change(self) -> None:
         self._validate()
 
     def choices(self) -> dict[str, str]:
-        return {
-            sid: self.query_one(f"#tpl-{sid}", Input).value.strip()
-            for sid in self._targets()
-            if self.query_one(f"#tpl-{sid}", Input).value.strip()
-        }
+        retenus = {}
+        for sid in self._targets():
+            valeur = self.query_one(f"#tpl-{sid}", Select).value
+            if isinstance(valeur, str) and valeur:
+                retenus[sid] = valeur
+        return retenus
 
     def _validate(self) -> bool:
         """Un nom inconnu n'echoue qu'a la toute fin du cablage. On le dit ici."""
@@ -501,6 +512,12 @@ class SummaryScreen(WizardScreen):
             yield DataTable(id="summary-table", cursor_type="row")
             yield Static(id="summary-paths")
             yield Static(id="summary-warnings")
+            # Choix propose UNIQUEMENT si une configuration inutilisable existe.
+            # Il n'apparait donc jamais lors d'une premiere installation.
+            yield Static(id="config-existante", classes="hidden")
+            with RadioSet(id="config-choix", classes="hidden"):
+                yield RadioButton("Conserver ces configurations", value=True, id="cfg-garder")
+                yield RadioButton("Supprimer et repartir de zero", id="cfg-supprimer")
         yield Horizontal(
             Button("Installer et cabler", variant="success", id="install"),
             Button("Retour", id="back"),
@@ -541,9 +558,49 @@ class SummaryScreen(WizardScreen):
                 f"mauvaises permissions. Sur un NAS, lancez `id`.[/dim]"
             )
         self.query_one("#summary-warnings", Static).update("\n\n".join(warnings))
+        self._proposer_reset(cfg)
+
+    def _proposer_reset(self, cfg) -> None:
+        """Affiche le choix garder / repartir de zero, s'il a lieu d'etre.
+
+        Le cas : qBittorrent, Transmission, Jellyfin, autobrr et qui ne stockent
+        leur mot de passe que hache. Une configuration heritee d'une installation
+        precedente ne peut donc pas etre reprise — les identifiants annonces
+        seront refuses, avec des messages incomprehensibles.
+
+        Le choix par defaut reste « conserver » : effacer la configuration de
+        quelqu'un sans qu'il l'ait demande serait inacceptable.
+        """
+        concernes = orchestrator.unusable_configs(cfg)
+        if not concernes:
+            return
+
+        chemins = "\n".join(f"  {cfg.config_path(sid)}" for sid in concernes)
+        bandeau = self.query_one("#config-existante", Static)
+        bandeau.update(
+            f"[yellow]Une configuration existe deja pour {', '.join(concernes)}.[/yellow]\n"
+            f"[dim]Leurs mots de passe n'y sont stockes que haches : arrsenal ne peut "
+            f"pas les reprendre, et ceux qu'il va vous annoncer seront refuses.[/dim]\n"
+            f"[dim]{chemins}[/dim]\n"
+            f"[dim]Vos medias ne sont jamais touches.[/dim]"
+        )
+        bandeau.remove_class("hidden")
+        self.query_one("#config-choix", RadioSet).remove_class("hidden")
+
+    def reset_demande(self) -> bool:
+        choix = self.query_one("#config-choix", RadioSet).pressed_button
+        return choix is not None and choix.id == "cfg-supprimer"
 
     @on(Button.Pressed, "#install")
     def go(self) -> None:
+        cfg = self.app.stack_config or self.app.build_config()
+        self.app.stack_config = cfg
+        if self.reset_demande():
+            # Suppression demandee explicitement : elle a lieu ICI, avant que
+            # l'installation ne commence, pour que le pre-semis reparte d'un
+            # dossier vide.
+            efface = orchestrator.reset_configs(cfg, orchestrator.unusable_configs(cfg))
+            journal.finish(f"configurations supprimees : {len(efface)}")
         self.app.push_screen(InstallScreen())
 
     @on(Button.Pressed, "#back")
@@ -710,6 +767,26 @@ class ReportScreen(WizardScreen):
             f"{self.app.project_dir / '.env'} (chmod 600).[/dim]"
         )
         self.query_one("#report-next", Static).update(body)
+        self._ouvrir_automatiquement()
+
+    def _ouvrir_automatiquement(self) -> None:
+        """Ouvre la page d'acces sans attendre un clic.
+
+        La ligne de commande le faisait deja ; l'assistant, lui, se contentait
+        d'un bouton. Or c'est precisement la que l'utilisateur a besoin de la
+        page : elle porte les adresses et les identifiants qu'il vient de se voir
+        annoncer.
+
+        Le bouton reste, comme second essai : sur un NAS sans environnement
+        graphique, aucun navigateur ne repond.
+        """
+        from .. import dashboard
+
+        if not self.app.auto_open_page:
+            return
+        chemin = Path(self.app.project_dir) / dashboard.FILENAME
+        if chemin.exists() and dashboard.open_in_browser(chemin):
+            self.query_one("#open-page", Button).label = "Rouvrir la page d'acces"
 
     @on(Button.Pressed, "#open-page")
     def open_page(self) -> None:

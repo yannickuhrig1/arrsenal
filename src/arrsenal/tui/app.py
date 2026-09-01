@@ -33,6 +33,10 @@ class ArrsenalApp(App):
         self.recyclarr_templates: dict[str, str] = {}
         self.stack_config: StackConfig | None = None
         self.results: list[StepResult] = []
+        #: Ouvrir la page d'acces a la fin. Mis a False par le generateur de
+        #: captures et par les tests : lancer un navigateur pendant une CI
+        #: n'aurait aucun sens.
+        self.auto_open_page: bool = True
 
     def on_mount(self) -> None:
         self.push_screen(WelcomeScreen())

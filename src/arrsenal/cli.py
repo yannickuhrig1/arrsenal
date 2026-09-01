@@ -89,6 +89,55 @@ def _announce_page(path: Path, open_page: bool) -> None:
         console.print("[dim]Aucun navigateur disponible ici : ouvrez ce fichier a la main.[/dim]")
 
 
+def _traiter_config_existante(
+    cfg: StackConfig, reset: bool | None, *, assume_yes: bool
+) -> None:
+    """Propose de repartir de zero quand une configuration inutilisable est la.
+
+    « Inutilisable » a un sens precis : qBittorrent, Transmission, Jellyfin,
+    autobrr et qui ne stockent leur mot de passe que hache. arrsenal ne peut ni
+    le relire ni le reinitialiser, et ceux qu'il annonce seront refuses.
+
+    Sans reponse explicite, on CONSERVE : effacer la configuration de quelqu'un
+    par defaut serait inacceptable.
+    """
+    concernes = orchestrator.unusable_configs(cfg)
+    if not concernes:
+        return
+
+    console.print(
+        f"\n[yellow]Configuration existante detectee[/yellow] pour "
+        f"[bold]{', '.join(concernes)}[/bold] dans {cfg.config_root}.\n"
+        f"[dim]Leurs mots de passe n'y sont stockes que haches : arrsenal ne peut pas "
+        f"les reprendre, et ceux qu'il va annoncer seront refuses.[/dim]"
+    )
+    for sid in concernes:
+        console.print(f"  [dim]{cfg.config_path(sid)}[/dim]")
+
+    if reset is None:
+        if assume_yes:
+            # `--yes` repond oui aux questions, pas aux suppressions.
+            console.print(
+                "[dim]Conservee (--yes ne supprime rien). Utilisez --reset-config pour "
+                "repartir de zero.[/dim]"
+            )
+            return
+        console.print(
+            "\n[dim]Vos medias ne sont jamais touches : seuls ces dossiers de "
+            "configuration le seraient.[/dim]"
+        )
+        reset = typer.confirm("Supprimer ces configurations et repartir de zero ?", default=False)
+
+    if not reset:
+        console.print("[dim]Configurations conservees.[/dim]")
+        return
+
+    efface = orchestrator.reset_configs(cfg, concernes)
+    for chemin in efface:
+        console.print(f"  [green]supprime[/green] {chemin}")
+    journal.finish(f"configurations supprimees : {', '.join(concernes)}")
+
+
 def _echo(progress: Progress) -> None:
     mark = "[green]OK[/green]" if progress.ok else "[red]ECHEC[/red]"
     console.print(f"  {mark} {progress.phase} : {progress.message}")
@@ -142,6 +191,14 @@ def install(
     recyclarr_radarr: str = typer.Option(
         "",
         help="Template TRaSH pour Radarr. Voir `arrsenal templates`. Vide = defaut.",
+    ),
+    reset_config: bool | None = typer.Option(
+        None,
+        "--reset-config/--keep-config",
+        help=(
+            "Configuration existante : repartir de zero, ou la conserver. "
+            "Sans l'option, la question est posee."
+        ),
     ),
 ) -> None:
     """Deploie et cable la stack de bout en bout, sans interaction."""
@@ -222,6 +279,8 @@ def install(
     console.print(f"[dim]arrsenal {__version__}[/dim]")
     chemin_journal = journal.start(project_dir, "install")
     journal.config(cfg)
+    _traiter_config_existante(cfg, reset_config, assume_yes=yes)
+
     controles = orchestrator.preflight(cfg, project_dir)
     journal.checks(controles)
     if not report.print_checks(controles):

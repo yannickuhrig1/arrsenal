@@ -7,7 +7,7 @@ reelle du fichier `templates.json` publie par Recyclarr qui est reproduite.
 from __future__ import annotations
 
 import pytest
-from textual.widgets import Button, Input, Static
+from textual.widgets import Button, Select, Static
 
 from arrsenal.clients import recyclarr
 from arrsenal.tui.app import ArrsenalApp
@@ -43,8 +43,8 @@ async def test_les_defauts_sont_preremplis(app):
     async with app.run_test() as pilot:
         screen = await _goto_templates(pilot, ["sonarr", "radarr", "recyclarr"])
 
-        assert screen.query_one("#tpl-sonarr", Input).value == "web-1080p"
-        assert screen.query_one("#tpl-radarr", Input).value == "hd-bluray-web"
+        assert screen.query_one("#tpl-sonarr", Select).value == "web-1080p"
+        assert screen.query_one("#tpl-radarr", Select).value == "hd-bluray-web"
         assert screen.choices() == recyclarr.DEFAULT_TEMPLATES
 
 
@@ -54,7 +54,7 @@ async def test_seuls_les_services_installes_sont_proposes(app):
     async with app.run_test() as pilot:
         screen = await _goto_templates(pilot, ["sonarr", "recyclarr"])
 
-        assert screen.query_one("#tpl-sonarr", Input) is not None
+        assert screen.query_one("#tpl-sonarr", Select) is not None
         assert not screen.query("#tpl-radarr")
         assert list(screen.choices()) == ["sonarr"]
 
@@ -68,13 +68,18 @@ async def test_un_nom_inconnu_est_signale_avant_l_installation(app):
     """
     async with app.run_test() as pilot:
         screen = await _goto_templates(pilot, ["sonarr", "radarr", "recyclarr"])
-        screen.query_one("#tpl-sonarr", Input).value = "web-9999p"
+        # Une valeur absente de la liste ne peut plus arriver par l'interface :
+        # on l'injecte pour verifier que le garde-fou tient quand meme.
+        screen._available["sonarr"] = ["web-1080p", "web-2160p"]
+        screen.query_one("#tpl-sonarr", Select).set_options([("web-9999p", "web-9999p")])
+        screen.query_one("#tpl-sonarr", Select).value = "web-9999p"
         await pilot.pause()
 
         assert screen.query_one("#next", Button).disabled is True
         assert "inconnu" in str(screen.query_one("#templates-status", Static).content)
 
-        screen.query_one("#tpl-sonarr", Input).value = "web-2160p"
+        screen.query_one("#tpl-sonarr", Select).set_options([("web-2160p", "web-2160p")])
+        screen.query_one("#tpl-sonarr", Select).value = "web-2160p"
         await pilot.pause()
 
         assert screen.query_one("#next", Button).disabled is False
@@ -99,7 +104,7 @@ async def test_passer_laisse_les_defauts_au_cablage(app):
 async def test_un_choix_atteint_la_configuration(app):
     async with app.run_test() as pilot:
         screen = await _goto_templates(pilot, ["sonarr", "radarr", "recyclarr"])
-        screen.query_one("#tpl-radarr", Input).value = "french-multi-vf-hd-bluray-web"
+        screen.query_one("#tpl-radarr", Select).value = "french-multi-vf-hd-bluray-web"
         await pilot.pause()
         screen.query_one("#next", Button).press()
         await pilot.pause()
@@ -157,3 +162,36 @@ async def test_recyclarr_seul_ne_declenche_pas_l_ecran(app):
         await pilot.pause()
 
         assert isinstance(pilot.app.screen, SummaryScreen)
+
+
+@pytest.mark.asyncio
+async def test_la_liste_complete_est_proposee_au_clic(app):
+    """Le champ libre obligeait a connaitre le nom par coeur.
+
+    Signale a l'usage : l'ecran affichait six noms sur vingt-deux, et il fallait
+    taper le sien. La liste deroulante contient desormais tout le manifeste.
+    """
+    async with app.run_test() as pilot:
+        screen = await _goto_templates(pilot, ["sonarr", "radarr", "recyclarr"])
+
+        for sid, attendus in AVAILABLE.items():
+            liste = screen.query_one(f"#tpl-{sid}", Select)
+            proposes = [valeur for _libelle, valeur in liste._options]
+            assert proposes == attendus, sid
+
+
+@pytest.mark.asyncio
+async def test_un_choix_se_fait_sans_clavier(app):
+    """Tout doit etre atteignable a la souris : c'est la demande d'origine."""
+    async with app.run_test() as pilot:
+        screen = await _goto_templates(pilot, ["sonarr", "recyclarr"])
+        liste = screen.query_one("#tpl-sonarr", Select)
+
+        # Derouler puis choisir, comme un clic le ferait.
+        liste.expanded = True
+        await pilot.pause()
+        liste.value = "web-2160p"
+        await pilot.pause()
+
+        assert screen.choices() == {"sonarr": "web-2160p"}
+        assert screen.query_one("#next", Button).disabled is False
