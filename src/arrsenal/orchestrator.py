@@ -97,17 +97,94 @@ def build_config(
     return cfg
 
 
-def preflight(cfg: StackConfig) -> list[Check]:
+def our_published_ports(cfg: StackConfig, project_dir: Path | None) -> set[int]:
+    """Ports deja publies par NOTRE propre pile.
+
+    Reinstaller la meme stack n'est pas un conflit : ces ports nous appartiennent
+    et seront liberes par l'arret prealable. Sans cette distinction, le preflight
+    refusait de rejouer une installation sur une stack en marche — c'est-a-dire
+    le cas le plus courant apres un premier essai.
+    """
+    if project_dir is None:
+        return set()
+    ports: set[int] = set()
+    for row in Compose(project_dir, cfg.project_name).ps_json():
+        for publie in row.get("Publishers") or []:
+            port = publie.get("PublishedPort")
+            if isinstance(port, int) and port:
+                ports.add(port)
+    return ports
+
+
+def preflight(cfg: StackConfig, project_dir: Path | None = None) -> list[Check]:
     checks = check_docker()
+    nos_ports = our_published_ports(cfg, project_dir)
     for sid in catalog.STARTUP_ORDER:
         # Un service sans interface web ne publie rien : Recyclarr tourne sur une
         # planification. Le controler afficherait « port 0 : libre », une ligne
         # qui n'apprend rien et fait douter du reste du tableau.
         if cfg.enabled(sid) and cfg.services[sid].host_port:
-            checks.append(check_port_free(cfg.services[sid].host_port, sid))
+            port = cfg.services[sid].host_port
+            if port in nos_ports:
+                checks.append(
+                    Check(f"port {port} ({sid})", True, "occupe par votre propre pile arrsenal")
+                )
+            else:
+                checks.append(check_port_free(port, sid))
     checks.append(check_disk_space(cfg.data_root))
     checks.append(check_hardlinks(cfg.data_root))
+    checks.append(check_existing_config(cfg))
     return checks
+
+
+def existing_configs(cfg: StackConfig) -> list[str]:
+    """Services dont la configuration existe DEJA sous config_root."""
+    present = []
+    for sid in catalog.STARTUP_ORDER:
+        if not cfg.enabled(sid):
+            continue
+        directory = Path(cfg.config_path(sid))
+        if directory.is_dir() and any(directory.iterdir()):
+            present.append(sid)
+    return present
+
+
+def check_existing_config(cfg: StackConfig) -> Check:
+    """Une configuration precedente est-elle reutilisee ?
+
+    Le cas est piegeux et a ete rencontre a l'usage. arrsenal reprend la cle API
+    des *arr dans leur `config.xml` existant, mais il ne PEUT pas retrouver les
+    mots de passe de qBittorrent, Jellyfin, autobrr ou qui : ils n'y sont
+    stockes que haches. Il en genere donc de nouveaux, les annonce dans le
+    rapport... et les services refusent les identifiants.
+
+    Le symptome est incomprehensible : « reponse illisible », « HTTP 401 »,
+    « l'API a peut-etre change de forme ». La cause tient en une phrase, autant
+    la dire avant de commencer.
+    """
+    present = existing_configs(cfg)
+    hachants = [s for s in present if catalog.get(s).api_family in _HASHED_PASSWORDS]
+    if not hachants:
+        return Check(
+            "configuration existante",
+            True,
+            "aucune, installation neuve" if not present else f"reprise : {', '.join(present)}",
+            blocking=False,
+        )
+    return Check(
+        "configuration existante",
+        False,
+        f"{', '.join(hachants)} ont deja une configuration dans {cfg.config_root}. "
+        f"Leurs mots de passe y sont haches : arrsenal ne peut pas les relire, et ceux "
+        f"qu'il vient de generer seront refuses. Reprenez l'installation d'origine avec "
+        f"--project-dir, ou supprimez ces dossiers pour repartir a zero.",
+        blocking=False,
+    )
+
+
+#: Services dont le mot de passe n'est stocke que sous forme hachee : impossible
+#: a relire, donc impossible a reprendre.
+_HASHED_PASSWORDS = ("qbittorrent", "transmission", "jellyfin", "autobrr", "qui")
 
 
 def blocking_failures(checks: list[Check]) -> list[Check]:
@@ -157,6 +234,90 @@ def seed_all(cfg: StackConfig) -> list[str]:
     return actions
 
 
+def wait_for_download_clients(cfg: StackConfig, on_progress: ProgressFn = _noop) -> None:
+    """Attend que les clients de telechargement repondent.
+
+    On attendait les *arr, pas eux. Or c'est le *arr qui VALIDE la connexion au
+    moment d'enregistrer le client : si qBittorrent n'a pas fini de demarrer, il
+    refuse avec « Authentication Failure », un message qui accuse les
+    identifiants alors qu'ils sont bons. Constate apres une reinstallation, ou
+    le conteneur redemarre juste avant le cablage.
+
+    N'importe quelle reponse HTTP suffit : elle prouve que le service ecoute.
+    """
+    import httpx
+
+    from .clients.base import wait_until
+
+    for sid in catalog.DOWNLOAD_CLIENTS:
+        if not cfg.enabled(sid) or cfg.services[sid].adopted:
+            continue
+        url = cfg.services[sid].url(cfg.host)
+
+        def probe(adresse: str = url) -> bool:
+            try:
+                httpx.get(adresse, timeout=5.0, follow_redirects=False)
+            except httpx.HTTPError:
+                return False
+            return True
+
+        resultat = wait_until(probe, label=sid, timeout=180.0)
+        message = (
+            f"{catalog.get(sid).display_name} pret"
+            if resultat.ready
+            else f"{catalog.get(sid).display_name} ne repond pas : {resultat.detail}"
+        )
+        if resultat.ready and sid == "qbittorrent":
+            leve = _lift_qbittorrent_ban(cfg)
+            if leve:
+                message += ", bannissement leve"
+        on_progress(Progress("attente", message, ok=resultat.ready))
+
+
+def _lift_qbittorrent_ban(cfg: StackConfig) -> bool:
+    """Leve un bannissement d'adresse dans qBittorrent, s'il y en a un.
+
+    qBittorrent bannit une adresse apres cinq echecs d'authentification, pour une
+    heure. Une installation qui s'est trompee de mot de passe — apres une
+    reinstallation, par exemple — fait donc bannir l'adresse de Sonarr. Le
+    symptome ensuite est cruel : le mot de passe est devenu correct, mais le
+    *arr recoit un 403 et refuse d'enregistrer le client sur
+    « Authentication Failure », en accusant les identifiants.
+
+    Verifie : depuis l'hote la connexion repondait 204, depuis le conteneur
+    Sonarr 403. Un redemarrage vide la liste des bannis, et la meme requete
+    repond 204.
+    """
+    import httpx
+
+    from .clients.base import wait_until
+
+    inst = cfg.services["qbittorrent"]
+    try:
+        reponse = httpx.post(
+            f"{inst.url(cfg.host)}/api/v2/auth/login",
+            data={"username": inst.username or "", "password": inst.password or ""},
+            headers={"Referer": inst.url(cfg.host)},
+            timeout=15.0,
+        )
+    except httpx.HTTPError:
+        return False
+    if reponse.status_code != 403 or cfg.project_dir is None:
+        return False
+
+    ok, _message = Compose(Path(str(cfg.project_dir)), cfg.project_name).control(
+        "restart", "qbittorrent"
+    )
+    if not ok:
+        return False
+    wait_until(
+        lambda: httpx.get(f"{inst.url(cfg.host)}/api/v2/app/version", timeout=5.0).is_success,
+        label="qbittorrent",
+        timeout=120.0,
+    )
+    return True
+
+
 def wait_for_arrs(cfg: StackConfig, on_progress: ProgressFn = _noop) -> None:
     """Attend que chaque *arr reponde AVEC NOTRE CLE, pas juste qu'il ecoute."""
     for sid in catalog.STARTUP_ORDER:
@@ -190,13 +351,35 @@ def install(
     created = create_tree(cfg.data_root, cfg.config_root, list(cfg.services))
     on_progress(Progress("arborescence", f"{len(created)} dossiers crees"))
 
+    written = compose.write_artifacts(cfg, project_dir)
+    on_progress(Progress("artefacts", ", ".join(p.name for p in written)))
+    runner = Compose(project_dir, cfg.project_name)
+
+    # Arreter AVANT de pre-semer, si une stack du meme nom tourne deja. Deux
+    # raisons, toutes deux constatees a l'usage :
+    #
+    # - qBittorrent garde sa configuration en memoire. Reecrire son mot de passe
+    #   pendant qu'il tourne ne change rien pour lui, et le *arr refuse ensuite
+    #   d'enregistrer le client sur « Authentication Failure » ;
+    # - Transmission REECRIT son settings.json a l'arret. Notre modification
+    #   serait purement et simplement effacee quelques minutes plus tard.
+    arretes, _ = runner.stop()
+    on_progress(
+        Progress(
+            "arret",
+            "conteneurs existants arretes avant pre-semis"
+            if arretes
+            else "aucun conteneur a arreter",
+        )
+    )
+
     for action in seed_all(cfg):
         on_progress(Progress("pre-semis", action))
 
-    written = compose.write_artifacts(cfg, project_dir)
-    on_progress(Progress("artefacts", ", ".join(p.name for p in written)))
+    # Le pre-semis peut adopter la cle API d'un config.xml existant : les
+    # artefacts doivent refleter ce qui sera reellement utilise.
+    compose.write_artifacts(cfg, project_dir)
 
-    runner = Compose(project_dir, cfg.project_name)
     valid, message = runner.config_valid()
     if not valid:
         raise InstallAborted(f"Le fichier compose genere est invalide : {message}")
@@ -207,6 +390,7 @@ def install(
         raise InstallAborted(f"docker compose up a echoue : {message}")
 
     wait_for_arrs(cfg, on_progress)
+    wait_for_download_clients(cfg, on_progress)
 
     wirer = Wirer(cfg)
     try:
@@ -244,8 +428,10 @@ def planned_links(cfg: StackConfig) -> int:
 
 
 #: Evenements emis par install() en dehors du pre-semis, de l'attente et du
-#: cablage : arborescence, artefacts, demarrage, page d'acces, fin.
-_FIXED_EVENTS = 5
+#: cablage : arborescence, artefacts, arret prealable, demarrage, page d'acces,
+#: fin. Un test deroule un vrai install() pour confronter ce compte aux
+#: evenements reellement emis : il a rattrape cette valeur des son changement.
+_FIXED_EVENTS = 6
 
 
 def seeded_services(cfg: StackConfig) -> list[str]:
@@ -271,7 +457,18 @@ def expected_events(cfg: StackConfig) -> int:
     promesse.
     """
     arrs = [sid for sid in catalog.STARTUP_ORDER if cfg.enabled(sid) and _is_arr(sid)]
-    return _FIXED_EVENTS + len(seeded_services(cfg)) + len(arrs) + planned_links(cfg)
+    clients = [
+        sid
+        for sid in catalog.DOWNLOAD_CLIENTS
+        if cfg.enabled(sid) and not cfg.services[sid].adopted
+    ]
+    return (
+        _FIXED_EVENTS
+        + len(seeded_services(cfg))
+        + len(arrs)
+        + len(clients)
+        + planned_links(cfg)
+    )
 
 
 def _is_arr(service_id: str) -> bool:

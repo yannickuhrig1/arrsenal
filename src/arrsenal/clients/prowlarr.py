@@ -263,4 +263,7 @@ def _readable(message: str) -> str:
         if marker in message:
             fragment = message.split(marker, 1)[1][:180].strip(' ":,')
             return f"{marker}{': ' if marker != 'errorMessage' else ' '}{fragment}"
-    return message.splitlines()[0][:200]
+    # `splitlines()[0]` sur un message vide leve IndexError - dans le gestionnaire
+    # d'erreur lui-meme, ce qui transformait un echec d'ajout en plantage.
+    lignes = message.splitlines()
+    return lignes[0][:200] if lignes else "aucun detail renvoye par Prowlarr"

@@ -125,12 +125,23 @@ def test_seed_qbittorrent_writes_to_the_linuxserver_path(tmp_path):
     assert (tmp_path / "qBittorrent" / "qBittorrent.conf").exists()
 
 
-def test_seed_qbittorrent_never_overwrites(tmp_path):
-    seed.seed_qbittorrent(tmp_path, username="u", password="p")
-    before = (tmp_path / "qBittorrent" / "qBittorrent.conf").read_text()
-    written, _ = seed.seed_qbittorrent(tmp_path, username="u", password="other")
-    assert not written
-    assert (tmp_path / "qBittorrent" / "qBittorrent.conf").read_text() == before
+def test_seed_qbittorrent_realigne_les_identifiants(tmp_path):
+    """Le second passage impose le mot de passe qu'arrsenal va ANNONCER.
+
+    Conserver l'ancien laissait une stack ou le rapport affichait un mot de passe
+    que qBittorrent refusait : tout le cablage repondait « Forbidden ». Le reste
+    de la configuration, lui, appartient a l'utilisateur et n'est pas touche
+    (voir tests/test_reinstallation.py).
+    """
+    seed.seed_qbittorrent(tmp_path, username="u", password="MotDePasse1!")
+    fichier = tmp_path / "qBittorrent" / "qBittorrent.conf"
+    avant = fichier.read_text()
+
+    seed.seed_qbittorrent(tmp_path, username="u", password="Autre2@")
+    apres = fichier.read_text()
+
+    assert avant != apres, "le mot de passe annonce doit devenir le vrai"
+    assert len(avant.splitlines()) == len(apres.splitlines())
 
 
 # -------------------------------------------------------------------- plan

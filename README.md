@@ -164,6 +164,22 @@ arrsenal generate    # régénère docker-compose.yml depuis stack.yml
 arrsenal uninstall   # arrête la stack, ne touche jamais à vos médias
 ```
 
+### En cas de problème
+
+Chaque installation écrit un journal complet à côté de `docker-compose.yml` :
+
+```bash
+arrsenal.log
+```
+
+Il contient la version, la plateforme, chaque étape, chaque avertissement et la trace
+complète d'une erreur. **Aucun secret n'y figure** : les mots de passe et clés API sont
+remplacés par leur nom avant écriture, pour qu'il puisse être joint à une issue sans y
+réfléchir.
+
+La version s'affiche aussi dans le bandeau de l'assistant, en pied de page d'accès, et
+par `arrsenal --version`.
+
 Toutes les captures de ce README sont **générées automatiquement** par
 `python scripts/screenshots.py`, sans terminal ni Docker. Elles sont versionnées : une
 régression visuelle apparaît dans le diff d'une pull request.

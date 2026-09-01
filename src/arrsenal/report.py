@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from . import catalog
+from . import catalog, journal
 from .models import StackConfig
 from .runner import Check
 from .wiring import StepResult
@@ -115,10 +115,12 @@ def install_with_progress(cfg: StackConfig, project_dir, install) -> list[StepRe
 
         def on_progress(progress: orchestrator.Progress) -> None:
             mark = "[green]OK[/green]" if progress.ok else "[red]ECHEC[/red]"
+            journal.progress(progress.phase, progress.message, progress.ok)
             console.print(f"  {mark} {progress.phase} : {progress.message}")
             advance(progress.phase)
 
         def on_step(result: StepResult) -> None:
+            journal.step(result)
             print_step(result)
             advance(result.name.split(":")[0])
 

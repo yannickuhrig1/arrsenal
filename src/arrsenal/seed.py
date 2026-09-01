@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import secrets
 import string
 from pathlib import Path
@@ -244,6 +245,16 @@ def render_qbittorrent_conf(*, username: str, password: str, port: int = 8080) -
         f"WebUI\\Port={port}",
         "WebUI\\HostHeaderValidation=false",
         "WebUI\\CSRFProtection=false",
+        # qBittorrent bannit une adresse apres cinq echecs d'authentification,
+        # une heure durant. Le bannissement est PAR ADRESSE : une installation
+        # qui s'est trompee de mot de passe fait bannir l'adresse de Sonarr, et
+        # la suite est cruelle — le mot de passe redevient correct, mais le *arr
+        # recoit un 403 et accuse les identifiants. Constate : 204 depuis l'hote
+        # et 403 depuis le conteneur Sonarr, au meme instant, meme mot de passe.
+        # Le seuil est releve, pas supprime : la protection contre une force
+        # brute reste utile, elle ne doit simplement pas viser nos conteneurs.
+        "WebUI\\MaxAuthenticationFailCount=100",
+        "WebUI\\BanDuration=60",
         f"Downloads\\SavePath={CONTAINER_PATHS['torrents_root']}/",
         f"Downloads\\TempPath={CONTAINER_PATHS['torrents_incomplete']}/",
         "Downloads\\TempPathEnabled=true",
@@ -263,7 +274,13 @@ def seed_qbittorrent(
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / "qBittorrent.conf"
     if target.exists():
-        return False, "qBittorrent.conf existe deja, conserve tel quel"
+        # Conserver le fichier tel quel laissait une installation cassee : le
+        # mot de passe qui y est hache vient d'une installation precedente, mais
+        # arrsenal en a genere un nouveau et l'annonce dans son rapport.
+        # qBittorrent repondait alors « Forbidden » a tout le cablage. Constate
+        # a l'usage. On ne remplace que l'identifiant et le mot de passe : le
+        # reste des reglages appartient a l'utilisateur.
+        return _replace_qbittorrent_credentials(target, username=username, password=password)
     target.write_text(
         render_qbittorrent_conf(username=username, password=password, port=port),
         encoding="utf-8",
@@ -278,7 +295,11 @@ def seed_transmission(
     config_dir.mkdir(parents=True, exist_ok=True)
     target = config_dir / "settings.json"
     if target.exists():
-        return False, "settings.json existe deja, conserve tel quel"
+        # Meme raison que pour qBittorrent : garder l'ancien mot de passe rendait
+        # faux tout ce que le rapport annonce.
+        return _replace_transmission_credentials(
+            target, rpc_username=rpc_username, rpc_password=rpc_password
+        )
     target.write_text(
         json.dumps(
             render_transmission_settings(
@@ -290,3 +311,54 @@ def seed_transmission(
         encoding="utf-8",
     )
     return True, "settings.json pre-seme"
+
+
+def _replace_qbittorrent_credentials(
+    target: Path, *, username: str, password: str
+) -> tuple[bool, str]:
+    """Met a jour identifiant et mot de passe dans un qBittorrent.conf existant.
+
+    Le fichier est un INI de Qt : on remplace deux lignes, on ne le reecrit pas.
+    Les cles absentes sont ajoutees a la section `[Preferences]`.
+    """
+    texte = target.read_text(encoding="utf-8")
+    remplacements = {
+        r"WebUI\Username": username,
+        r"WebUI\Password_PBKDF2": qbittorrent_password_hash(password),
+        # Meme raison que dans le gabarit : ne pas se faire bannir soi-meme.
+        r"WebUI\MaxAuthenticationFailCount": "100",
+        r"WebUI\BanDuration": "60",
+    }
+    for cle, valeur in remplacements.items():
+        motif = re.compile(rf"^{re.escape(cle)}=.*$", re.MULTILINE)
+        if motif.search(texte):
+            texte = motif.sub(lambda _m, v=valeur, c=cle: f"{c}={v}", texte)
+        elif "[Preferences]" in texte:
+            texte = texte.replace("[Preferences]", f"[Preferences]\n{cle}={valeur}", 1)
+        else:
+            texte = texte.rstrip("\n") + f"\n[Preferences]\n{cle}={valeur}\n"
+    target.write_text(texte, encoding="utf-8")
+    return True, "qBittorrent.conf existant : identifiants mis a jour"
+
+
+def _replace_transmission_credentials(
+    target: Path, *, rpc_username: str, rpc_password: str
+) -> tuple[bool, str]:
+    """Met a jour les identifiants RPC dans un settings.json existant.
+
+    Transmission stocke le mot de passe HACHE apres son premier demarrage. Le
+    reecrire en clair est la facon prevue de le changer : il le rehache au
+    demarrage suivant.
+    """
+    try:
+        reglages = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return False, f"settings.json illisible, conserve tel quel ({exc})"
+    if not isinstance(reglages, dict):
+        return False, "settings.json inattendu, conserve tel quel"
+
+    reglages["rpc-username"] = rpc_username
+    reglages["rpc-password"] = rpc_password
+    reglages["rpc-authentication-required"] = True
+    target.write_text(json.dumps(reglages, indent=4) + "\n", encoding="utf-8")
+    return True, "settings.json existant : identifiants RPC mis a jour"

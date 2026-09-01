@@ -133,6 +133,19 @@ class Compose:
         proc = _run(self._cmd("up", "-d", "--remove-orphans"), cwd=self.dir, timeout=timeout)
         return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
 
+    def stop(self, timeout: int = 300) -> tuple[bool, str]:
+        """Arrete les conteneurs du projet sans les supprimer.
+
+        Sert avant un pre-semis : une application qui tourne garde sa
+        configuration en memoire, et certaines la reecrivent en s'arretant.
+
+        Renvoie (quelque_chose_a_ete_arrete, message). Un projet inexistant n'est
+        pas une erreur : c'est le cas d'une premiere installation.
+        """
+        proc = _run(self._cmd("stop"), cwd=self.dir, timeout=timeout)
+        sortie = (proc.stderr or "") + (proc.stdout or "")
+        return proc.returncode == 0 and "Stopping" in sortie or "Stopped" in sortie, sortie.strip()
+
     def down(self, *, volumes: bool = False) -> tuple[bool, str]:
         args = ["down"] + (["-v"] if volumes else [])
         proc = _run(self._cmd(*args), cwd=self.dir)

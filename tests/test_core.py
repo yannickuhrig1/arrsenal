@@ -92,13 +92,22 @@ def test_transmission_settings_allow_container_to_container_rpc():
     assert s["incomplete-dir"].startswith("/data/")
 
 
-def test_seed_transmission_does_not_overwrite(tmp_path):
+def test_seed_transmission_preserve_les_reglages_et_realigne_les_identifiants(tmp_path):
+    """Les reglages de l'utilisateur restent, les identifiants sont imposes.
+
+    Garder l'ancien mot de passe RPC laissait un rapport mensonger et un cablage
+    en echec apres une reinstallation.
+    """
     d = tmp_path / "transmission"
     d.mkdir()
-    (d / "settings.json").write_text(json.dumps({"custom": True}))
-    written, _ = seed.seed_transmission(d, rpc_username="u", rpc_password="p")
-    assert not written
-    assert json.loads((d / "settings.json").read_text()) == {"custom": True}
+    (d / "settings.json").write_text(json.dumps({"custom": True, "rpc-password": "ancien"}))
+
+    seed.seed_transmission(d, rpc_username="u", rpc_password="Nouveau2@")
+    reglages = json.loads((d / "settings.json").read_text())
+
+    assert reglages["custom"] is True
+    assert reglages["rpc-username"] == "u"
+    assert reglages["rpc-password"] == "Nouveau2@"
 
 
 # ---------------------------------------------------------------------- compose

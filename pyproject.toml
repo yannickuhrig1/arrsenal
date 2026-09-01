@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "arrsenal"
-version = "0.1.1"
+dynamic = ["version"]
 description = "Deploie ET cable automatiquement une stack media *arr complete"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,6 +23,9 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-httpx>=0.30", "ruff>=0.5"]
 
 [project.scripts]
 arrsenal = "arrsenal.cli:app"
+
+[tool.hatch.version]
+path = "src/arrsenal/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/arrsenal"]

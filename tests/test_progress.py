@@ -38,6 +38,9 @@ class _FakeCompose:
     def config_valid(self):
         return True, "compose valide"
 
+    def stop(self, timeout=300):
+        return False, "aucun conteneur"
+
     def up(self, timeout=1800):
         return True, ""
 

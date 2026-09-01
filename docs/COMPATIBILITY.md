@@ -1079,3 +1079,82 @@ La première version de ce contrôle utilisait `[\/]` au lieu de `[\/]`. Dans un
 de caractères, `\/` ne vaut que la barre oblique : la forme fautive ne reconnaissait
 **aucun** chemin à antislash, pas même `C:\Users\...`, et les signalait tous comme « pas
 un chemin Windows ». Deux tests l'ont attrapée avant toute publication.
+
+---
+
+## Réinstaller sur une configuration existante — corrigé le 2026-09-01
+
+Signalé à l'usage, capture à l'appui : une installation relancée sur un `config_root`
+déjà utilisé donnait 19 liens sur 25, avec des messages incompréhensibles — « réponse
+illisible sur les catégories », « HTTP 401 », « l'API d'autobrr a peut-être changé de
+forme », « qui n'est jamais devenu disponible ».
+
+Une seule cause de départ, et quatre défauts qu'elle a révélés.
+
+### La cause : des mots de passe annoncés mais jamais appliqués
+
+Les dossiers de configuration dataient de la veille, l'installation était de l'heure.
+arrsenal conservait les configurations existantes **mais générait de nouveaux mots de
+passe**, qu'il affichait dans son rapport. Les services refusaient donc les identifiants
+montrés à l'utilisateur. Vérifié : l'empreinte PBKDF2 stockée dans `qBittorrent.conf` ne
+correspondait pas au mot de passe du `stack.yml`.
+
+qBittorrent et Transmission sont désormais **réalignés** : seules les deux lignes
+d'identification sont réécrites, le reste du fichier appartient à l'utilisateur.
+
+### Écrire pendant qu'un conteneur tourne ne sert à rien
+
+qBittorrent garde sa configuration en mémoire, et Transmission **réécrit son
+`settings.json` en s'arrêtant** — notre correction aurait été effacée quelques minutes
+plus tard. L'installation arrête donc les conteneurs existants *avant* le pré-semis.
+
+### Le préflight refusait nos propres ports
+
+Une pile en marche occupe ses ports. Le préflight les déclarait « déjà utilisés » et
+bloquait — c'est-à-dire exactement le cas le plus courant, réinstaller après un premier
+essai. Les ports publiés par le projet en cours sont maintenant reconnus comme siens.
+
+### Le bannissement d'adresse de qBittorrent
+
+Après cinq échecs d'authentification, qBittorrent bannit l'adresse pour une heure. Une
+installation qui s'est trompée de mot de passe fait donc bannir l'adresse de Sonarr. La
+suite est cruelle : le mot de passe redevient correct, mais le *arr reçoit un 403 et
+répond « Authentication Failure », en accusant les identifiants.
+
+Mesuré au même instant, avec le même mot de passe :
+
+| Depuis | Réponse |
+|---|---|
+| l'hôte | **204** |
+| le conteneur Sonarr | **403** |
+
+Le seuil est relevé à 100 dans la configuration semée — la protection contre une force
+brute reste utile, elle ne doit simplement pas viser nos propres conteneurs.
+
+Une réparation subsiste en secours (redémarrage puis nouvel essai), **strictement
+limitée aux refus d'authentification**. L'avoir élargie à tout échec de test a fabriqué
+la panne suivante : le redémarrage invalidait l'adresse mise en cache par Sonarr, qui
+échouait alors sur « Unable to connect ». Le remède créait le symptôme.
+
+### Ce qui reste impossible, et qui est maintenant dit
+
+Jellyfin, autobrr et qui ne stockent leur mot de passe que **haché**, et aucune API ne
+permet de le réinitialiser sans lui. arrsenal ne peut donc pas reprendre ces trois
+services. Le préflight l'annonce avant de commencer, et chaque échec porte désormais la
+phrase utile : supprimez ce dossier, ou reprenez l'installation d'origine avec
+`--project-dir`.
+
+### Résultat
+
+| Scénario | Avant | Après |
+|---|---|---|
+| Installation neuve, 8 services | — | **19/19** |
+| Réinstallation, mêmes dossiers | 19/25 | tous les clients de téléchargement câblés, seuls les trois services à mot de passe haché refusent, avec l'explication |
+
+### Un plantage, aussi
+
+Saisir un tracker puis cliquer sur *Ajouter* fermait la fenêtre. `add` protégeait son
+appel HTTP, mais pas `configured()` ni `app_profile_id()`, qui interrogent Prowlarr eux
+aussi : une exception dans un worker Textual arrête l'application, et l'utilisateur perd
+sa saisie **et** l'explication. Les quatre workers de l'assistant sont désormais
+étanches, et la trace part dans le journal.

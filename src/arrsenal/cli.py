@@ -12,7 +12,18 @@ from pathlib import Path
 import typer
 import yaml
 
-from . import admin, catalog, compose, dashboard, discovery, indexers_cli, orchestrator, report
+from . import (
+    __version__,
+    admin,
+    catalog,
+    compose,
+    dashboard,
+    discovery,
+    indexers_cli,
+    journal,
+    orchestrator,
+    report,
+)
 from . import adopt as adopt_mod
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
@@ -34,8 +45,20 @@ STACK_FILE = "stack.yml"
 app.add_typer(indexers_cli.app, name="indexers")
 
 
+def _show_version(value: bool) -> None:
+    if value:
+        console.print(f"arrsenal {__version__}")
+        raise typer.Exit(0)
+
+
 @app.callback()
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    _version: bool = typer.Option(
+        False, "--version", "-V", callback=_show_version, is_eager=True,
+        help="Affiche la version et quitte.",
+    ),
+) -> None:
     """Sans sous-commande, lance l'assistant interactif."""
     if ctx.invoked_subcommand is not None:
         return
@@ -196,7 +219,14 @@ def install(
         if avertissement:
             console.print(f"[yellow]{label} : {avertissement}[/yellow]")
 
-    if not report.print_checks(orchestrator.preflight(cfg)):
+    console.print(f"[dim]arrsenal {__version__}[/dim]")
+    chemin_journal = journal.start(project_dir, "install")
+    journal.config(cfg)
+    controles = orchestrator.preflight(cfg, project_dir)
+    journal.checks(controles)
+    if not report.print_checks(controles):
+        journal.failure("preflight bloquant : installation abandonnee")
+        console.print(f"[dim]Journal : {chemin_journal}[/dim]")
         raise typer.Exit(1)
 
     report.print_summary(cfg)
@@ -212,12 +242,25 @@ def install(
     try:
         results = report.install_with_progress(cfg, project_dir, orchestrator.install)
     except InstallAborted as exc:
+        journal.failure(str(exc))
         console.print(f"[red]{exc}[/red]")
+        console.print(f"[dim]Journal : {chemin_journal}[/dim]")
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        journal.LOGGER.exception("installation")
+        console.print(f"[red]{type(exc).__name__} : {exc}[/red]")
+        console.print(f"[dim]Detail complet dans {chemin_journal}[/dim]")
         raise typer.Exit(1) from exc
 
     report.print_final(cfg, results)
+    echecs = [r for r in results if not r.ok]
+    journal.finish(f"{len(results) - len(echecs)}/{len(results)} liens etablis")
     _announce_page(project_dir / dashboard.FILENAME, open_page)
-    raise typer.Exit(0 if all(r.ok for r in results) else 2)
+    # Le journal n'est signale que s'il sert a quelque chose : tout annoncer a
+    # chaque fois finit par n'etre plus lu.
+    if echecs:
+        console.print(f"\n[dim]Journal detaille : {chemin_journal}[/dim]")
+    raise typer.Exit(0 if not echecs else 2)
 
 
 @app.command()
@@ -426,7 +469,7 @@ def serve(
 def doctor(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml.")) -> None:
     """Diagnostique une installation existante."""
     cfg = _load_config(project_dir)
-    if not report.print_checks(orchestrator.preflight(cfg)):
+    if not report.print_checks(orchestrator.preflight(cfg, project_dir)):
         console.print("[red]Des controles bloquants ont echoue.[/red]")
 
     console.print("\nEtat des conteneurs :")

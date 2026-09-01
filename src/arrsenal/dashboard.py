@@ -23,7 +23,7 @@ import socket
 from datetime import datetime
 from pathlib import Path
 
-from . import catalog
+from . import __version__, catalog
 from .layout import CONTAINER_PATHS
 from .models import Category, StackConfig
 
@@ -219,6 +219,7 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
         paths=_paths(cfg),
         banner=banner,
         data_root=html.escape(cfg.data_root),
+        version=__version__,
         live_script=_LIVE_SCRIPT if live else "",
         title="Administration" if live else "Acces",
     )
@@ -384,7 +385,7 @@ _TEMPLATE = """<!doctype html>
     descendront automatiquement vers vos applications. arrsenal n'en fournit aucun.</p>
     <p>Cette page contient vos mots de passe et vos cles API. Elle est en lecture seule
     pour vous (<code>chmod 600</code>) et exclue du depot git. Ne la partagez pas.</p>
-    <p>Genere par arrsenal — donnees dans <code>{data_root}</code>.</p>
+    <p>Genere par arrsenal {version} — donnees dans <code>{data_root}</code>.</p>
   </footer>
 </div>
 <script>

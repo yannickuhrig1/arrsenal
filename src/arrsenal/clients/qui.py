@@ -58,14 +58,21 @@ class QuiClient:
     # -- disponibilite -------------------------------------------------------
 
     def wait_ready(self, timeout: float = 120.0) -> None:
-        """Attend que le serveur reponde, installe ou non.
+        """Attend que le serveur reponde, quelle que soit sa reponse.
 
-        428 signifie « je suis la, mais il n'y a pas encore de compte » : c'est
-        une reponse valable pour dire que le service est demarre.
+        Toute reponse HTTP prouve que le service ecoute. Enumerer les codes
+        acceptables etait une erreur : la liste (200, 401, 428) ne contenait pas
+        **403**, que qui renvoie des qu'un compte existe. Sur une stack deja
+        installee, l'attente allait donc jusqu'au bout du delai puis declarait
+        « qui n'est jamais devenu disponible » — alors que le conteneur etait
+        demarre, sain, et repondait en quelques millisecondes.
+
+        Une erreur de connexion, elle, leve : c'est `wait_until` qui la rattrape.
         """
 
         def probe() -> bool:
-            return self._request("GET", "/api/auth/me").status_code in (200, 401, 428)
+            self._request("GET", "/api/auth/me")
+            return True
 
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:

@@ -70,9 +70,19 @@ class Wirer:
         self._arr_cache: dict[str, ArrClient] = {}
 
     def _verify(
-        self, client: ArrClient, resource: str, name: str, result: StepResult
+        self,
+        client: ArrClient,
+        resource: str,
+        name: str,
+        result: StepResult,
+        on_auth_failure: Callable[[], bool] | None = None,
     ) -> StepResult:
-        """Fait valider le lien par l'application elle-meme."""
+        """Fait valider le lien par l'application elle-meme.
+
+        `on_auth_failure` permet de tenter UNE reparation quand le refus vient
+        d'un bannissement plutot que d'un mauvais mot de passe : les deux se
+        presentent a l'identique, « Authentication Failure ».
+        """
         if not self.run_tests:
             return result
         obj = client.find_by_name(resource, name)
@@ -81,6 +91,14 @@ class Wirer:
             result.detail += " - introuvable a la relecture"
             return result
         ok, message = client.test_resource(resource, obj)
+        # La reparation ne vaut que pour un refus d'AUTHENTIFICATION. L'avoir
+        # elargie a tout echec redemarrait qBittorrent sur un simple defaut de
+        # connexion — et ce redemarrage cassait a son tour l'adresse mise en
+        # cache par Sonarr, qui echouait alors sur « Unable to connect ». Le
+        # remede fabriquait la panne suivante.
+        refus = not ok and "Authentication Failure" in message
+        if refus and on_auth_failure and on_auth_failure():
+            ok, message = client.test_resource(resource, obj)
         if ok:
             result.detail += ", test OK"
         else:
@@ -174,6 +192,61 @@ class Wirer:
             created=created,
         )
 
+    def _conseil_config_existante(self, sid: str) -> str:
+        """Explication a joindre quand un service refuse nos identifiants.
+
+        Trois services ne stockent leur mot de passe que HACHE : Jellyfin,
+        autobrr et qui. Si leur configuration vient d'une installation
+        precedente, arrsenal ne peut ni le relire ni le reinitialiser — aucune
+        API ne le permet sans le mot de passe actuel.
+
+        Le message brut (« connexion a echoue », « HTTP 401 ») envoyait chercher
+        une panne reseau. La cause est ailleurs, et la solution tient en une
+        ligne.
+        """
+        from pathlib import Path
+
+        dossier = Path(self.cfg.config_path(sid))
+        if not (dossier.is_dir() and any(dossier.iterdir())):
+            return ""
+        return (
+            f"{sid} a une configuration prealable dans {dossier}. Son mot de passe "
+            f"n'y est stocke que hache : arrsenal ne peut pas le retrouver, et celui "
+            f"qu'il annonce est refuse. Supprimez ce dossier pour repartir a zero, ou "
+            f"reprenez l'installation d'origine avec --project-dir."
+        )
+
+    def _unban_download_client(self, dl_id: str) -> bool:
+        """Redemarre un client de telechargement pour lever un bannissement.
+
+        qBittorrent bannit une adresse apres cinq echecs d'authentification, une
+        heure durant. Le bannissement est PAR ADRESSE : sonde depuis l'hote, tout
+        va bien ; depuis le conteneur Sonarr, c'est un 403. Le *arr traduit ce
+        403 en « Authentication Failure » et accuse les identifiants, alors
+        qu'ils sont corrects.
+
+        Vu en conditions reelles : 204 depuis l'hote et 403 depuis Sonarr, au
+        meme instant, avec le meme mot de passe. Un redemarrage vide la liste des
+        bannis.
+        """
+        from pathlib import Path
+
+        from .runner import Compose
+
+        if dl_id != "qbittorrent" or self.cfg.project_dir is None:
+            return False
+        runner = Compose(Path(str(self.cfg.project_dir)), self.cfg.project_name)
+        ok, _ = runner.control("restart", dl_id)
+        if not ok:
+            return False
+        with QBittorrentClient(
+            self.cfg.services[dl_id].url(self.cfg.host),
+            self.cfg.services[dl_id].username or "",
+            self.cfg.services[dl_id].password or "",
+        ) as client:
+            client.wait_ready(timeout=120.0)
+        return True
+
     def step_download_client(self, arr_id: str, dl_id: str) -> StepResult:
         """Rattache un client de telechargement a un *arr.
 
@@ -235,14 +308,42 @@ class Wirer:
             if skipped
             else []
         )
+
+        etat = "cree" if created else "deja present"
+        if not created:
+            # Une entree existante garde les identifiants d'alors. Si le mot de
+            # passe du client a change depuis — une reinstallation suffit — elle
+            # reste en place et son test echoue, sans que rien ne l'explique. On
+            # realigne les seuls champs d'identification.
+            identifiants = {
+                nom: values[nom] for nom in ("username", "password") if nom in values
+            }
+            try:
+                modifies = client.sync_fields("downloadclient", obj, identifiants)
+            except WiringError:
+                # Un bannissement se presente comme un refus d'identifiants. On
+                # le leve une fois, puis on reessaie : si l'echec persiste, c'est
+                # bien le mot de passe qui est en cause.
+                if not self._unban_download_client(dl_id):
+                    raise
+                modifies = client.sync_fields("downloadclient", obj, identifiants)
+            if modifies:
+                etat = f"identifiants mis a jour ({', '.join(modifies)})"
+
         result = StepResult(
             f"{arr_id}: client de telechargement {dl_spec.display_name}",
             ok=client.find_by_name("downloadclient", dl_spec.display_name) is not None,
-            detail=("cree" if created else "deja present") + f" (id={obj.get('id', '?')})",
+            detail=etat + f" (id={obj.get('id', '?')})",
             created=created,
             warnings=warnings,
         )
-        return self._verify(client, "downloadclient", dl_spec.display_name, result)
+        return self._verify(
+            client,
+            "downloadclient",
+            dl_spec.display_name,
+            result,
+            on_auth_failure=lambda: self._unban_download_client(dl_id),
+        )
 
     def step_qbittorrent_categories(self) -> StepResult:
         """Cree les categories qBittorrent avec leur chemin de sauvegarde."""
@@ -335,14 +436,37 @@ class Wirer:
             extra={"enable": True, "protocol": profile.protocol, "priority": 1},
         )
         warnings = [f"champs ignores: {', '.join(skipped)}"] if skipped else []
+
+        etat = "cree" if created else "deja present"
+        if not created:
+            # Meme raison que pour les *arr : une entree existante garde les
+            # identifiants d'alors, et son test echoue apres un changement de mot
+            # de passe. Prowlarr passe par une etape distincte, il avait donc
+            # ete oublie — 13 liens sur 14 au lieu de 14.
+            identifiants = {"username": dl.username or "", "password": dl.password or ""}
+            try:
+                modifies = prowlarr.sync_fields("downloadclient", obj, identifiants)
+            except WiringError:
+                if not self._unban_download_client(dl_id):
+                    raise
+                modifies = prowlarr.sync_fields("downloadclient", obj, identifiants)
+            if modifies:
+                etat = f"identifiants mis a jour ({', '.join(modifies)})"
+
         result = StepResult(
             f"prowlarr: client de telechargement {dl_spec.display_name}",
             ok=prowlarr.find_by_name("downloadclient", dl_spec.display_name) is not None,
-            detail=("cree" if created else "deja present") + f" (id={obj.get('id', '?')})",
+            detail=etat + f" (id={obj.get('id', '?')})",
             created=created,
             warnings=warnings,
         )
-        return self._verify(prowlarr, "downloadclient", dl_spec.display_name, result)
+        return self._verify(
+            prowlarr,
+            "downloadclient",
+            dl_spec.display_name,
+            result,
+            on_auth_failure=lambda: self._unban_download_client(dl_id),
+        )
 
     def step_jellyfin_notification(self, arr_id: str) -> StepResult:
         """Fait rafraichir la bibliotheque Jellyfin apres chaque import."""
@@ -756,6 +880,17 @@ class Wirer:
                 result = step.run()
             except WiringError as exc:
                 result = StepResult(step.name, ok=False, detail=str(exc))
+                # Un refus d'identifiants sur un service au mot de passe hache a
+                # presque toujours la meme cause : une configuration heritee d'une
+                # installation precedente. Le dire ici evite d'envoyer l'
+                # utilisateur chercher une panne reseau.
+                service = step.name.split("/")[0]
+                if service in _HASHED_ONLY and any(
+                    mot in str(exc).lower() for mot in ("401", "refus", "echoue", "unauthorized")
+                ):
+                    conseil = self._conseil_config_existante(service)
+                    if conseil:
+                        result.warnings.append(conseil)
             results.append(result)
             if on_step:
                 on_step(result)
@@ -765,3 +900,8 @@ class Wirer:
 def _is_arr(service_id: str) -> bool:
     """Un service de la famille *arr, Prowlarr compris."""
     return catalog.get(service_id).api_family == "arr"
+
+
+#: Services dont le mot de passe n'existe que hache : arrsenal ne peut ni le
+#: relire ni le reinitialiser sans lui.
+_HASHED_ONLY = ("jellyfin", "autobrr", "qui")

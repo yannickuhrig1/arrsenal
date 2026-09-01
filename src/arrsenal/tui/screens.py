@@ -28,7 +28,7 @@ from textual.widgets import (
     Static,
 )
 
-from .. import catalog, orchestrator
+from .. import catalog, journal, orchestrator
 from ..clients import recyclarr as recyclarr_cfg
 from ..layout import (
     PROFILE_DEFAULTS,
@@ -59,7 +59,12 @@ class WizardHeader(Static):
     """
 
     def __init__(self, subtitle: str) -> None:
-        super().__init__(f"arrsenal  —  {subtitle}", id="wizard-header")
+        # La version est affichee sur CHAQUE ecran : c'est la premiere chose a
+        # demander quand quelqu'un signale un probleme, et la derniere qu'il
+        # pense a donner.
+        from .. import __version__
+
+        super().__init__(f"arrsenal {__version__}  —  {subtitle}", id="wizard-header")
 
 
 class WizardScreen(Screen):
@@ -109,7 +114,14 @@ class WelcomeScreen(WizardScreen):
     def check_docker(self) -> None:
         from ..runner import check_docker
 
-        checks = check_docker()
+        try:
+            checks = check_docker()
+        except Exception as exc:  # noqa: BLE001
+            journal.LOGGER.exception("diagnostic docker")
+            self.app.call_from_thread(
+                self._render_docker, f"[red]Diagnostic impossible : {exc}[/red]", False
+            )
+            return
         lines, ok = [], True
         for check in checks:
             mark = "[green]OK[/green]" if check.ok else "[red]ECHEC[/red]"
@@ -401,7 +413,11 @@ class TemplatesScreen(WizardScreen):
     @work(thread=True)
     def _load(self) -> None:
         config_dir = Path(self.app.config_root) / "recyclarr" if self.app.config_root else None
-        names, problem = recyclarr_cfg.available_templates(config_dir)
+        try:
+            names, problem = recyclarr_cfg.available_templates(config_dir)
+        except Exception as exc:  # noqa: BLE001
+            journal.LOGGER.exception("liste des templates Recyclarr")
+            names, problem = {}, f"liste indisponible : {exc}"
         self.app.call_from_thread(self._loaded, names, problem)
 
     def _loaded(self, names: dict[str, list[str]], problem: str | None) -> None:
@@ -578,15 +594,20 @@ class InstallScreen(WizardScreen):
         app = self.app
         cfg = app.stack_config or app.build_config()
         app.stack_config = cfg
+        chemin = journal.start(Path(app.project_dir), "assistant : installation")
+        journal.config(cfg)
+        app.call_from_thread(self._log, f"[dim]Journal detaille : {chemin}[/dim]")
         app.call_from_thread(self._set_total, orchestrator.expected_events(cfg))
 
         def on_progress(progress: Progress) -> None:
             mark = "[green]OK[/green]" if progress.ok else "[red]ECHEC[/red]"
+            journal.progress(progress.phase, progress.message, progress.ok)
             app.call_from_thread(self._phase, f"{progress.phase} : {progress.message}")
             app.call_from_thread(self._log, f"  {mark}  {progress.phase} : {progress.message}")
             app.call_from_thread(self._advance)
 
         def on_step(result: StepResult) -> None:
+            journal.step(result)
             mark = "[green]OK[/green]" if result.ok else "[red]ECHEC[/red]"
             app.call_from_thread(self._log, f"  {mark}  {result.name} - {result.detail}")
             for warning in result.warnings:
@@ -598,7 +619,19 @@ class InstallScreen(WizardScreen):
                 cfg, app.project_dir, on_progress=on_progress, on_step=on_step
             )
         except InstallAborted as exc:
+            journal.failure(str(exc))
             app.call_from_thread(self._log, f"[red]{exc}[/red]")
+            app.call_from_thread(self._phase, "[red]Installation interrompue[/red]")
+            app.call_from_thread(self._enable_done, [])
+            return
+        except Exception as exc:  # noqa: BLE001 - rien ne doit tuer l'assistant
+            # Sans ce filet, une erreur imprevue fait disparaitre la fenetre en
+            # plein cablage : l'utilisateur perd l'ecran ET l'explication.
+            journal.LOGGER.exception("installation")
+            app.call_from_thread(self._log, f"[red]{type(exc).__name__} : {exc}[/red]")
+            app.call_from_thread(
+                self._log, f"[dim]Detail complet dans {app.project_dir / journal.FILENAME}[/dim]"
+            )
             app.call_from_thread(self._phase, "[red]Installation interrompue[/red]")
             app.call_from_thread(self._enable_done, [])
             return

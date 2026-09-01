@@ -206,6 +206,29 @@ class ArrClient:
         created = self.post(resource, payload)
         return created, True, skipped
 
+    def sync_fields(self, resource: str, existing: dict, values: dict[str, Any]) -> list[str]:
+        """Aligne quelques champs d'une ressource existante. Renvoie ceux modifies.
+
+        `ensure_resource` ne touche jamais a l'existant, et c'est voulu : un
+        reglage manuel ne doit pas etre ecrase. Mais un mot de passe qui a change
+        est un autre sujet — l'entree reste alors en place avec des identifiants
+        perimes, et le bouton Test echoue sans que rien ne l'explique. Constate a
+        l'usage apres une reinstallation.
+
+        On ne compare et ne modifie que les champs demandes.
+        """
+        champs = {f.get("name"): f for f in existing.get("fields", []) if isinstance(f, dict)}
+        modifies = []
+        for nom, valeur in values.items():
+            champ = champs.get(nom)
+            if champ is None or champ.get("value") == valeur:
+                continue
+            champ["value"] = valeur
+            modifies.append(nom)
+        if modifies:
+            self.put(f"{resource}/{existing['id']}", existing)
+        return modifies
+
     def ensure_root_folder(self, path: str, extra: dict[str, Any] | None = None) -> tuple[dict, bool]:
         """Cree le dossier racine s'il n'existe pas.
 

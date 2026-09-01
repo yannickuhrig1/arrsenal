@@ -13,7 +13,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static
 
-from .. import catalog
+from .. import catalog, journal
 from ..clients.arr import ArrClient
 from ..clients.prowlarr import IndexerDefinition, ProwlarrIndexers
 from .screens import WizardScreen
@@ -71,6 +71,7 @@ class IndexersScreen(WizardScreen):
             count = len(indexers.definitions())
             already = [i.get("name", "?") for i in indexers.configured()]
         except Exception as exc:  # noqa: BLE001
+            journal.LOGGER.exception("chargement des definitions Prowlarr")
             self.app.call_from_thread(
                 self._set_status, f"[red]Prowlarr injoignable : {exc}[/red]"
             )
@@ -160,9 +161,22 @@ class IndexersScreen(WizardScreen):
 
     @work(thread=True)
     def submit(self, definition: IndexerDefinition, values: dict[str, str]) -> None:
+        """Ajoute l'indexeur, et ne laisse RIEN s'echapper.
+
+        Une exception levee dans un worker Textual arrete l'application : le
+        terminal se ferme, et l'utilisateur perd tout ce qu'il venait de saisir.
+        `add` protege son propre appel HTTP, mais pas `configured()` ni
+        `app_profile_id()`, qui interrogent Prowlarr eux aussi. Constate a
+        l'usage : saisie d'un tracker, clic sur Ajouter, fenetre disparue.
+        """
         assert self._indexers is not None
-        ok, message = self._indexers.add(definition, values)
-        already = [i.get("name", "?") for i in self._indexers.configured()]
+        try:
+            ok, message = self._indexers.add(definition, values)
+            already = [i.get("name", "?") for i in self._indexers.configured()]
+        except Exception as exc:  # noqa: BLE001 - aucune ne doit tuer l'assistant
+            journal.LOGGER.exception("ajout de l'indexeur %s", definition.name)
+            ok, message = False, f"{type(exc).__name__} : {exc}"
+            already = []
         self.app.call_from_thread(self._added, definition.name, ok, message, already)
 
     def _added(self, name: str, ok: bool, message: str, already: list[str]) -> None:
