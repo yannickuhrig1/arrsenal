@@ -98,6 +98,26 @@ Le préflight ne se contente pas de l'espérer : il **crée un vrai hardlink** e
 
 ## Installation
 
+### Windows : un seul fichier, sans Python
+
+Téléchargez `arrsenal.exe` depuis la
+[dernière version](https://github.com/yannickuhrig1/arrsenal/releases), ouvrez un
+terminal dans le dossier de téléchargement, et lancez :
+
+```bash
+.\arrsenal.exe
+```
+
+Seul Docker Desktop est nécessaire. L'exécutable embarque son propre interpréteur : il
+fonctionne sans Python installé, ce qui a été vérifié en le lançant avec un `PATH` vidé.
+20 Mo, environ une seconde et demie au démarrage.
+
+Windows SmartScreen peut afficher un avertissement au premier lancement : le binaire
+n'est pas signé — une signature de code coûte plusieurs centaines d'euros par an.
+« Informations complémentaires », puis « Exécuter quand même ».
+
+### Les autres plateformes
+
 Prérequis : Docker Engine (ou Docker Desktop) avec le plugin `docker compose`, et
 Python 3.12 ou plus récent.
 

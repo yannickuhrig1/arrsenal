@@ -982,3 +982,54 @@ passe, recalcul à l'appui.
 
 Les mots de passe vivent dans `stack.yml`. Une stack déjà installée garde les siens :
 seules les nouvelles installations reçoivent le nouvel alphabet.
+
+---
+
+## Exécutable Windows — vérifié le 2026-09-01
+
+Objectif : retirer le dernier prérequis qui restait à un utilisateur Windows, installer
+Python. PyInstaller 6.22.2, un seul fichier, mode console.
+
+### Trois obstacles, aucun devinable
+
+**Le point d'entrée évident ne marche pas.** `src/arrsenal/__main__.py` fait un import
+relatif (`from .cli import app`), et PyInstaller exécute son script d'entrée comme un
+module de premier niveau, sans paquet parent :
+
+```
+ImportError: attempted relative import with no known parent package
+```
+
+D'où `packaging/launcher.py`, qui ne fait rien d'autre qu'un import absolu.
+
+**`app.tcss` doit être embarqué explicitement.** Sans lui, Textual lève
+`StylesheetError` au démarrage et l'assistant ne s'ouvre pas. Vérifié en construisant
+volontairement sans le fichier : l'exécutable s'arrête, code de sortie 1.
+
+**Le chemin de `--add-data` est relatif au fichier `.spec`**, pas au répertoire courant.
+Avec `--specpath`, un chemin relatif fait échouer la construction sur un
+`Unable to find … when adding binary and data files` déroutant.
+
+### Ce qui a été vérifié sur le binaire produit
+
+| Vérification | Résultat |
+|---|---|
+| Catalogue, aide, liste des templates (réseau) | conformes |
+| Préflight Docker | daemon et compose détectés |
+| Assistant Textual | **137 règles** de style, 11 services affichés |
+| Installation complète | **14/14 liens**, 168 secondes |
+| Autonomie | fonctionne avec `PATH` vidé et `PYTHONHOME` invalide |
+| Taille et démarrage | 20,5 Mo, ~1,5 s |
+
+### Ce qui est publié, et comment
+
+`.github/workflows/windows-exe.yml` construit le binaire sur `windows-latest` à chaque
+poussée, le contrôle, puis l'attache à la release sur un tag `v*`.
+
+Le contrôle ne se contente pas de vérifier que le fichier existe : il construit un
+second exécutable jetable à partir de `packaging/smoke_tui.py`, qui démarre réellement
+l'assistant et compte les règles de style chargées. C'est la seule façon d'attraper une
+feuille de style oubliée, panne invisible tant que personne ne lance le binaire.
+
+Le binaire n'est pas signé. Windows SmartScreen affichera donc un avertissement au
+premier lancement, ce que le README annonce plutôt que de le laisser surprendre.

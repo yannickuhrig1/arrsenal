@@ -1,0 +1,68 @@
+name: Executable Windows
+
+# L'executable retire le seul prerequis qui restait a un utilisateur Windows :
+# installer Python. Il est construit ici pour que personne n'ait a le faire, et
+# controle avant d'etre publie.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Construire et controler
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install . pyinstaller
+
+      - name: Construction
+        run: pyinstaller packaging/arrsenal.spec --noconfirm
+
+      - name: Le binaire repond
+        run: |
+          dist\arrsenal.exe --help
+          dist\arrsenal.exe list | Select-String -Pattern "sonarr" -Quiet
+          if (-not $?) { throw "le catalogue ne cite pas sonarr" }
+        shell: pwsh
+
+      - name: L'assistant vit dans l'executable
+        # Ce qui casse le plus facilement a l'empaquetage est `app.tcss` : sans
+        # lui, Textual leve StylesheetError et l'assistant ne s'ouvre pas.
+        # Verifie en construisant volontairement sans lui : code de sortie 1.
+        run: |
+          pyinstaller packaging/smoke_tui.py --onefile --console --noconfirm `
+            --name smoke --distpath dist-smoke --workpath build-smoke --specpath build-smoke `
+            --paths src --collect-all textual `
+            --add-data "${{ github.workspace }}/src/arrsenal/tui/app.tcss;arrsenal/tui"
+          dist-smoke\smoke.exe
+        shell: pwsh
+
+      - name: Taille du binaire
+        run: |
+          $mo = [math]::Round((Get-Item dist\arrsenal.exe).Length / 1MB, 1)
+          Write-Output "arrsenal.exe : $mo Mo"
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arrsenal-windows
+          path: dist/arrsenal.exe
+          if-no-files-found: error
+
+      - name: Publier sur la release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gh release upload "${{ github.ref_name }}" dist/arrsenal.exe --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh

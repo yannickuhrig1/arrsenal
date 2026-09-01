@@ -17,3 +17,8 @@ stack.local.yml
 /config/
 /data/
 *.bak
+
+# Sous-produits de PyInstaller
+dist-*/
+build-*/
+/arrsenal.spec
