@@ -14,6 +14,7 @@ import yaml
 
 from . import admin, catalog, compose, dashboard, discovery, indexers_cli, orchestrator, report
 from . import adopt as adopt_mod
+from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
 from .models import VPN_PROVIDERS, PlatformProfile, StackConfig, VpnConfig
 from .orchestrator import InstallAborted, Progress
@@ -108,6 +109,14 @@ def install(
     vpn_pass: str = typer.Option("", help="Mot de passe OpenVPN."),
     vpn_key: str = typer.Option("", help="Cle privee WireGuard."),
     vpn_countries: str = typer.Option("", help="Pays souhaites, separes par des virgules."),
+    recyclarr_sonarr: str = typer.Option(
+        "",
+        help="Template TRaSH pour Sonarr. Voir `arrsenal templates`. Vide = defaut.",
+    ),
+    recyclarr_radarr: str = typer.Option(
+        "",
+        help="Template TRaSH pour Radarr. Voir `arrsenal templates`. Vide = defaut.",
+    ),
 ) -> None:
     """Deploie et cable la stack de bout en bout, sans interaction."""
     selection = [s.strip() for s in services.split(",") if s.strip()]
@@ -122,6 +131,29 @@ def install(
         host=host,
         timezone=timezone,
     )
+
+    chosen = {"sonarr": recyclarr_sonarr.strip(), "radarr": recyclarr_radarr.strip()}
+    chosen = {sid: name for sid, name in chosen.items() if name}
+    if chosen and not cfg.enabled("recyclarr"):
+        console.print(
+            "[yellow]Un template a ete choisi mais Recyclarr n'est pas dans la "
+            "selection : il ne sera pas applique.[/yellow]"
+        )
+    if chosen:
+        # Un nom invalide ne se voit qu'a la toute fin, quand `config create`
+        # echoue apres le demarrage de la stack. Le dire avant d'ecrire quoi que
+        # ce soit coute une requete.
+        known, problem = recyclarr_cfg.available_templates()
+        for sid, name in chosen.items():
+            if not problem and name not in known.get(sid, []):
+                console.print(
+                    f"[red]Template inconnu pour {sid} : {name}[/red]\n"
+                    f"[dim]`arrsenal templates` liste les noms acceptes.[/dim]"
+                )
+                raise typer.Exit(1)
+        if problem:
+            console.print(f"[yellow]Noms de templates non verifies : {problem}[/yellow]")
+        cfg.recyclarr_templates = chosen
 
     if vpn:
         cfg.vpn = VpnConfig(
@@ -462,6 +494,36 @@ def list_services() -> None:
             spec.notes,
         )
     console.print(table)
+
+
+@app.command("templates")
+def list_templates(
+    config_root: str | None = typer.Option(
+        None, help="Racine des configurations, pour lire le manifeste deja clone."
+    ),
+) -> None:
+    """Liste les profils de qualite TRaSH proposables a Recyclarr."""
+    from rich.table import Table
+
+    config_dir = Path(config_root) / "recyclarr" if config_root else None
+    names, problem = recyclarr_cfg.available_templates(config_dir)
+    if problem:
+        console.print(f"[red]{problem}[/red]")
+        raise typer.Exit(1)
+
+    table = Table(title="Templates officiels Recyclarr")
+    table.add_column("Service")
+    table.add_column("Template", overflow="fold")
+    table.add_column("Defaut")
+    for service in sorted(names):
+        default = recyclarr_cfg.DEFAULT_TEMPLATES.get(service, "")
+        for name in names[service]:
+            table.add_row(service, name, "oui" if name == default else "")
+    console.print(table)
+    console.print(
+        "[dim]Choix a l'installation : "
+        "`arrsenal install --recyclarr-sonarr <nom> --recyclarr-radarr <nom>`.[/dim]"
+    )
 
 
 if __name__ == "__main__":

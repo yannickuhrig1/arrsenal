@@ -18,9 +18,12 @@ Trois choses relevees sur l'image 8.7.1, aucune devinable :
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+import httpx
 
 #: Marqueurs poses par les templates officiels. Les remplacer est tout ce
 #: qu'arrsenal a a faire.
@@ -54,19 +57,89 @@ class Filled:
         return self.url_written and self.key_written
 
 
-def template_names(config_dir: Path, service: str) -> list[str]:
-    """Templates officiels presents sur disque, pour un service donne.
+#: Manifeste des templates racine, dans le depot clone par Recyclarr.
+#:
+#: C'est LUI qui fait foi, pas le contenu du dossier `templates/`. Un nom de
+#: fichier n'est pas un identifiant : `sonarr/templates/german-hd-bluray-web.yml`
+#: s'appelle `sonarr-german-hd-bluray-web` pour `config create`, parce que Radarr
+#: a un fichier du meme nom. 11 templates sur 22 sont dans ce cas de chaque cote,
+#: et Radarr en range 10 de plus dans un sous-dossier `sqp/` qu'un simple glob ne
+#: voit pas. Lister les fichiers proposerait donc des noms que Recyclarr refuse.
+MANIFEST_PATH = Path("resources/config-templates/git/official/templates.json")
 
-    Recyclarr clone le depot des templates dans son dossier de ressources au
-    premier demarrage. On lit ce qu'il a reellement, plutot que d'embarquer une
-    liste qui vieillirait.
+#: Le meme manifeste, servi par GitHub. Verifie : le contenu est IDENTIQUE octet
+#: pour octet a celui que Recyclarr clone. Cela permet de proposer la liste dans
+#: l'assistant en une fraction de seconde, sans avoir a telecharger l'image ni a
+#: attendre le premier demarrage du conteneur (une minute, mesuree).
+MANIFEST_URL = "https://raw.githubusercontent.com/recyclarr/config-templates/master/templates.json"
+
+
+def parse_manifest(payload: str | bytes) -> dict[str, list[str]]:
+    """Identifiants des templates racine, par service.
+
+    Renvoie un dictionnaire vide plutot que de lever : un manifeste illisible doit
+    degrader l'assistant, pas l'interrompre.
     """
-    folder = (
-        config_dir / "resources" / "config-templates" / "git" / "official" / service / "templates"
-    )
-    if not folder.is_dir():
-        return []
-    return sorted(p.stem for p in folder.glob("*.yml"))
+    try:
+        data = json.loads(payload)
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    names: dict[str, list[str]] = {}
+    for service, entries in data.items():
+        if not isinstance(entries, list):
+            continue
+        ids = [
+            entry["id"]
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+        ]
+        if ids:
+            names[service] = sorted(ids)
+    return names
+
+
+def local_manifest(config_dir: Path) -> dict[str, list[str]]:
+    """Manifeste clone par Recyclarr, s'il a deja tourne. Vide sinon."""
+    try:
+        return parse_manifest((config_dir / MANIFEST_PATH).read_bytes())
+    except OSError:
+        return {}
+
+
+def fetch_manifest(*, timeout: float = 10.0) -> tuple[dict[str, list[str]], str | None]:
+    """Manifeste distant. Renvoie (templates, probleme)."""
+    try:
+        response = httpx.get(MANIFEST_URL, timeout=timeout, follow_redirects=True)
+    except httpx.HTTPError as exc:
+        return {}, f"depot des templates injoignable : {exc}"
+    if response.status_code != 200:
+        return {}, f"le depot des templates a repondu HTTP {response.status_code}"
+    names = parse_manifest(response.content)
+    return names, None if names else "manifeste des templates illisible"
+
+
+def available_templates(
+    config_dir: Path | None = None, *, timeout: float = 10.0
+) -> tuple[dict[str, list[str]], str | None]:
+    """Templates proposables, disque d'abord, reseau ensuite.
+
+    Le disque fait foi quand Recyclarr a deja tourne : c'est exactement ce que
+    cette installation-la connait. Sinon on interroge le depot, ce qui evite
+    d'imposer un telechargement d'image avant meme le recapitulatif.
+    """
+    if config_dir is not None:
+        local = local_manifest(config_dir)
+        if local:
+            return local, None
+    return fetch_manifest(timeout=timeout)
+
+
+def template_names(config_dir: Path, service: str) -> list[str]:
+    """Templates presents sur disque pour un service. Vide si Recyclarr n'a pas
+    encore tourne."""
+    return local_manifest(config_dir).get(service, [])
 
 
 def fill(config_file: Path, base_url: str, api_key: str, service: str) -> Filled:

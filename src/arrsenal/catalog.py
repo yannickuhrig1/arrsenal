@@ -187,7 +187,11 @@ MANAGED_ARRS = ("sonarr", "radarr", "lidarr")
 DOWNLOAD_CLIENTS = ("transmission", "qbittorrent")
 
 #: Selection par defaut du profil "Debutant tout-en-un" en Phase 1.
-DEFAULT_SELECTION = ("prowlarr", "sonarr", "radarr", "transmission", "jellyfin")
+#: Coches par defaut dans l'assistant. Recyclarr en fait partie : il ne coute
+#: presque rien (pas de port, pas d'interface, un reveil par jour) et c'est lui
+#: qui evite qu'un *arr accepte n'importe quel encodage. Une stack sans profil de
+#: qualite telecharge, mais telecharge mal.
+DEFAULT_SELECTION = ("prowlarr", "sonarr", "radarr", "transmission", "jellyfin", "recyclarr")
 
 
 def get(service_id: str) -> ServiceSpec:

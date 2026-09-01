@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from textual.widgets import Label, ListItem, ListView
+from textual.widgets import Label, ListItem, ListView, Static
 
 from arrsenal.clients.prowlarr import IndexerDefinition
 from arrsenal.tui.app import ArrsenalApp
@@ -29,6 +29,7 @@ from arrsenal.tui.screens import (
     ReportScreen,
     ServicesScreen,
     SummaryScreen,
+    TemplatesScreen,
 )
 from arrsenal.wiring import StepResult
 
@@ -90,9 +91,19 @@ async def capture() -> None:
         await shot(app, pilot, "3-chemins")
 
         app.data_root, app.config_root = "/srv/data", "/opt/arrsenal/config"
+        app.selection = [*app.selection, "recyclarr"]
+        app.push_screen(TemplatesScreen())
+        # La liste des templates arrive d'un worker : capturer trop tot montrerait
+        # « Chargement… » au lieu de l'ecran reel.
+        for _ in range(40):
+            await pilot.pause(0.25)
+            if str(app.screen.query_one("#tpl-choices-sonarr", Static).content):
+                break
+        await shot(app, pilot, "4-profils")
+
         app.push_screen(SummaryScreen())
         await pilot.pause()
-        await shot(app, pilot, "4-recapitulatif")
+        await shot(app, pilot, "5-recapitulatif")
 
         # L'ecran d'installation lance un worker : on le rend inerte pour la
         # capture, puis on injecte des lignes representatives.
@@ -105,7 +116,7 @@ async def capture() -> None:
         for step in FAKE_STEPS:
             screen._log(f"  [green]OK[/green]  {step.name} - {step.detail}")
         await pilot.pause()
-        await shot(app, pilot, "5-installation")
+        await shot(app, pilot, "6-installation")
 
         # Etape indexeurs : rendue hors ligne. Le chargement des definitions est
         # neutralise, on injecte des exemples representatifs de ce que Prowlarr
@@ -123,12 +134,12 @@ async def capture() -> None:
         # champs du formulaire soient rendus.
         for _ in range(4):
             await pilot.pause()
-        await shot(app, pilot, "6-indexeurs")
+        await shot(app, pilot, "7-indexeurs")
 
         app.results = FAKE_STEPS
         app.push_screen(ReportScreen())
         await pilot.pause()
-        await shot(app, pilot, "7-rapport")
+        await shot(app, pilot, "8-rapport")
 
 
 if __name__ == "__main__":

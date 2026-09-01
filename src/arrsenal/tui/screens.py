@@ -28,6 +28,7 @@ from textual.widgets import (
 )
 
 from .. import catalog, orchestrator
+from ..clients import recyclarr as recyclarr_cfg
 from ..layout import PROFILE_DEFAULTS, hardlink_supported, resolve_ids
 from ..models import Category, PlatformProfile
 from ..orchestrator import InstallAborted, Progress
@@ -289,6 +290,149 @@ class PathsScreen(WizardScreen):
         self.app.data_root = self.query_one("#data-root", Input).value.strip()
         self.app.timezone = self.query_one("#tz", Input).value.strip() or "Etc/UTC"
         self.app.platform = self.platform()
+        # Ecran facultatif : il n'a de sens que si Recyclarr est installe ET s'il a
+        # au moins un *arr a configurer.
+        if "recyclarr" in self.app.selection and any(
+            sid in self.app.selection for sid in TemplatesScreen.SERVICES
+        ):
+            self.app.push_screen(TemplatesScreen())
+        else:
+            self.app.push_screen(SummaryScreen())
+
+    @on(Button.Pressed, "#back")
+    def back(self) -> None:
+        self.app.pop_screen()
+
+
+# ------------------------------------------------------------ profils qualite
+
+
+class TemplatesScreen(WizardScreen):
+    """Choix du profil de qualite TRaSH, service par service.
+
+    Etape facultative : les defauts conviennent a la plupart des installations,
+    et le bouton « Passer » est la pour le dire. Elle n'apparait que si Recyclarr
+    est selectionne avec au moins un *arr a configurer.
+
+    La liste vient du manifeste officiel, pas d'une copie embarquee dans le code.
+    Elle est chargee dans un thread : l'ecran doit s'afficher tout de suite, meme
+    si le reseau traine.
+    """
+
+    SUB_TITLE = "Etape optionnelle - profils de qualite"
+
+    #: Services que Recyclarr sait configurer, dans l'ordre d'affichage.
+    SERVICES = ("sonarr", "radarr")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._available: dict[str, list[str]] = {}
+
+    def _targets(self) -> list[str]:
+        return [sid for sid in self.SERVICES if sid in self.app.selection]
+
+    def content(self) -> ComposeResult:
+        yield Static(
+            "Sans profil de qualite, un *arr accepte [b]n'importe quel[/b] encodage : "
+            "le premier resultat venu, pas le meilleur.\n"
+            "[dim]Les profils viennent des TRaSH Guides. arrsenal ne fait que poser "
+            "l'adresse et la cle API dans le template que vous choisissez ici.[/dim]",
+            id="templates-intro",
+        )
+        with VerticalScroll(id="templates"):
+            for sid in self._targets():
+                spec = catalog.get(sid)
+                default = recyclarr_cfg.DEFAULT_TEMPLATES.get(sid, "")
+                yield Label(spec.display_name, classes="group-title")
+                yield Input(
+                    value=default,
+                    placeholder=f"nom du template pour {sid}",
+                    id=f"tpl-{sid}",
+                )
+                yield Static(id=f"tpl-choices-{sid}", classes="service-note")
+        yield Static(id="templates-status")
+        yield Horizontal(
+            Button("Continuer", variant="primary", id="next"),
+            Button("Passer", id="skip"),
+            Button("Retour", id="back"),
+            classes="actions",
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#templates-status", Static).update(
+            "[dim]Chargement de la liste officielle…[/dim]"
+        )
+        self._load()
+
+    @work(thread=True)
+    def _load(self) -> None:
+        config_dir = Path(self.app.config_root) / "recyclarr" if self.app.config_root else None
+        names, problem = recyclarr_cfg.available_templates(config_dir)
+        self.app.call_from_thread(self._loaded, names, problem)
+
+    def _loaded(self, names: dict[str, list[str]], problem: str | None) -> None:
+        self._available = names
+        status = self.query_one("#templates-status", Static)
+        if problem:
+            # Le nom reste saisissable : ne pas pouvoir lister n'est pas une raison
+            # d'empecher quelqu'un qui sait ce qu'il veut.
+            status.update(
+                f"[yellow]{problem}[/yellow]\n"
+                "[dim]Les noms ne seront pas verifies ici. Les defauts restent valables.[/dim]"
+            )
+            return
+        status.update("")
+        for sid in self._targets():
+            available = names.get(sid, [])
+            self.query_one(f"#tpl-choices-{sid}", Static).update(
+                f"[dim]{len(available)} disponibles : {', '.join(available[:6])}"
+                f"{'…' if len(available) > 6 else ''}[/dim]"
+            )
+        self._validate()
+
+    @on(Input.Changed)
+    def _on_change(self) -> None:
+        self._validate()
+
+    def choices(self) -> dict[str, str]:
+        return {
+            sid: self.query_one(f"#tpl-{sid}", Input).value.strip()
+            for sid in self._targets()
+            if self.query_one(f"#tpl-{sid}", Input).value.strip()
+        }
+
+    def _validate(self) -> bool:
+        """Un nom inconnu n'echoue qu'a la toute fin du cablage. On le dit ici."""
+        if not self._available:
+            return True
+        unknown = [
+            f"{sid} : {name}"
+            for sid, name in self.choices().items()
+            if name not in self._available.get(sid, [])
+        ]
+        status = self.query_one("#templates-status", Static)
+        button = self.query_one("#next", Button)
+        if unknown:
+            status.update(
+                f"[red]Template inconnu — {', '.join(unknown)}[/red]\n"
+                "[dim]Recyclarr refuserait de generer la configuration.[/dim]"
+            )
+            button.disabled = True
+            return False
+        status.update("")
+        button.disabled = False
+        return True
+
+    @on(Button.Pressed, "#next")
+    def go(self) -> None:
+        if not self._validate():
+            return
+        self.app.recyclarr_templates = self.choices()
+        self.app.push_screen(SummaryScreen())
+
+    @on(Button.Pressed, "#skip")
+    def skip(self) -> None:
+        self.app.recyclarr_templates = {}
         self.app.push_screen(SummaryScreen())
 
     @on(Button.Pressed, "#back")
@@ -319,7 +463,11 @@ class SummaryScreen(WizardScreen):
         table.add_columns("Service", "Image", "URL")
         for sid, inst in orchestrator.iter_selected(cfg):
             spec = catalog.get(sid)
-            table.add_row(spec.display_name, spec.image, inst.url(cfg.host))
+            table.add_row(
+                spec.display_name,
+                spec.image,
+                inst.url(cfg.host) if inst.has_web_ui else "tache de fond",
+            )
 
         self.query_one("#summary-paths", Static).update(
             f"[b]Configurations[/b]  {cfg.config_root}\n"

@@ -29,6 +29,8 @@ class ArrsenalApp(App):
         self.data_root: str | None = None
         self.timezone: str = "Etc/UTC"
         self.platform: PlatformProfile = PlatformProfile.GENERIC_LINUX
+        #: Template TRaSH choisi par service. Vide = celui par defaut.
+        self.recyclarr_templates: dict[str, str] = {}
         self.stack_config: StackConfig | None = None
         self.results: list[StepResult] = []
 
@@ -37,13 +39,15 @@ class ArrsenalApp(App):
 
     def build_config(self) -> StackConfig:
         """Materialise la saisie en StackConfig. Les secrets sont generes ici."""
-        return orchestrator.build_config(
+        cfg = orchestrator.build_config(
             services=self.selection,
             config_root=self.config_root,
             data_root=self.data_root,
             platform=self.platform,
             timezone=self.timezone,
         )
+        cfg.recyclarr_templates = dict(self.recyclarr_templates)
+        return cfg
 
 
 def run_wizard(project_dir: Path | None = None) -> int:

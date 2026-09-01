@@ -646,6 +646,42 @@ dans le remplacement. Une `url_base` saisie à la main en contenant un aurait le
 `bad escape` au lieu d'écrire le fichier. Le remplacement passe maintenant par une
 fonction.
 
+### Un nom de fichier n'est pas un identifiant
+
+Première version : lister `official/<service>/templates/*.yml` et proposer les noms de
+fichiers. Faux, et sur deux plans à la fois.
+
+C'est `templates.json`, à la racine du dépôt cloné, qui fait foi. Il associe à chaque
+fichier l'`id` que `config create --template` accepte, et les deux diffèrent souvent :
+
+| Fichier | Identifiant |
+|---|---|
+| `sonarr/templates/german-hd-bluray-web.yml` | `sonarr-german-hd-bluray-web` |
+| `radarr/templates/german-hd-bluray-web.yml` | `radarr-german-hd-bluray-web` |
+
+11 des 22 templates Sonarr et 11 des 35 Radarr portent ce préfixe — il lève l'ambiguïté
+entre deux fichiers homonymes. Le glob aurait donc proposé des noms que Recyclarr
+refuse. Il ratait en plus les **10 templates rangés dans `radarr/templates/sqp/`**, qu'un
+`glob("*.yml")` ne voit pas : 25 trouvés au lieu de 35.
+
+`scripts/audit_templates.py` confronte les deux noms par défaut au manifeste publié et
+sort non nul si l'un disparaît.
+
+### Le manifeste est lisible sans télécharger l'image
+
+Le premier démarrage du conteneur clone les dépôts de templates : **59 secondes**,
+mesurées. Imposer cela avant même le récapitulatif de l'assistant serait absurde.
+
+`https://raw.githubusercontent.com/recyclarr/config-templates/master/templates.json`
+répond en 0,3 s, et son contenu est **identique octet pour octet** (sha256 comparé) à ce
+que Recyclarr clone. L'assistant lit donc le disque quand Recyclarr a déjà tourné — c'est
+ce que cette installation-là connaît — et interroge le dépôt sinon. Sans réseau, les
+noms restent saisissables, simplement non vérifiés : ne pas pouvoir lister n'est pas une
+raison d'arrêter quelqu'un qui sait ce qu'il veut.
+
+Vérifié de bout en bout avec un profil français : `french-multi-vf-hd-bluray-web` →
+57 custom formats et le profil `[French MULTi.VF] HD Bluray + WEB` créés dans Radarr.
+
 ### Recyclarr refuse d'écraser, et `wire` doit rester idempotent
 
 `config create` s'arrête sur `The file /config/configs/hd-bluray-web.yml already

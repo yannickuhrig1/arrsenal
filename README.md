@@ -8,7 +8,7 @@ arrsenal
 
 <p align="center">
   <img src="docs/screenshots/2-services.svg" alt="Sélection des services" width="49%">
-  <img src="docs/screenshots/5-installation.svg" alt="Câblage en cours" width="49%">
+  <img src="docs/screenshots/6-installation.svg" alt="Câblage en cours" width="49%">
 </p>
 
 Vous cochez ce que vous voulez. À la fin, Prowlarr pousse déjà ses indexeurs vers Sonarr,
@@ -138,8 +138,8 @@ régression visuelle apparaît dans le diff d'une pull request.
 | | |
 |---|---|
 | ![Accueil](docs/screenshots/1-accueil.svg) | ![Chemins](docs/screenshots/3-chemins.svg) |
-| ![Récapitulatif](docs/screenshots/4-recapitulatif.svg) | ![Indexeurs](docs/screenshots/6-indexeurs.svg) |
-| ![Rapport](docs/screenshots/7-rapport.svg) | |
+| ![Récapitulatif](docs/screenshots/5-recapitulatif.svg) | ![Indexeurs](docs/screenshots/7-indexeurs.svg) |
+| ![Profils de qualite](docs/screenshots/4-profils.svg) | ![Rapport](docs/screenshots/8-rapport.svg) |
 
 </details>
 
@@ -305,6 +305,39 @@ Un point à connaître : **ajouter un indexeur le contacte** pour valider vos id
 C'est Prowlarr qui l'impose — `forceSave` n'y change rien, il n'existe pas
 d'enregistrement hors ligne. La contrepartie est agréable : si l'ajout réussit, vos
 identifiants sont bons.
+
+---
+
+## Profils de qualité
+
+Sans profil de qualité, un *arr accepte **n'importe quel encodage** : le premier résultat
+venu, pas le meilleur. C'est le travail des [TRaSH Guides](https://trash-guides.info/),
+et `arrsenal` ne les réimplémente pas — il installe **Recyclarr**, lui demande de générer
+sa configuration à partir d'un template officiel, et n'y écrit que les deux lignes qu'il
+est seul à connaître : l'adresse et la clé API.
+
+Recyclarr est coché par défaut. Il ne publie aucun port, n'a pas d'interface web, et se
+réveille une fois par jour.
+
+L'assistant propose une **étape optionnelle** pour choisir le template, service par
+service. La liste vient du manifeste officiel, pas d'une copie embarquée ici : 22 pour
+Sonarr, 35 pour Radarr, dont plusieurs profils français.
+
+```bash
+arrsenal templates                                            # les noms acceptés
+arrsenal install --recyclarr-radarr french-multi-vf-hd-bluray-web
+```
+
+Un nom inconnu est refusé **avant** que quoi que ce soit ne soit écrit. Sans cette
+vérification, l'erreur n'apparaîtrait qu'à la toute fin du câblage, la stack déjà
+démarrée.
+
+Résultat mesuré sur une installation neuve, lu dans l'API de chaque instance :
+
+| | Sonarr `web-1080p` | Radarr `hd-bluray-web` |
+|---|---|---|
+| Custom formats | 37 | 40 |
+| Profil créé | `WEB-1080p` | `HD Bluray + WEB` |
 
 ---
 

@@ -141,15 +141,78 @@ def test_pending_markers_sans_dossier(tmp_path):
     assert recyclarr.pending_markers(tmp_path) == []
 
 
-def test_template_names_lit_le_disque(tmp_path):
-    """La liste vient des ressources clonees par Recyclarr, pas d'une copie figee."""
-    folder = tmp_path / "resources/config-templates/git/official/sonarr/templates"
-    folder.mkdir(parents=True)
-    for name in ("web-2160p.yml", "web-1080p.yml", "notes.txt"):
-        (folder / name).touch()
+MANIFEST = """{
+  "radarr": [
+    {"template": "radarr/templates/hd-bluray-web.yml", "id": "hd-bluray-web"},
+    {"template": "radarr/templates/german-hd-bluray-web.yml", "id": "radarr-german-hd-bluray-web"},
+    {"template": "radarr/templates/sqp/sqp-1-1080p.yml", "id": "sqp-1-1080p"}
+  ],
+  "sonarr": [
+    {"template": "sonarr/templates/web-1080p.yml", "id": "web-1080p"},
+    {"template": "sonarr/templates/german-hd-bluray-web.yml", "id": "sonarr-german-hd-bluray-web"}
+  ]
+}"""
 
-    assert recyclarr.template_names(tmp_path, "sonarr") == ["web-1080p", "web-2160p"]
-    assert recyclarr.template_names(tmp_path, "radarr") == []
+
+def _with_manifest(tmp_path: Path, text: str = MANIFEST) -> Path:
+    manifest = tmp_path / recyclarr.MANIFEST_PATH
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(text, encoding="utf-8")
+    return tmp_path
+
+
+def test_un_nom_de_fichier_n_est_pas_un_identifiant(tmp_path):
+    """C'est le manifeste qui fait foi, pas le contenu du dossier `templates/`.
+
+    `sonarr/templates/german-hd-bluray-web.yml` s'appelle
+    `sonarr-german-hd-bluray-web` pour `config create`, parce que Radarr a un
+    fichier du meme nom. Lister les fichiers proposerait des noms refuses, et
+    raterait au passage les templates ranges dans `sqp/`.
+    """
+    _with_manifest(tmp_path)
+
+    assert recyclarr.template_names(tmp_path, "sonarr") == [
+        "sonarr-german-hd-bluray-web",
+        "web-1080p",
+    ]
+    assert "sqp-1-1080p" in recyclarr.template_names(tmp_path, "radarr")
+    assert "german-hd-bluray-web" not in recyclarr.template_names(tmp_path, "radarr")
+
+
+def test_template_names_sans_manifeste(tmp_path):
+    """Recyclarr n'a pas encore tourne : rien sur disque, et surtout pas d'erreur."""
+    assert recyclarr.template_names(tmp_path, "sonarr") == []
+
+
+def test_un_manifeste_illisible_degrade_sans_interrompre(tmp_path):
+    for garbage in ("", "pas du json", "[]", '{"sonarr": "web-1080p"}', '{"sonarr": [1, 2]}'):
+        assert recyclarr.parse_manifest(garbage) == {}
+
+
+def test_available_templates_prefere_le_disque(tmp_path, monkeypatch):
+    """Ce que cette installation connait vaut mieux que ce que le depot publie."""
+    _with_manifest(tmp_path)
+    monkeypatch.setattr(
+        recyclarr, "fetch_manifest", lambda **kw: (_ for _ in ()).throw(AssertionError("reseau"))
+    )
+
+    names, problem = recyclarr.available_templates(tmp_path)
+
+    assert problem is None
+    assert names["sonarr"] == ["sonarr-german-hd-bluray-web", "web-1080p"]
+
+
+def test_available_templates_bascule_sur_le_reseau(tmp_path, monkeypatch):
+    """Avant la premiere installation, le disque est vide : on demande au depot.
+
+    C'est ce qui evite d'imposer le telechargement de l'image Recyclarr, puis une
+    minute de clonage, avant meme le recapitulatif de l'assistant.
+    """
+    monkeypatch.setattr(recyclarr, "fetch_manifest", lambda **kw: ({"sonarr": ["web-2160p"]}, None))
+
+    names, problem = recyclarr.available_templates(tmp_path)
+
+    assert problem is None and names == {"sonarr": ["web-2160p"]}
 
 
 # -------------------------------------------------------------------- cablage
