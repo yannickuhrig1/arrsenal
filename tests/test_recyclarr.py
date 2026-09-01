@@ -381,14 +381,14 @@ def test_la_page_d_acces_ne_propose_pas_de_lien_vers_le_port_0(tmp_path):
     from arrsenal import dashboard
 
     cfg = _cfg(tmp_path)
-    cfg.host = "192.168.1.53"
+    cfg.host = "192.168.1.10"
     page = dashboard.render(cfg)
 
     assert ":0" not in page.replace("rgba(0", "").replace("#0", "")
     assert "Recyclarr" in page
     assert "tache de fond, sans interface" in page
     # Sonarr, lui, garde son lien.
-    assert 'href="http://192.168.1.53:8989"' in page
+    assert 'href="http://192.168.1.10:8989"' in page
 
 
 # ---------------------------------------------------------------- idempotence
@@ -439,7 +439,7 @@ def test_le_rapport_n_affiche_pas_d_url_pour_un_service_sans_interface(tmp_path)
     from arrsenal import report
 
     cfg = _cfg(tmp_path)
-    cfg.host = "192.168.1.53"
+    cfg.host = "192.168.1.10"
     recorder = Console(record=True, width=200, force_terminal=False)
     original, report.console = report.console, recorder
     try:
@@ -448,6 +448,6 @@ def test_le_rapport_n_affiche_pas_d_url_pour_un_service_sans_interface(tmp_path)
         report.console = original
     text = recorder.export_text()
 
-    assert "192.168.1.53:0" not in text
+    assert "192.168.1.10:0" not in text
     assert "tache de fond" in text
-    assert "192.168.1.53:8989" in text
+    assert "192.168.1.10:8989" in text

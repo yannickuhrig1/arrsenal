@@ -171,10 +171,10 @@ def test_an_adopted_service_is_reached_through_the_host():
     service compose n'y resout pas. Verifie en conditions reelles - Prowlarr
     repondait "cannot connect to Sonarr" sur une URL en nom de service."""
     cfg = adopt.config_from_plan(
-        adopt.build_plan([found()]), data_root="/srv/d", config_root="/opt/c", host="192.168.1.53"
+        adopt.build_plan([found()]), data_root="/srv/d", config_root="/opt/c", host="192.168.1.10"
     )
     spec = catalog.get("sonarr")
-    assert cfg.services["sonarr"].internal_url(spec, cfg.host) == "http://192.168.1.53:8991"
+    assert cfg.services["sonarr"].internal_url(spec, cfg.host) == "http://192.168.1.10:8991"
 
 
 def test_a_managed_service_keeps_the_compose_service_name():

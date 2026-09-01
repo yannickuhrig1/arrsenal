@@ -599,7 +599,7 @@ Il tourne sur une planification, `CRON_SCHEDULE=@daily` par défaut, et
 - le préflight ne contrôle pas son port : la ligne « port 0 : libre » n'apprenait rien
   et faisait douter du reste du tableau ;
 - la page d'accès ne lui donne **pas** de lien. Elle en proposait un vers
-  `http://192.168.1.53:0`, juste sous une note disant « Aucune interface web ». Un lien
+  `http://192.168.1.10:0`, juste sous une note disant « Aucune interface web ». Un lien
   mort au milieu d'une page de raccourcis fait conclure que l'installation a échoué.
 
 L'entrypoint est `/sbin/tini -- /entrypoint.sh` et prend les sous-commandes
