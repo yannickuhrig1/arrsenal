@@ -9,13 +9,15 @@ Les fichiers sont regeneres a l'identique a chaque execution ET sur n'importe
 quelle machine, ce qui permet de les versionner et de voir les regressions
 visuelles dans une pull request. La CI le verifie.
 
-Six sources de variation sont neutralisees ici, et il a fallu les trouver
+Sept sources de variation sont neutralisees ici, et il a fallu les trouver
 une par une : le profil de plateforme propose (il suit la machine), les
 identifiants Unix detectes, le diagnostic Docker (celui de la machine, absent
 sur une CI), les secrets generes (tires au hasard a chaque execution), le
 repertoire du projet (le chemin personnel de qui lance le script se retrouvait
-dans une capture publiee) et la liste des templates Recyclarr (elle vient du
-depot amont et bouge sans nous).
+dans une capture publiee), la liste des templates Recyclarr (elle vient du
+depot amont et bouge sans nous) et les configurations deja presentes sur le
+disque (le recapitulatif les lit pour avertir, et avertissait donc de ce qui
+trainait sur la machine de l'auteur).
 """
 
 from __future__ import annotations
@@ -127,6 +129,13 @@ def freeze_environment() -> None:
         lambda config_dir=None, **kw: (dict(SHOWN_TEMPLATES), None)
     )
 
+    # Le recapitulatif LIT LE DISQUE pour avertir d'une configuration heritee.
+    # La capture dependait donc du contenu de /opt/arrsenal/config sur la machine
+    # qui la produit : ici un avertissement qBittorrent laisse par un essai
+    # precedent, sur la CI rien du tout. On montre le cas nominal, une machine
+    # vierge — c'est celui que decrit le depot.
+    screens.orchestrator.unusable_configs = lambda cfg: []  # type: ignore[assignment]
+
 
 #: Resultats fictifs pour illustrer l'ecran de rapport sans rien demarrer.
 FAKE_STEPS = [
@@ -208,6 +217,10 @@ async def capture() -> None:
         screen.query_one("#vpn-key", Input).value = SHOWN_VPN_KEY
         await pilot.pause()
         await shot(app, pilot, "4-vpn")
+        # Ce que fait le bouton « Continuer ». Sans cela le recapitulatif suivant
+        # avertirait qu'aucun VPN n'est configure, juste apres une capture qui en
+        # montre un rempli.
+        app.vpn = screen.config()
 
         app.selection = [*app.selection, "recyclarr"]
         app.push_screen(TemplatesScreen())

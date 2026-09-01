@@ -703,20 +703,37 @@ class SummaryScreen(WizardScreen):
                 inst.url(cfg.host) if inst.has_web_ui else "tache de fond",
             )
 
-        self.query_one("#summary-paths", Static).update(
-            f"[b]Configurations[/b]  {cfg.config_root}\n"
-            f"[b]Donnees[/b]        {cfg.data_root}  -> /data dans tous les conteneurs\n"
-            f"[b]PUID:PGID[/b]      {cfg.puid}:{cfg.pgid} [dim]({cfg.ids_source})[/dim]\n"
-            f"[b]UMASK / TZ[/b]     {cfg.umask}   {cfg.timezone}\n"
-            f"[b]Liens a cabler[/b] {orchestrator.planned_links(cfg)}"
-        )
+        lignes = [
+            f"[b]Configurations[/b]  {cfg.config_root}",
+            f"[b]Donnees[/b]        {cfg.data_root}  -> /data dans tous les conteneurs",
+            f"[b]PUID:PGID[/b]      {cfg.puid}:{cfg.pgid} [dim]({cfg.ids_source})[/dim]",
+            f"[b]UMASK / TZ[/b]     {cfg.umask}   {cfg.timezone}",
+        ]
+        # Un VPN configure ajoute un conteneur que le tableau ci-dessus ne montre
+        # pas : Gluetun n'est pas un service du catalogue. Sans cette ligne, le
+        # recapitulatif ne dirait RIEN du choix qui vient d'etre fait, et la
+        # disparition de l'avertissement serait le seul indice qu'il a ete pris.
+        if cfg.vpn_enabled:
+            lignes.append(
+                f"[b]VPN[/b]            gluetun - {cfg.vpn.provider} "
+                f"[dim]({cfg.vpn.vpn_type}) ; le client de telechargement ne "
+                f"demarrera pas sans le tunnel[/dim]"
+            )
+        lignes.append(f"[b]Liens a cabler[/b] {orchestrator.planned_links(cfg)}")
+        self.query_one("#summary-paths", Static).update("\n".join(lignes))
 
         vpn_warning = (
             "[yellow]Aucun VPN n'est configure pour le client torrent.[/yellow]\n"
             "[dim]Le trafic BitTorrent sortira sur l'adresse IP publique de cette "
             "machine, visible par les autres pairs.[/dim]"
         )
-        warnings = [vpn_warning] if orchestrator.has_download_client(cfg) else []
+        # L'avertissement ne vaut que si le VPN n'a PAS ete configure. Tant
+        # qu'il n'existait qu'en ligne de commande la question ne se posait
+        # pas ; avec l'ecran VPN, avertir sans regarder revenait a annoncer
+        # « aucun VPN » a quelqu'un qui venait d'en saisir un.
+        warnings = []
+        if orchestrator.has_download_client(cfg) and not cfg.vpn_enabled:
+            warnings.append(vpn_warning)
         if not cfg.ids_certain:
             warnings.append(
                 f"[yellow]PUID/PGID non detectables ici : repli sur "

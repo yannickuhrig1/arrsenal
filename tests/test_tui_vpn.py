@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Button, Input, RadioButton, Select, Static
 
-from arrsenal.models import VPN_PROVIDERS
+from arrsenal.models import VPN_PROVIDERS, VpnConfig
 from arrsenal.tui.app import ArrsenalApp
 from arrsenal.tui.screens import PathsScreen, SummaryScreen, TemplatesScreen, VpnScreen
 
@@ -197,3 +197,64 @@ async def test_un_hote_vide_retombe_sur_localhost(app):
         await pilot.pause()
 
         assert pilot.app.build_config().host == "localhost"
+
+
+# ------------------------------------------------------------ recapitulatif
+
+
+async def _recap(pilot, vpn: VpnConfig) -> SummaryScreen:
+    pilot.app.selection = ["sonarr", "qbittorrent"]
+    pilot.app.config_root, pilot.app.data_root = "/c", "/d"
+    pilot.app.vpn = vpn
+    pilot.app.push_screen(SummaryScreen())
+    await pilot.pause()
+    return pilot.app.screen
+
+
+def _texte(screen: SummaryScreen) -> str:
+    return " ".join(str(w.content) for w in screen.query(Static))
+
+
+@pytest.mark.asyncio
+async def test_sans_vpn_le_recapitulatif_avertit(app):
+    async with app.run_test() as pilot:
+        screen = await _recap(pilot, VpnConfig())
+
+        assert "Aucun VPN" in _texte(screen)
+
+
+@pytest.mark.asyncio
+async def test_avec_un_vpn_le_recapitulatif_se_tait(app):
+    """Il annoncait « aucun VPN » a qui venait d'en saisir un : l'avertissement
+    ne regardait que la presence d'un client de telechargement."""
+    async with app.run_test() as pilot:
+        screen = await _recap(
+            pilot,
+            VpnConfig(enabled=True, provider="mullvad", wireguard_private_key="cle"),
+        )
+
+        assert "Aucun VPN" not in _texte(screen)
+
+
+@pytest.mark.asyncio
+async def test_le_recapitulatif_annonce_gluetun(app):
+    """Gluetun n'est pas un service du catalogue : il n'apparait pas dans le
+    tableau. Sans cette ligne, rien ne confirmerait le choix qui vient d'etre
+    fait."""
+    async with app.run_test() as pilot:
+        screen = await _recap(
+            pilot,
+            VpnConfig(enabled=True, provider="mullvad", wireguard_private_key="cle"),
+        )
+        texte = _texte(screen)
+
+        assert "gluetun" in texte and "mullvad" in texte
+        assert "wireguard" in texte
+
+
+@pytest.mark.asyncio
+async def test_sans_vpn_le_recapitulatif_ne_parle_pas_de_gluetun(app):
+    async with app.run_test() as pilot:
+        screen = await _recap(pilot, VpnConfig())
+
+        assert "gluetun" not in _texte(screen)
