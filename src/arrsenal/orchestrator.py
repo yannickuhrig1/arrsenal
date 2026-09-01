@@ -59,6 +59,7 @@ def build_config(
     platform: PlatformProfile = PlatformProfile.GENERIC_LINUX,
     host: str = "localhost",
     timezone: str = "Etc/UTC",
+    username: str = "arrsenal",
 ) -> StackConfig:
     """Construit une StackConfig complete, secrets generes.
 
@@ -78,6 +79,7 @@ def build_config(
         host=host,
         ids_source=source,
         ids_certain=certain,
+        username=username,
     )
     for sid in catalog.resolve_dependencies(services):
         spec = catalog.get(sid)
@@ -92,7 +94,7 @@ def build_config(
             "autobrr",
             "qui",
         ):
-            inst.username = "arrsenal"
+            inst.username = cfg.username
             inst.password = seed.generate_password()
         cfg.services[sid] = inst
     return cfg
@@ -442,7 +444,12 @@ def install(
     compose.write_artifacts(cfg, project_dir)
 
     page = dashboard.write(cfg, project_dir, failed=sum(1 for r in results if not r.ok))
-    on_progress(Progress("page d'acces", str(page)))
+    # La page d'acces est un fichier fige : ni etat des services, ni mises a
+    # jour, ni boutons. Tout cela vient de `arrsenal serve` — encore faut-il
+    # pouvoir le lancer. Un utilisateur qui a double-clique un executable n'a pas
+    # `arrsenal` dans son PATH : on lui depose donc un lanceur cliquable.
+    lanceur = dashboard.write_admin_launcher(project_dir)
+    on_progress(Progress("page d'acces", f"{page} (+ {lanceur.name})"))
 
     on_progress(Progress("cablage", "termine", ok=all(r.ok for r in results), done=True))
     return results

@@ -7,6 +7,7 @@ des artefacts generes, jamais edites a la main (voir PROMPT.md sec. 6).
 from __future__ import annotations
 
 import os
+import re
 from enum import Enum
 from pathlib import PurePosixPath
 
@@ -205,6 +206,20 @@ class ServiceInstance(BaseModel):
         return f"http://{spec.id}:{spec.internal_port}"
 
 
+#: Forme acceptee pour l'identifiant.
+#:
+#: La longueur minimale est de UN caractere : verifie contre qBittorrent 5.2.3,
+#: qui accepte « ab » sans broncher (HTTP 204 a la connexion). Imposer trois
+#: caracteres aurait ete une contrainte inventee.
+#:
+#: Le jeu de caracteres, lui, est bien une contrainte reelle : ce nom finit dans
+#: un XML, un INI, un JSON, un formulaire de connexion et une ligne de commande
+#: de conteneur. Espaces, accents et ponctuation exotique y passeraient
+#: peut-etre — mais « peut-etre » ne convient pas pour une valeur qu'on ne peut
+#: plus changer sans tout reinstaller.
+USERNAME_PATTERN = re.compile(r"[A-Za-z0-9._-]{1,32}")
+
+
 class StackConfig(BaseModel):
     """Etat canonique versionnable (stack.yml)."""
 
@@ -222,6 +237,10 @@ class StackConfig(BaseModel):
 
     #: Hote joignable depuis le navigateur de l'utilisateur, pour le rapport final.
     host: str = "localhost"
+
+    #: Identifiant commun a tous les services. « arrsenal » n'est qu'un defaut :
+    #: demande a l'usage, tout le monde ne veut pas ce nom-la.
+    username: str = "arrsenal"
 
     #: D'ou viennent puid/pgid. Affiche a l'utilisateur : des identifiants faux
     #: cassent les permissions de toute la stack, il doit pouvoir les juger.
@@ -251,6 +270,25 @@ class StackConfig(BaseModel):
         if not v:
             raise ValueError("le chemin ne peut pas etre vide")
         return v.rstrip("/\\") or v
+
+    @field_validator("username")
+    @classmethod
+    def _username_utilisable(cls, v: str) -> str:
+        """Un identifiant qui traverse cinq applications differentes.
+
+        Les caracteres acceptes sont volontairement restreints : ce nom finit
+        dans un XML, un INI, un JSON, un formulaire de connexion et une ligne de
+        commande de conteneur. Une espace ou un accent y passeraient peut-etre,
+        mais « peut-etre » ne convient pas pour une valeur qu'on ne peut plus
+        changer sans tout reinstaller.
+        """
+        v = v.strip()
+        if not USERNAME_PATTERN.fullmatch(v):
+            raise ValueError(
+                f"identifiant invalide: {v!r}. Attendu 1 a 32 caracteres parmi "
+                f"lettres, chiffres, point, tiret et souligne, sans espace."
+            )
+        return v
 
     @field_validator("umask")
     @classmethod

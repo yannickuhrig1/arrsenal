@@ -168,6 +168,9 @@ def install(
     # proposait des chemins Linux, crees ensuite a la racine du disque courant.
     platform: PlatformProfile = typer.Option(default_profile(), help="Profil de plateforme."),
     host: str = typer.Option("localhost", help="Hote pour les URL du rapport final."),
+    username: str = typer.Option(
+        "arrsenal", help="Identifiant commun a tous les services installes."
+    ),
     timezone: str = typer.Option("Etc/UTC", "--tz"),
     project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
     dry_run: bool = typer.Option(False, "--dry-run", help="N'ecrit rien, montre tout."),
@@ -213,6 +216,7 @@ def install(
         platform=platform,
         host=host,
         timezone=timezone,
+        username=username,
     )
 
     chosen = {"sonarr": recyclarr_sonarr.strip(), "radarr": recyclarr_radarr.strip()}

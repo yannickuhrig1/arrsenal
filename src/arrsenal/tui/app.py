@@ -28,6 +28,7 @@ class ArrsenalApp(App):
         self.config_root: str | None = None
         self.data_root: str | None = None
         self.timezone: str = "Etc/UTC"
+        self.username: str = "arrsenal"
         self.platform: PlatformProfile = PlatformProfile.GENERIC_LINUX
         #: Template TRaSH choisi par service. Vide = celui par defaut.
         self.recyclarr_templates: dict[str, str] = {}
@@ -49,6 +50,7 @@ class ArrsenalApp(App):
             data_root=self.data_root,
             platform=self.platform,
             timezone=self.timezone,
+            username=self.username,
         )
         cfg.recyclarr_templates = dict(self.recyclarr_templates)
         return cfg

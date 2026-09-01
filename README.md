@@ -164,6 +164,16 @@ arrsenal generate    # régénère docker-compose.yml depuis stack.yml
 arrsenal uninstall   # arrête la stack, ne touche jamais à vos médias
 ```
 
+### Après l'installation : la page d'administration
+
+La page d'accès est un **fichier figé** : elle liste les adresses et les identifiants,
+rien de plus. L'état des services, les boutons démarrer / arrêter / redémarrer et les
+mises à jour disponibles viennent d'un petit serveur local.
+
+Un fichier `administration.cmd` (`administration.sh` ailleurs) est déposé à côté des
+artefacts : **double-cliquez dessus**. Il connaît le chemin de votre installation, donc
+il fonctionne même sans `arrsenal` dans le PATH.
+
 ### En cas de problème
 
 Chaque installation écrit un journal complet à côté de `docker-compose.yml` :
@@ -308,6 +318,10 @@ automatique sans laisser Sonarr et Radarr ouverts à tout le réseau local.
 
 Les identifiants sont écrits dans `.env` en `chmod 600`, déjà couvert par le
 `.gitignore` généré, et masqués dans les journaux.
+
+L'identifiant est **le vôtre** : `arrsenal` n'est qu'un défaut, changeable dans
+l'assistant ou par `--username`. Le même pour tous les services, ce qui garde la page
+d'accès lisible.
 
 **Chaque installation génère ses propres secrets**, tirés par `secrets`, la source
 cryptographique de Python. Rien n'est réutilisé d'une machine à l'autre, et aucun mot de

@@ -251,6 +251,12 @@ class PathsScreen(WizardScreen):
             )
             yield Input(value=defaults.data_root, id="data-root")
 
+            yield Label(
+                "Identifiant [dim](le meme pour tous les services installes)[/dim]",
+                classes="group-title",
+            )
+            yield Input(value="arrsenal", id="username")
+
             yield Label("Fuseau horaire", classes="group-title")
             yield Input(value="Europe/Paris", id="tz")
 
@@ -336,6 +342,7 @@ class PathsScreen(WizardScreen):
         self.app.config_root = self.query_one("#config-root", Input).value.strip()
         self.app.data_root = self.query_one("#data-root", Input).value.strip()
         self.app.timezone = self.query_one("#tz", Input).value.strip() or "Etc/UTC"
+        self.app.username = self.query_one("#username", Input).value.strip() or "arrsenal"
         self.app.platform = self.platform()
         # Ecran facultatif : il n'a de sens que si Recyclarr est installe ET s'il a
         # au moins un *arr a configurer.

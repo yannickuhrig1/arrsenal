@@ -20,7 +20,7 @@ _TAGS = {
     "jellyfin": "10.11.11",
     "flood": "4.16.1",
     "autobrr": "v1.85.0",
-    "qui": "v1.27.0",
+    "qui": "v1.28.0",
     "recyclarr": "8.7.1",
 }
 

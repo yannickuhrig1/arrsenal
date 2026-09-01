@@ -1198,3 +1198,80 @@ pour les machines sans navigateur — un NAS en ligne de commande, par exemple.
 Deux garde-fous : rien ne s'ouvre si le fichier n'existe pas, et le générateur
 de captures comme les tests désactivent l'ouverture. Lancer un navigateur
 pendant une CI n'aurait aucun sens.
+
+---
+
+## L'identifiant se choisit — 2026-09-01
+
+Demandé à l'usage : « pas tout le monde veut mettre arrsenal comme username ».
+
+Un seul endroit du code fixait ce nom ; tout le reste n'était qu'un repli. Il est
+maintenant porté par `StackConfig`, exposé par `--username` et par un champ de
+l'assistant, et il atteint les cinq familles de services.
+
+### La contrainte de forme, et ce qu'elle vaut vraiment
+
+Première version : minimum trois caractères, « parce que qBittorrent les exige ».
+**C'était faux.** Vérifié sur qBittorrent 5.2.3 avec une configuration semée pour
+l'identifiant `ab` : la connexion répond **204**. La règle a été ramenée à un
+caractère, et le commentaire corrigé.
+
+Ce qui reste contraint, en revanche, l'est pour une raison réelle : ce nom finit dans un
+XML, un INI, un JSON, un formulaire de connexion et une ligne de commande de conteneur.
+Espaces, accents et ponctuation exotique y passeraient peut-être — mais « peut-être » ne
+convient pas pour une valeur qu'on ne peut plus changer sans tout réinstaller. D'où
+`[A-Za-z0-9._-]{1,32}`.
+
+### Vérifié sur une installation réelle
+
+`--username yannick`, six services, 17 liens sur 17, puis connexion à chacun avec ce
+nom :
+
+| Service | Connexion |
+|---|---|
+| Prowlarr, Sonarr, Radarr | redirection vers `/` |
+| qBittorrent | HTTP 204 |
+| Transmission | RPC 200 |
+| Jellyfin | HTTP 200 |
+
+---
+
+## La page figée et les versions épinglées — 2026-09-01
+
+Deux remarques d'usage le même jour : « quand je me suis connecté à qui, je n'avais pas
+la dernière version », et « la page ne me dit pas s'il y a une mise à jour, et ne me
+permet pas d'arrêter ou relancer une instance ».
+
+### Le catalogue vieillit, et il faut le mesurer
+
+Chaque tag du catalogue a été confronté à son registre. Dix services sur onze étaient à
+jour ; **`qui` accusait une version de retard**, v1.27.0 contre v1.28.0.
+
+La nouvelle version a été vérifiée avant d'être épinglée, comme le veut la règle du
+projet : 428 avant création du compte, 201 sur `POST /api/auth/setup`, 200 à la
+connexion, 201 sur la déclaration d'instance, relecture correcte. Comportement
+identique.
+
+Le contrôle complet tient en une commande et mérite d'être rejoué avant chaque
+publication :
+
+```
+for sid in catalog.STARTUP_ORDER: updates.newer_tags(catalog.get(sid).image)
+```
+
+### « La page ne me permet pas d'arrêter une instance »
+
+C'était exact, et voulu : la page d'accès est un fichier figé, sans serveur derrière.
+L'état des services, les boutons et les mises à jour viennent de `arrsenal serve`.
+
+Le défaut n'était donc pas dans la page, mais dans le chemin pour y arriver. Elle
+affichait « lancez `arrsenal serve` » — une commande inutile pour quelqu'un qui vient de
+double-cliquer un exécutable absent du PATH.
+
+Un lanceur `administration.cmd` (`administration.sh` ailleurs) est désormais déposé à
+côté des artefacts. Il porte le chemin réel de l'exécutable utilisé pour cette
+installation, et `--project-dir` pointant sur le bon dossier — sans quoi `serve`
+chercherait un `stack.yml` là où le double-clic a eu lieu.
+
+Vérifié en le lançant comme le ferait un double-clic : la page d'administration répond,
+HTTP 401 sans jeton, ce qui est exactement le comportement attendu.

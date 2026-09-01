@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import html
 import socket
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -207,9 +208,10 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
 
     if not live:
         banner += (
-            "<div class=\"banner info\">Cette page est un fichier fige. Pour voir l'etat "
-            "des services et les demarrer ou les arreter, lancez "
-            "<code>arrsenal serve</code>.</div>"
+            "<div class=\"banner info\">Cette page est un <b>fichier fige</b> : elle ne "
+            "montre ni l'etat des services, ni les mises a jour disponibles, et ses "
+            "boutons n'existent pas ici.<br>Pour tout cela, ouvrez "
+            f"<code>{LAUNCHER_NAME}</code>, depose a cote de cette page.</div>"
         )
 
     return _TEMPLATE.format(
@@ -517,3 +519,55 @@ _LIVE_SCRIPT = """<script>
   setInterval(verifierMaj, 900000);
 </script>
 """
+
+
+#: Nom du lanceur ecrit a cote des artefacts, selon la plateforme.
+LAUNCHER_NAME = "administration.cmd" if sys.platform == "win32" else "administration.sh"
+
+
+def admin_command(project_dir: Path) -> str:
+    """Commande capable de relancer la page d'administration.
+
+    Un utilisateur qui a double-clique un executable n'a pas `arrsenal` dans son
+    PATH : lui dire « lancez arrsenal serve » ne l'avance a rien. On note donc le
+    chemin reellement utilise pour cette installation.
+    """
+    cible = f'"{Path(project_dir).resolve()}"'
+    if getattr(sys, "frozen", False):
+        return f'"{Path(sys.executable).resolve()}" serve --project-dir {cible}'
+    return f'"{Path(sys.executable).resolve()}" -m arrsenal serve --project-dir {cible}'
+
+
+def write_admin_launcher(project_dir: Path) -> Path:
+    """Ecrit un lanceur double-cliquable pour la page d'administration.
+
+    C'est elle qui porte l'etat des services, les boutons demarrer / arreter /
+    redemarrer et les mises a jour disponibles. La page d'acces, elle, est un
+    fichier fige : signale a l'usage, personne ne devine qu'il faut lancer une
+    commande pour obtenir le reste.
+    """
+    project_dir = Path(project_dir)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    cible = project_dir / LAUNCHER_NAME
+    commande = admin_command(project_dir)
+
+    if sys.platform == "win32":
+        contenu = (
+            "@echo off\r\n"
+            "rem Genere par arrsenal. Ouvre la page d'administration : etat des\r\n"
+            "rem services, demarrage, arret, mises a jour.\r\n"
+            "title arrsenal - administration\r\n"
+            f"{commande}\r\n"
+            "pause\r\n"
+        )
+        cible.write_text(contenu, encoding="utf-8", newline="")
+    else:
+        contenu = (
+            "#!/bin/sh\n"
+            "# Genere par arrsenal. Ouvre la page d'administration : etat des\n"
+            "# services, demarrage, arret, mises a jour.\n"
+            f"exec {commande}\n"
+        )
+        cible.write_text(contenu, encoding="utf-8")
+        cible.chmod(0o755)
+    return cible

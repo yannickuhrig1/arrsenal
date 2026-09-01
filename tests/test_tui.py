@@ -222,3 +222,37 @@ async def test_aucune_ouverture_si_la_page_manque(app, tmp_path, monkeypatch):
         await pilot.pause()
 
     assert ouvertes == []
+
+
+@pytest.mark.asyncio
+async def test_l_identifiant_se_choisit_dans_l_assistant(app):
+    """Demande a l'usage : tout le monde ne veut pas s'appeler « arrsenal »."""
+    async with app.run_test() as pilot:
+        pilot.app.selection = ["sonarr"]
+        pilot.app.push_screen(PathsScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+
+        assert screen.query_one("#username", Input).value == "arrsenal"
+        screen.query_one("#username", Input).value = "yannick"
+        await pilot.pause()
+        screen.query_one("#next", Button).press()
+        await pilot.pause()
+
+        assert pilot.app.username == "yannick"
+        assert pilot.app.build_config().services["sonarr"].username == "yannick"
+
+
+@pytest.mark.asyncio
+async def test_un_identifiant_vide_retombe_sur_le_defaut(app):
+    async with app.run_test() as pilot:
+        pilot.app.selection = ["sonarr"]
+        pilot.app.push_screen(PathsScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+        screen.query_one("#username", Input).value = "   "
+        await pilot.pause()
+        screen.query_one("#next", Button).press()
+        await pilot.pause()
+
+        assert pilot.app.username == "arrsenal"
