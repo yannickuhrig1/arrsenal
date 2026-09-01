@@ -27,7 +27,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from textual.widgets import Footer, Label, ListItem, ListView, Static
+from textual.widgets import Label, ListItem, ListView, Static
 
 from arrsenal.clients.prowlarr import IndexerDefinition
 from arrsenal.tui.app import ArrsenalApp
@@ -150,20 +150,23 @@ async def capture() -> None:
     freeze_environment()
 
     async def shot(app: ArrsenalApp, pilot, name: str) -> None:
-        # Le `Footer` monte ses raccourcis de facon asynchrone. Exporter sans
-        # l'attendre donne, selon l'ordonnancement, une capture avec pied de page
-        # et une capture sans : deux executions de suite ne coincidaient pas.
-        for _ in range(20):
-            footer = app.screen.query(Footer)
-            if footer and footer.first().children:
+        # Le `Footer` monte ses raccourcis de facon asynchrone. Attendre que ses
+        # ENFANTS existent ne suffit pas : le premier apparait avant que le texte
+        # ne soit rendu, et la capture partait parfois sans pied de page. On
+        # attend donc ce qu'on va reellement ecrire, en cherchant le raccourci
+        # « palette » que toutes les fenetres affichent.
+        contenu = app.export_screenshot()
+        for _ in range(40):
+            if "palette" in contenu:
                 break
             await pilot.pause()
+            contenu = app.export_screenshot()
         path = OUT / f"{name}.svg"
         # newline="" : sans cela Python traduit les sauts de ligne en CRLF sous
         # Windows. Git le rattrape a la normalisation, mais un depot configure
         # autrement verrait le controle de la CI echouer sans rien de reel.
         with path.open("w", encoding="utf-8", newline="") as handle:
-            handle.write(app.export_screenshot())
+            handle.write(contenu)
         print(f"  {path.relative_to(ROOT)}")
 
     app = ArrsenalApp(project_dir=SHOWN_PROJECT_DIR)
