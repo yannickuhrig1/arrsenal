@@ -95,11 +95,21 @@ Le préflight ne se contente pas de l'espérer : il **crée un vrai hardlink** e
 
 ## Installation
 
-Prérequis : Docker Engine (ou Docker Desktop) avec le plugin `docker compose`.
+Prérequis : Docker Engine (ou Docker Desktop) avec le plugin `docker compose`, et
+Python 3.12 ou plus récent.
 
 ```bash
-pipx install arrsenal
+pipx install git+https://github.com/yannickuhrig1/arrsenal
 ```
+
+Sans `pipx`, un environnement virtuel fait la même chose :
+
+```bash
+python -m venv ~/.venvs/arrsenal && ~/.venvs/arrsenal/bin/pip install git+https://github.com/yannickuhrig1/arrsenal
+```
+
+Le paquet n'est pas encore sur PyPI : `pipx install arrsenal` ne fonctionnera qu'après
+la première publication.
 
 Aperçu sans rien écrire :
 

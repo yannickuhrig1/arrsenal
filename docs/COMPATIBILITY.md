@@ -730,3 +730,36 @@ jour » ne prouve rien :
 
 - `8.7.1` → aucune plus récente (c'est bien la dernière) ;
 - `7.4.1` → propose `8.6.0`, `8.7.0`, `8.7.1`.
+
+---
+
+## Docker Desktop sous Windows — vérifié le 2026-09-01
+
+Le README oriente les utilisateurs Windows vers Docker. Restait à savoir si la promesse
+centrale du projet — **le montage `/data` unique qui rend les hardlinks possibles** —
+tient à travers un bind mount Docker Desktop. Elle n'avait été vérifiée que sur Linux
+natif.
+
+Elle tient. Dans un conteneur montant un chemin Windows (`-v C:/tmp/hltest:/data`) :
+
+```
+/data/torrents/film.mkv : 2 liens, inode 1970324838307120
+/data/media/film.mkv    : 2 liens, inode 1970324838307120
+```
+
+Même inode, et une écriture par l'un des deux noms est visible par l'autre : c'est un
+vrai lien, pas une copie. Un import *arr ne recopiera donc pas 40 Go.
+
+Une réserve, cosmétique : côté Windows, la **taille** affichée pour le second nom peut
+rester en retard (17 octets contre 23) alors que le contenu lu est bien le même. C'est
+la couche de traduction de fichiers de Docker Desktop, pas le lien.
+
+### L'emballage tient aussi
+
+Installation depuis GitHub dans un environnement neuf, comme le ferait un inconnu :
+`app.tcss` est bien embarqué dans le paquet, l'assistant démarre et sa feuille de style
+est chargée. Sans cet artefact déclaré dans `pyproject.toml`, le wizard s'ouvrirait sans
+aucun style chez tous les utilisateurs.
+
+Le README indiquait `pipx install arrsenal`. Le paquet n'est pas sur PyPI (HTTP 404) :
+la commande échouait pour tout le monde. Corrigé en `pipx install git+https://…`.
