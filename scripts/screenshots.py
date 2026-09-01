@@ -195,6 +195,12 @@ async def capture() -> None:
         app.push_screen(InstallScreen())
         await pilot.pause()
         screen = app.screen
+        # Une barre sans total s'affiche en mode INDETERMINE, c'est-a-dire animee :
+        # deux captures ne coincideraient jamais. Lui donner un total la fige, et
+        # montre au passage ce que l'utilisateur voit vraiment.
+        screen._set_total(len(FAKE_STEPS))
+        for _ in FAKE_STEPS:
+            screen._advance()
         screen._phase("cablage : 8/8 liens etablis")
         for step in FAKE_STEPS:
             screen._log(f"  [green]OK[/green]  {step.name} - {step.detail}")
