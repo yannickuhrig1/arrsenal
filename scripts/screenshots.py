@@ -78,10 +78,24 @@ SHOWN_TEMPLATES = {
 }
 
 
+#: Diagnostic Docker d'illustration. L'ecran d'accueil affiche celui de la
+#: machine : sans cela, une machine sans Docker (une CI, par exemple) produit une
+#: capture rouge, et le chemin du binaire trahit le systeme de l'auteur.
+SHOWN_DOCKER = (
+    ("docker", "trouve: /usr/bin/docker"),
+    ("daemon docker", "version serveur 27.3.1"),
+    ("docker compose", "v2.29.7"),
+)
+
+
 def freeze_environment() -> None:
     """Rend la capture independante de la machine qui la produit."""
-    from arrsenal import orchestrator, seed
+    from arrsenal import orchestrator, runner, seed
     from arrsenal.tui import screens
+
+    runner.check_docker = lambda: [  # type: ignore[assignment]
+        runner.Check(name, True, detail) for name, detail in SHOWN_DOCKER
+    ]
 
     fixed_ids = (1000, 1000, "profil generic-linux", True)
     orchestrator.resolve_ids = lambda profile: fixed_ids  # type: ignore[assignment]
