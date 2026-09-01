@@ -1,0 +1,390 @@
+"""Tests de la configuration Recyclarr.
+
+Le fragment de template reproduit ici est copie tel quel d'un conteneur
+`ghcr.io/recyclarr/recyclarr:8.7.1` : c'est lui qui fixe la forme des marqueurs.
+Si une version future changeait leur libelle, ces tests le signaleraient avant
+qu'une installation ne parte avec une configuration a moitie remplie.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from arrsenal import catalog, compose
+from arrsenal.clients import recyclarr
+from arrsenal.orchestrator import build_config
+from arrsenal.wiring import Wirer
+
+TEMPLATE = """\
+# yaml-language-server: $schema=https://schemas.recyclarr.dev/v8/config-schema.json
+################################################################################
+## TRaSH Guides: WEB-1080p
+##
+## https://trash-guides.info/Sonarr/sonarr-setup-quality-profiles/#web-1080p
+################################################################################
+
+sonarr:
+  web-1080p:
+    base_url: Put your Sonarr URL here
+    api_key: Put your API key here
+
+    quality_definition:
+      type: series
+
+    quality_profiles:
+      - name: WEB-1080p
+"""
+
+
+def _template(tmp_path: Path, text: str = TEMPLATE, name: str = "web-1080p.yml") -> Path:
+    path = tmp_path / name
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+# ----------------------------------------------------------------- remplissage
+
+
+def test_fill_ecrit_adresse_et_cle(tmp_path):
+    path = _template(tmp_path)
+    result = recyclarr.fill(path, "http://sonarr:8989", "abc123", "sonarr")
+
+    assert result.ok
+    text = path.read_text(encoding="utf-8")
+    assert "    base_url: http://sonarr:8989\n" in text
+    assert "    api_key: abc123\n" in text
+    assert "Put your" not in text
+
+
+def test_fill_ne_touche_a_rien_d_autre(tmp_path):
+    """Tout le contenu vient des TRaSH Guides et doit rester intact.
+
+    C'est la garantie centrale du module : arrsenal cable, il ne redige pas les
+    profils. Une seule ligne modifiee ailleurs serait une reimplementation
+    silencieuse du guide.
+    """
+    path = _template(tmp_path)
+    recyclarr.fill(path, "http://sonarr:8989", "abc123", "sonarr")
+
+    before = TEMPLATE.splitlines()
+    after = path.read_text(encoding="utf-8").splitlines()
+
+    # Meme nombre de lignes : les lignes vides autour des marqueurs sont du
+    # contenu, pas du remplissage. Un `\s*$` gourmand les avalerait.
+    assert len(after) == len(before)
+    for index, (was, now) in enumerate(zip(before, after)):
+        if "Put your" in was:
+            assert now.startswith("    ") and "Put your" not in now
+        else:
+            assert now == was, f"ligne {index} modifiee"
+
+
+def test_fill_accepte_un_antislash_dans_l_url(tmp_path):
+    """Une url_base saisie a la main peut contenir un antislash.
+
+    Passe tel quel a re.sub comme chaine de remplacement, il ferait lever
+    « bad escape » et l'installation s'arreterait sur une erreur incomprehensible.
+    """
+    path = _template(tmp_path)
+    result = recyclarr.fill(path, r"http://host:8989/sonarr\g<0>", "a\\b", "sonarr")
+
+    assert result.ok
+    text = path.read_text(encoding="utf-8")
+    assert r"base_url: http://host:8989/sonarr\g<0>" in text
+    assert "api_key: a\\b" in text
+
+
+def test_fill_sur_un_fichier_deja_rempli_ne_signale_rien(tmp_path):
+    """Rejouer le cablage ne doit pas ecraser une valeur choisie par l'utilisateur."""
+    path = _template(tmp_path, TEMPLATE.replace("Put your Sonarr URL here", "http://moi:8989"))
+    result = recyclarr.fill(path, "http://sonarr:8989", "abc123", "sonarr")
+
+    assert not result.url_written and result.key_written
+    assert "http://moi:8989" in path.read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------- lecture
+
+
+def test_target_service_lit_le_yaml_pas_le_nom_de_fichier(tmp_path):
+    """`hd-bluray-web` est un titre de template, pas un nom de service.
+
+    Se fier au nom de fichier enverrait la cle de Radarr dans un fichier Sonarr.
+    """
+    path = _template(tmp_path, TEMPLATE, name="un-nom-qui-ne-dit-rien.yml")
+    assert recyclarr.target_service(path) == "sonarr"
+
+    radarr = _template(tmp_path, TEMPLATE.replace("sonarr:", "radarr:"), name="web-1080p.yml")
+    assert recyclarr.target_service(radarr) == "radarr"
+
+
+def test_target_service_repond_none_sur_un_fichier_muet(tmp_path):
+    assert recyclarr.target_service(_template(tmp_path, "# vide\n")) is None
+    assert recyclarr.target_service(tmp_path / "absent.yml") is None
+
+
+def test_pending_markers_repere_un_marqueur_oublie(tmp_path):
+    configs = tmp_path / "configs"
+    configs.mkdir()
+    (configs / "rempli.yml").write_text(
+        TEMPLATE.replace("Put your Sonarr URL here", "http://sonarr:8989").replace(
+            "Put your API key here", "abc"
+        ),
+        encoding="utf-8",
+    )
+    (configs / "oublie.yml").write_text(TEMPLATE, encoding="utf-8")
+
+    assert [p.name for p in recyclarr.pending_markers(tmp_path)] == ["oublie.yml"]
+
+
+def test_pending_markers_sans_dossier(tmp_path):
+    assert recyclarr.pending_markers(tmp_path) == []
+
+
+def test_template_names_lit_le_disque(tmp_path):
+    """La liste vient des ressources clonees par Recyclarr, pas d'une copie figee."""
+    folder = tmp_path / "resources/config-templates/git/official/sonarr/templates"
+    folder.mkdir(parents=True)
+    for name in ("web-2160p.yml", "web-1080p.yml", "notes.txt"):
+        (folder / name).touch()
+
+    assert recyclarr.template_names(tmp_path, "sonarr") == ["web-1080p", "web-2160p"]
+    assert recyclarr.template_names(tmp_path, "radarr") == []
+
+
+# -------------------------------------------------------------------- cablage
+
+
+def _cfg(tmp_path, services=("sonarr", "radarr", "recyclarr")):
+    cfg = build_config(
+        services=list(services),
+        config_root=str(tmp_path / "config"),
+        data_root=str(tmp_path / "data"),
+    )
+    cfg.project_dir = tmp_path
+    return cfg
+
+
+class FakeCompose:
+    """Remplace `docker compose run` : ecrit ce que Recyclarr aurait ecrit."""
+
+    def __init__(self, config_dir: Path, ok: bool = True):
+        self.config_dir = config_dir
+        self.ok = ok
+        self.calls: list[list[str]] = []
+
+    def __call__(self, project_dir, project_name):
+        return self
+
+    def run_once(self, service, args, timeout=600):
+        self.calls.append(args)
+        if not self.ok:
+            return False, "recyclarr: template inconnu"
+        configs = self.config_dir / "configs"
+        configs.mkdir(parents=True, exist_ok=True)
+        for index, name in enumerate(args):
+            if name != "--template":
+                continue
+            title = args[index + 1]
+            body = TEMPLATE if "1080p" in title else TEMPLATE.replace("sonarr:", "radarr:")
+            (configs / f"{title}.yml").write_text(body, encoding="utf-8")
+        return True, ""
+
+
+def _patch_compose(monkeypatch, fake):
+    monkeypatch.setattr("arrsenal.runner.Compose", fake)
+
+
+def test_step_recyclarr_remplit_chaque_fichier(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    config_dir = Path(cfg.config_path("recyclarr"))
+    _patch_compose(monkeypatch, FakeCompose(config_dir))
+
+    result = Wirer(cfg).step_recyclarr()
+
+    assert result.ok, result.warnings
+    assert "web-1080p -> sonarr" in result.detail
+    assert "hd-bluray-web -> radarr" in result.detail
+
+    sonarr = (config_dir / "configs" / "web-1080p.yml").read_text(encoding="utf-8")
+    assert f"api_key: {cfg.services['sonarr'].api_key}" in sonarr
+    assert "base_url: http://sonarr:8989" in sonarr
+
+    radarr = (config_dir / "configs" / "hd-bluray-web.yml").read_text(encoding="utf-8")
+    assert f"api_key: {cfg.services['radarr'].api_key}" in radarr
+    assert "base_url: http://radarr:7878" in radarr
+
+
+def test_step_recyclarr_n_ecrit_que_pour_les_services_installes(tmp_path, monkeypatch):
+    """Sans Radarr, aucun template Radarr ne doit etre demande."""
+    cfg = _cfg(tmp_path, services=("sonarr", "recyclarr"))
+    _patch_compose(monkeypatch, FakeCompose(Path(cfg.config_path("recyclarr"))))
+
+    result = Wirer(cfg).step_recyclarr()
+
+    assert result.ok
+    assert "radarr" not in result.detail
+
+
+def test_step_recyclarr_signale_un_echec_de_generation(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    _patch_compose(monkeypatch, FakeCompose(Path(cfg.config_path("recyclarr")), ok=False))
+
+    result = Wirer(cfg).step_recyclarr()
+
+    assert not result.ok
+    assert "template inconnu" in result.warnings[0]
+
+
+def test_step_recyclarr_signale_un_fichier_orphelin(tmp_path, monkeypatch):
+    """Un template laisse par une installation precedente garde ses marqueurs.
+
+    Cas reel : l'utilisateur avait Radarr, il l'a retire. Le fichier reste dans
+    `configs/`, arrsenal ne le remplit pas puisque le service n'existe plus, et
+    `recyclarr sync` echoue dessus avec un message obscur. On le dit ici, avec le
+    nom du fichier.
+    """
+    cfg = _cfg(tmp_path, services=("sonarr", "recyclarr"))
+    config_dir = Path(cfg.config_path("recyclarr"))
+    inner = FakeCompose(config_dir)
+
+    class WithOrphan(FakeCompose):
+        def run_once(self, service, args, timeout=600):
+            ok, message = inner.run_once(service, args, timeout)
+            (config_dir / "configs" / "hd-bluray-web.yml").write_text(
+                TEMPLATE.replace("sonarr:", "radarr:"), encoding="utf-8"
+            )
+            return ok, message
+
+    _patch_compose(monkeypatch, WithOrphan(config_dir))
+    result = Wirer(cfg).step_recyclarr()
+
+    assert not result.ok
+    assert any("hd-bluray-web.yml" in w for w in result.warnings)
+    # Le fichier orphelin n'a pas ete rempli au passage : Radarr n'est pas la.
+    assert "Put your" in (config_dir / "configs" / "hd-bluray-web.yml").read_text(encoding="utf-8")
+
+
+def test_step_recyclarr_sans_template_ne_fait_rien(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.recyclarr_templates = {"sonarr": "", "radarr": ""}
+    _patch_compose(monkeypatch, FakeCompose(Path(cfg.config_path("recyclarr"))))
+
+    result = Wirer(cfg).step_recyclarr()
+
+    assert result.ok and not result.created
+
+
+def test_recyclarr_est_cable_avant_autobrr(tmp_path):
+    """L'ordre compte peu fonctionnellement, mais un profil pose avant qu'autobrr
+    ne pousse des releases evite un premier passage a vide."""
+    cfg = _cfg(tmp_path, services=("sonarr", "radarr", "recyclarr", "autobrr", "prowlarr"))
+    names = [step.name for step in Wirer(cfg).build_plan()]
+
+    assert names.index("recyclarr/profils") < names.index("autobrr/clients")
+
+
+# ------------------------------------------------------------------- catalogue
+
+
+def test_recyclarr_ne_publie_aucun_port(tmp_path):
+    """Recyclarr n'a pas d'interface web : lui publier un port bloquerait un port
+    de l'hote pour rien, et ferait echouer le preflight sur une machine chargee."""
+    cfg = _cfg(tmp_path)
+    document = compose.build_compose(cfg)
+
+    assert "ports" not in document["services"]["recyclarr"]
+    assert catalog.get("recyclarr").internal_port == 0
+
+
+def test_recyclarr_tire_un_arr():
+    """Seul, Recyclarr n'a rien a synchroniser."""
+    assert "sonarr" in catalog.resolve_dependencies(["recyclarr"])
+    # Radarr suffit aussi : la dependance est un « au moins un ».
+    resolved = catalog.resolve_dependencies(["recyclarr", "radarr"])
+    assert "sonarr" not in resolved and "radarr" in resolved
+
+
+# --------------------------------------------------------------- page d'acces
+
+
+def test_la_page_d_acces_ne_propose_pas_de_lien_vers_le_port_0(tmp_path):
+    """Recyclarr n'a pas d'interface web.
+
+    Une carte cliquable menant a `http://hote:0` ferait conclure au lecteur que
+    l'installation a echoue, alors qu'elle a reussi. Constate sur une vraie page
+    generee : le lien etait la, sous une note disant « Aucune interface web ».
+    """
+    from arrsenal import dashboard
+
+    cfg = _cfg(tmp_path)
+    cfg.host = "192.168.1.53"
+    page = dashboard.render(cfg)
+
+    assert ":0" not in page.replace("rgba(0", "").replace("#0", "")
+    assert "Recyclarr" in page
+    assert "tache de fond, sans interface" in page
+    # Sonarr, lui, garde son lien.
+    assert 'href="http://192.168.1.53:8989"' in page
+
+
+# ---------------------------------------------------------------- idempotence
+
+
+def test_step_recyclarr_rejoue_ne_redemande_rien(tmp_path, monkeypatch):
+    """`wire` est idempotent, et Recyclarr refuse d'ecraser un fichier existant.
+
+    Constate en conditions reelles : rejouer le cablage apres une installation
+    echouait sur « The file /config/configs/hd-bluray-web.yml already exists ».
+    Le refus de Recyclarr est legitime, le fichier a pu etre modifie a la main.
+    C'est a arrsenal de ne demander que ce qui manque.
+    """
+    cfg = _cfg(tmp_path)
+    fake = FakeCompose(Path(cfg.config_path("recyclarr")))
+    _patch_compose(monkeypatch, fake)
+
+    first = Wirer(cfg).step_recyclarr()
+    second = Wirer(cfg).step_recyclarr()
+
+    assert first.ok and second.ok
+    assert len(fake.calls) == 1, "le second passage a redemande une generation"
+    assert "2 deja configures" in second.detail
+    assert not second.created
+
+
+def test_step_recyclarr_ne_regenere_que_ce_qui_manque(tmp_path, monkeypatch):
+    """Radarr ajoute apres coup : seul son template doit etre demande."""
+    cfg = _cfg(tmp_path)
+    config_dir = Path(cfg.config_path("recyclarr"))
+    fake = FakeCompose(config_dir)
+    _patch_compose(monkeypatch, fake)
+
+    Wirer(cfg).step_recyclarr()
+    (config_dir / "configs" / "hd-bluray-web.yml").unlink()
+    Wirer(cfg).step_recyclarr()
+
+    assert fake.calls[1] == ["config", "create", "--template", "hd-bluray-web"]
+    # Le fichier Sonarr n'a pas ete regenere : son contenu rempli est intact.
+    sonarr = (config_dir / "configs" / "web-1080p.yml").read_text(encoding="utf-8")
+    assert "Put your" not in sonarr
+
+
+def test_le_rapport_n_affiche_pas_d_url_pour_un_service_sans_interface(tmp_path):
+    """`http://hote:0` dans le tableau final se lit comme une adresse a ouvrir."""
+    from rich.console import Console
+
+    from arrsenal import report
+
+    cfg = _cfg(tmp_path)
+    cfg.host = "192.168.1.53"
+    recorder = Console(record=True, width=200, force_terminal=False)
+    original, report.console = report.console, recorder
+    try:
+        report.print_summary(cfg)
+    finally:
+        report.console = original
+    text = recorder.export_text()
+
+    assert "192.168.1.53:0" not in text
+    assert "tache de fond" in text
+    assert "192.168.1.53:8989" in text

@@ -21,6 +21,7 @@ _TAGS = {
     "flood": "4.16.1",
     "autobrr": "v1.85.0",
     "qui": "v1.27.0",
+    "recyclarr": "8.7.1",
 }
 
 CATALOG: dict[str, ServiceSpec] = {
@@ -129,6 +130,20 @@ CATALOG: dict[str, ServiceSpec] = {
         api_family=None,
         notes="UI web pour qBittorrent. N'est pas un client.",
     ),
+    "recyclarr": ServiceSpec(
+        id="recyclarr",
+        display_name="Recyclarr",
+        category=Category.ARR,
+        image=f"ghcr.io/recyclarr/recyclarr:{_TAGS['recyclarr']}",
+        #: Aucune interface web : Recyclarr tourne sur une planification et sort.
+        #: Le port 0 signale qu'il n'y a rien a publier.
+        internal_port=0,
+        default_host_port=0,
+        config_dir="recyclarr",
+        requires_one_of=("sonarr", "radarr"),
+        api_family="recyclarr",
+        notes="Profils de qualite TRaSH. Aucune interface web.",
+    ),
     "flood": ServiceSpec(
         id="flood",
         display_name="Flood",
@@ -155,6 +170,8 @@ STARTUP_ORDER = (
     "radarr",
     "lidarr",
     "prowlarr",
+    # Recyclarr apres les *arr : il ecrit dans leurs profils de qualite.
+    "recyclarr",
     # autobrr apres les *arr ET apres les clients : il les declare tous les deux
     # au meme endpoint, et son test de connexion les contacte reellement.
     "autobrr",

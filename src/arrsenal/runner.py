@@ -20,10 +20,25 @@ class Check:
     blocking: bool = True
 
 
+#: Un daemon Docker occupe peut mettre tres longtemps a repondre a `docker info`.
+#: Constate en conditions reelles : la suite de tests est passee de 45 secondes a
+#: 8 minutes, et l'ecran d'accueil de l'assistant serait reste muet tout ce temps.
+#: Un diagnostic doit repondre vite, quitte a repondre « je ne sais pas ».
+PROBE_TIMEOUT = 20
+
+
 def _run(args: list[str], cwd: Path | None = None, timeout: int = 600) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        args, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=False
-    )
+    try:
+        return subprocess.run(
+            args, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args,
+            returncode=124,
+            stdout="",
+            stderr=f"aucune reponse en {timeout}s",
+        )
 
 
 # --------------------------------------------------------------------- preflight
@@ -43,20 +58,21 @@ def check_docker() -> list[Check]:
         ]
     checks.append(Check("docker", True, f"trouve: {binary}"))
 
-    info = _run(["docker", "info", "--format", "{{.ServerVersion}}"])
+    info = _run(["docker", "info", "--format", "{{.ServerVersion}}"], timeout=PROBE_TIMEOUT)
     if info.returncode != 0:
         checks.append(
             Check(
                 "daemon docker",
                 False,
-                "le binaire repond mais le daemon est injoignable. Demarrez Docker "
-                f"(Desktop, ou `systemctl start docker`). Detail: {info.stderr.strip()[:200]}",
+                "le binaire repond mais le daemon est injoignable ou trop lent. "
+                "Demarrez Docker (Desktop, ou `systemctl start docker`). "
+                f"Detail: {info.stderr.strip()[:200]}",
             )
         )
         return checks
     checks.append(Check("daemon docker", True, f"version serveur {info.stdout.strip()}"))
 
-    compose = _run(["docker", "compose", "version", "--short"])
+    compose = _run(["docker", "compose", "version", "--short"], timeout=PROBE_TIMEOUT)
     checks.append(
         Check(
             "docker compose",
@@ -181,6 +197,18 @@ class Compose:
             timeout=timeout,
         )
         return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
+
+    def run_once(self, service: str, args: list[str], timeout: int = 600) -> tuple[bool, str]:
+        """Lance une commande ponctuelle dans un service, sans le demarrer.
+
+        `run --rm` cree un conteneur jetable a partir de la meme image et des
+        memes volumes : Recyclarr peut generer sa configuration avant meme que le
+        service planifie n'ait tourne.
+        """
+        proc = _run(
+            self._cmd("run", "--rm", "--no-deps", service, *args), cwd=self.dir, timeout=timeout
+        )
+        return proc.returncode == 0, (proc.stdout or "") + (proc.stderr or "")
 
     def logs(self, service: str, tail: int = 50) -> str:
         return _run(self._cmd("logs", "--tail", str(tail), service), cwd=self.dir).stdout

@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from . import catalog
+from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
 from .clients.autobrr import AutobrrClient
 from .clients.base import WiringError
@@ -464,6 +465,94 @@ class Wirer:
             warnings=warnings,
         )
 
+    def step_recyclarr(self) -> StepResult:
+        """Genere la configuration Recyclarr et y ecrit adresses et cles.
+
+        arrsenal ne reimplemente pas les TRaSH Guides : il demande a Recyclarr de
+        generer sa configuration a partir de templates OFFICIELS, puis remplace
+        les marqueurs `Put your ... here`. Tout le contenu des profils reste
+        celui du guide.
+        """
+        from pathlib import Path
+
+        from .runner import Compose
+
+        config_dir = Path(self.cfg.config_path("recyclarr"))
+        runner = Compose(self.cfg.project_dir or Path("."), self.cfg.project_name)
+
+        wanted = {
+            sid: self.cfg.recyclarr_templates.get(
+                sid, recyclarr_cfg.DEFAULT_TEMPLATES.get(sid, "")
+            )
+            for sid in ("sonarr", "radarr")
+            if self.cfg.enabled(sid)
+        }
+        wanted = {sid: name for sid, name in wanted.items() if name}
+        if not wanted:
+            return StepResult(
+                "recyclarr: profils de qualite",
+                ok=True,
+                detail="aucun template choisi, rien a generer",
+            )
+
+        # Recyclarr REFUSE d'ecraser un fichier existant, et il a raison : celui-ci
+        # a pu etre modifie a la main. On ne demande donc que ce qui manque. Sans
+        # cela, rejouer `wire` echouait sur « File already exists », alors que la
+        # commande est censee etre idempotente.
+        #
+        # `--force` existe, mais l'employer detruirait les reglages de
+        # l'utilisateur a chaque passage.
+        args = []
+        for name in wanted.values():
+            if not (config_dir / "configs" / f"{name}.yml").exists():
+                args += ["--template", name]
+
+        if args:
+            ok, message = runner.run_once("recyclarr", ["config", "create", *args])
+            if not ok:
+                return StepResult(
+                    "recyclarr: profils de qualite",
+                    ok=False,
+                    detail="generation impossible",
+                    warnings=[message.splitlines()[-1][:200] if message else "aucun detail"],
+                )
+
+        filled, kept, warnings = [], [], []
+        for path in sorted((config_dir / "configs").glob("*.yml")):
+            service = recyclarr_cfg.target_service(path)
+            if service is None or not self.cfg.enabled(service):
+                continue
+            result = recyclarr_cfg.fill(
+                path,
+                self.internal_url(service),
+                self.cfg.services[service].api_key or "",
+                service,
+            )
+            # Un fichier deja renseigne n'a plus de marqueur a remplacer : ce n'est
+            # pas un echec, c'est un second passage. Seul un marqueur RESTANT est
+            # un probleme, et `pending_markers` le voit.
+            (filled if (result.url_written or result.key_written) else kept).append(
+                f"{path.stem} -> {service}"
+            )
+
+        for leftover in recyclarr_cfg.pending_markers(config_dir):
+            warnings.append(
+                f"{leftover.name} contient encore un marqueur : la synchronisation "
+                f"echouera tant qu'il est la"
+            )
+
+        parts = list(filled)
+        if kept:
+            parts.append(f"{len(kept)} deja configure{'s' if len(kept) > 1 else ''}")
+
+        return StepResult(
+            "recyclarr: profils de qualite",
+            ok=not warnings and bool(filled or kept),
+            detail=", ".join(parts) or "aucun fichier rempli",
+            created=bool(filled),
+            warnings=warnings,
+        )
+
     # -- graphe --------------------------------------------------------------
 
     def build_plan(self) -> list[WiringStep]:
@@ -516,6 +605,9 @@ class Wirer:
                         lambda a=arr_id: self.step_prowlarr_application(a),
                     )
                 )
+
+        if cfg.enabled("recyclarr"):
+            steps.append(WiringStep("recyclarr/profils", self.step_recyclarr))
 
         if cfg.enabled("autobrr"):
             steps.append(WiringStep("autobrr/clients", self.step_autobrr))

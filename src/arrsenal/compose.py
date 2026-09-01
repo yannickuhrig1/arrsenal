@@ -144,6 +144,11 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         block["environment"] = {"TZ": cfg.timezone, "QUI__HOST": "0.0.0.0"}
         block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
         block["depends_on"] = ["qbittorrent"]
+    elif service_id == "recyclarr":
+        # Recyclarr n'expose rien et ne touche pas aux medias : il parle aux API
+        # des *arr. `CRON_SCHEDULE` est sa planification, pas un reglage d'arrsenal.
+        block["environment"] = {"TZ": cfg.timezone, "CRON_SCHEDULE": "@daily"}
+        block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
     elif service_id == "autobrr":
         # autobrr n'a pas besoin de /data : il ne touche pas aux fichiers, il
         # pousse des sorties vers les applications.
@@ -155,7 +160,7 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         block.pop("networks", None)
         block["network_mode"] = "service:gluetun"
         block["depends_on"] = {"gluetun": {"condition": "service_healthy"}}
-    else:
+    elif spec.internal_port:
         block["ports"] = [f"{inst.host_port}:{spec.internal_port}"]
 
     return block

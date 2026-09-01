@@ -161,6 +161,17 @@ class ServiceInstance(BaseModel):
     #: nouvelle version de l'outil.
     image: str = ""
 
+    @property
+    def has_web_ui(self) -> bool:
+        """Ce service publie-t-il quelque chose a ouvrir dans un navigateur ?
+
+        Recyclarr n'a pas d'interface : il tourne sur une planification et ne
+        publie aucun port. Tout affichage doit le savoir, sans quoi il propose un
+        lien vers `http://hote:0` — un lien mort au milieu d'une page de
+        raccourcis fait conclure que l'installation a echoue.
+        """
+        return bool(self.host_port)
+
     def url(self, host: str = "localhost") -> str:
         base = f"http://{host}:{self.host_port}"
         return f"{base}/{self.url_base}" if self.url_base else base
@@ -220,6 +231,12 @@ class StackConfig(BaseModel):
     services: dict[str, ServiceInstance] = Field(default_factory=dict)
 
     vpn: VpnConfig = Field(default_factory=VpnConfig)
+
+    #: Template TRaSH choisi par service. Vide = celui par defaut de Recyclarr.
+    recyclarr_templates: dict[str, str] = Field(default_factory=dict)
+    #: Repertoire des artefacts, necessaire pour lancer une commande ponctuelle.
+    #: Renseigne a l'execution, pas persiste : il depend d'ou l'on se trouve.
+    project_dir: object | None = Field(default=None, exclude=True)
 
     @property
     def vpn_enabled(self) -> bool:

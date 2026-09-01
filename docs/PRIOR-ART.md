@@ -13,7 +13,7 @@ mis à jour depuis. Chaque projet a été lu, pas supposé.
 | [Recyclarr](https://github.com/recyclarr/recyclarr) | non | non | **oui** | non |
 | [Configarr](https://github.com/raydak-labs/configarr) | non | non | **oui** | non |
 | [TRaSH Guides](https://trash-guides.info/) | non | non | manuel | non |
-| **arrsenal** | **oui** | **oui** | phase 4 | **oui** |
+| **arrsenal** | **oui** | **oui** | **oui** (délégués à Recyclarr) | **oui** |
 
 La colonne qui compte est la deuxième. C'est celle où presque personne ne va.
 
@@ -51,8 +51,13 @@ Ils synchronisent les profils de qualité et les *custom formats* des TRaSH Guid
 Sonarr et Radarr. Chacun fait très bien ce travail.
 
 **Ils ne se recoupent pas avec `arrsenal`** : ils supposent une stack déjà installée et
-déjà câblée. Ils interviennent après. La phase 4 vise l'intégration de Recyclarr, pas
-son remplacement.
+déjà câblée. Ils interviennent après.
+
+C'est exactement pour cela que Recyclarr est désormais **intégré, pas remplacé**.
+`arrsenal` lui demande de générer sa configuration à partir d'un template officiel, puis
+n'y écrit que l'adresse et la clé API — les deux choses qu'il est seul à connaître, et
+les deux seules lignes que l'utilisateur aurait dû aller chercher à la main. Le contenu
+des profils reste celui du guide.
 
 ### TRaSH Guides et le wiki Servarr
 
@@ -76,8 +81,9 @@ de DockSTARTer.
 **Le câblage doit être vérifié, pas supposé.** C'est ce qui distingue un outil d'un
 script. Chaque lien est validé par le bouton *Test* de l'application cible.
 
-**Les profils de qualité viendront de Recyclarr.** Réimplémenter les TRaSH Guides
-serait une duplication inutile et vite périmée.
+**Les profils de qualité viennent de Recyclarr.** Réimplémenter les TRaSH Guides serait
+une duplication inutile et vite périmée. `arrsenal` fournit le câblage, TRaSH fournit
+les profils.
 
 ## L'écosystème autobrr
 

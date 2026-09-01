@@ -580,3 +580,117 @@ jeton, la page répondait « jeton invalide » une fois sur deux.
 
 Le serveur refuse désormais de partager son port. Vérifié : le second démarrage échoue
 avec `WinError 10048`, et il ne reste qu'une écoute.
+
+---
+
+## Recyclarr 8.7.1 — vérifié le 2026-09-01
+
+Image `ghcr.io/recyclarr/recyclarr:8.7.1`. Recyclarr synchronise les profils de qualité
+et les *custom formats* des TRaSH Guides vers Sonarr et Radarr. `arrsenal` ne
+réimplémente rien : il demande à Recyclarr de générer sa configuration à partir d'un
+template **officiel**, puis n'y écrit que l'adresse et la clé API.
+
+### Le conteneur n'a pas d'interface web
+
+Il tourne sur une planification, `CRON_SCHEDULE=@daily` par défaut, et
+`RECYCLARR_CONFIG_DIR=/config`. Trois conséquences dans le code :
+
+- son `internal_port` vaut `0` et **aucun port n'est publié** ;
+- le préflight ne contrôle pas son port : la ligne « port 0 : libre » n'apprenait rien
+  et faisait douter du reste du tableau ;
+- la page d'accès ne lui donne **pas** de lien. Elle en proposait un vers
+  `http://192.168.1.53:0`, juste sous une note disant « Aucune interface web ». Un lien
+  mort au milieu d'une page de raccourcis fait conclure que l'installation a échoué.
+
+L'entrypoint est `/sbin/tini -- /entrypoint.sh` et prend les sous-commandes
+directement : `--version`, pas `recyclarr --version`.
+
+### `config create` ignore `--path`
+
+`config create --template X --template Y` écrit **un fichier par template** dans
+`/config/configs/X.yml`, quel que soit `--path`. Recyclarr charge ensuite tout le
+dossier. La génération se fait donc par `docker compose run --rm --no-deps`, un
+conteneur jetable : la configuration existe avant que le service planifié n'ait tourné
+une seule fois.
+
+22 templates officiels Sonarr, 25 Radarr, dont des profils français
+(`french-multi-vf-hd-bluray-web`). La liste est lue sur le disque, dans les ressources
+que Recyclarr clone au premier démarrage — pas recopiée dans le code, où elle
+vieillirait.
+
+### Les templates portent des marqueurs en clair
+
+```yaml
+sonarr:
+  web-1080p:
+    base_url: Put your Sonarr URL here
+    api_key: Put your API key here
+```
+
+Ce sont les deux seules lignes que `arrsenal` remplace. Tout le reste vient du guide et
+doit rester intact — c'est la garantie centrale du module.
+
+### Deux défauts trouvés par les tests, pas par la lecture
+
+**`\s` matche aussi le retour à la ligne.** Le motif se terminait par `\s*$` : gourmand,
+il avalait les lignes vides qui suivaient le marqueur. Le fichier restait valide et la
+synchronisation réussissait, mais `arrsenal` reformatait au passage un fichier qu'il
+s'était engagé à ne pas toucher. Les motifs sont désormais bornés à l'espace
+**horizontal**, `[^\S\n]`.
+
+Vérifié sur les **47 templates officiels** : chacun est rempli, aucune autre ligne
+modifiée, aucune ligne perdue.
+
+**Une chaîne de remplacement n'est pas un texte.** `re.sub` interprète les antislashs
+dans le remplacement. Une `url_base` saisie à la main en contenant un aurait levé
+`bad escape` au lieu d'écrire le fichier. Le remplacement passe maintenant par une
+fonction.
+
+### Recyclarr refuse d'écraser, et `wire` doit rester idempotent
+
+`config create` s'arrête sur `The file /config/configs/hd-bluray-web.yml already
+exists`. Le refus est légitime : le fichier a pu être modifié à la main. Mais
+`arrsenal wire` est documenté comme rejouable, et il échouait donc au second passage.
+
+`arrsenal` ne demande désormais que les templates **absents**. `--force` existe, mais
+l'employer détruirait les réglages de l'utilisateur à chaque câblage.
+
+Corollaire dans la lecture du résultat : un fichier déjà renseigné n'a plus de marqueur
+à remplacer. Ce n'est pas un échec, c'est un second passage. Seul un marqueur *restant*
+est un problème. Vérifié : trois `wire` d'affilée, tous `OK`, un seul appel à
+`config create`.
+
+### Le service visé est lu dans le YAML, pas dans le nom du fichier
+
+`hd-bluray-web` est un titre de template, pas un nom de service. Se fier au nom de
+fichier enverrait la clé de Radarr dans un fichier Sonarr. La clé racine du YAML fait
+foi.
+
+Un fichier laissé par une installation précédente — l'utilisateur avait Radarr, il l'a
+retiré — garde ses marqueurs et fait échouer `recyclarr sync` avec un message obscur.
+`arrsenal` le signale par son nom à la fin du câblage.
+
+### Résultat, confirmé par Sonarr et Radarr eux-mêmes
+
+Installation `sonarr,radarr,recyclarr` puis `recyclarr sync` :
+
+| Vérification | Sonarr | Radarr |
+|---|---|---|
+| Custom formats créés | 37 | 40 |
+| Tailles de qualité synchronisées | 14 | 14 |
+| Profil créé | `WEB-1080p` | `HD Bluray + WEB` |
+| Formats **notés** dans ce profil | 37 | 25 |
+
+Les chiffres viennent de `GET /api/v3/qualityprofile` et `GET /api/v3/customformat`
+interrogés avec la clé de chaque instance, pas des journaux de Recyclarr. Un profil dont
+les formats seraient tous à zéro ne trierait rien : c'est le score qui compte, et il est
+là.
+
+### Détection de mise à jour sur ghcr.io
+
+Le dépôt n'est pas sur Docker Hub : la voie générique du protocole registry v2
+s'applique. Elle répond en ~1 s. Vérifié dans les deux sens, sans quoi « aucune mise à
+jour » ne prouve rien :
+
+- `8.7.1` → aucune plus récente (c'est bien la dernière) ;
+- `7.4.1` → propose `8.6.0`, `8.7.0`, `8.7.1`.

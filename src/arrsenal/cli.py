@@ -329,6 +329,7 @@ def generate(project_dir: Path = typer.Option(Path("."), help="Repertoire du sta
 def wire(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml.")) -> None:
     """Rejoue uniquement le cablage sur une stack deja demarree. Idempotent."""
     cfg = _load_config(project_dir)
+    cfg.project_dir = project_dir
     wirer = Wirer(cfg)
     try:
         results = wirer.execute(on_step=report.print_step)
@@ -455,7 +456,9 @@ def list_services() -> None:
             spec.display_name,
             spec.category.value,
             spec.image,
-            str(spec.default_host_port),
+            # Un service sans interface web ne publie rien : « 0 » se lirait comme
+            # un port, pas comme une absence.
+            str(spec.default_host_port or "-"),
             spec.notes,
         )
     console.print(table)

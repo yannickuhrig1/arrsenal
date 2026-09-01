@@ -118,15 +118,27 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
                 f'<span class="v">{_secret(inst.api_key, "la cle API")}</span></div>'
             )
         controls = _CONTROLS.format(sid=spec.id) if live else ""
+        # Un service sans port publie n'a pas d'interface a ouvrir. Recyclarr
+        # tourne sur une planification. Lui donner un lien vers le port 0 offrirait
+        # une carte cliquable qui n'aboutit nulle part : le lecteur en conclurait
+        # que l'installation a echoue, alors qu'elle a reussi.
+        if inst.has_web_ui:
+            title = (
+                f'<a class="title" href="{url}" target="_blank" rel="noopener">'
+                f'<span class="badge">{html.escape(spec.display_name[0])}</span>'
+                f"<span><strong>{html.escape(spec.display_name)}</strong>"
+                f'<span class="url">{html.escape(url)}</span></span></a>'
+            )
+        else:
+            title = (
+                '<div class="title headless">'
+                f'<span class="badge">{html.escape(spec.display_name[0])}</span>'
+                f"<span><strong>{html.escape(spec.display_name)}</strong>"
+                '<span class="url">tache de fond, sans interface</span></span></div>'
+            )
         blocks.append(
             f"""      <article class="card" style="--accent:{accent}">
-        <a class="title" href="{url}" target="_blank" rel="noopener">
-          <span class="badge">{html.escape(spec.display_name[0])}</span>
-          <span>
-            <strong>{html.escape(spec.display_name)}</strong>
-            <span class="url">{html.escape(url)}</span>
-          </span>
-        </a>
+        {title}
         <p class="note">{html.escape(spec.notes)}</p>
 {controls}        <div class="creds">{rows}</div>
       </article>"""
@@ -276,6 +288,8 @@ _TEMPLATE = """<!doctype html>
   }}
   .title {{ display: flex; gap: .75rem; align-items: center; text-decoration: none; color: inherit; }}
   .title:hover .url {{ text-decoration: underline; }}
+  .title.headless:hover .url {{ text-decoration: none; }}
+  .title.headless .url {{ color: var(--muted); font-style: italic; }}
   .badge {{
     width: 38px; height: 38px; flex: none; border-radius: 9px; background: var(--accent);
     color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem;

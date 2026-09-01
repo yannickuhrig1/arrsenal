@@ -93,7 +93,10 @@ def build_config(
 def preflight(cfg: StackConfig) -> list[Check]:
     checks = check_docker()
     for sid in catalog.STARTUP_ORDER:
-        if cfg.enabled(sid):
+        # Un service sans interface web ne publie rien : Recyclarr tourne sur une
+        # planification. Le controler afficherait « port 0 : libre », une ligne
+        # qui n'apprend rien et fait douter du reste du tableau.
+        if cfg.enabled(sid) and cfg.services[sid].host_port:
             checks.append(check_port_free(cfg.services[sid].host_port, sid))
     checks.append(check_disk_space(cfg.data_root))
     checks.append(check_hardlinks(cfg.data_root))
@@ -178,6 +181,7 @@ def install(
 
     Leve InstallAborted avec un message actionnable en cas d'echec bloquant.
     """
+    cfg.project_dir = project_dir
     created = create_tree(cfg.data_root, cfg.config_root, list(cfg.services))
     on_progress(Progress("arborescence", f"{len(created)} dossiers crees"))
 

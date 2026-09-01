@@ -42,7 +42,10 @@ def print_summary(cfg: StackConfig) -> None:
             continue
         spec, inst = catalog.get(sid), cfg.services[sid]
         table.add_row(
-            spec.display_name, spec.image, inst.url(cfg.host), cfg.config_path(sid)
+            spec.display_name,
+            spec.image,
+            inst.url(cfg.host) if inst.has_web_ui else "tache de fond",
+            cfg.config_path(sid),
         )
     console.print(table)
 
@@ -91,7 +94,7 @@ def print_final(cfg: StackConfig, results: list[StepResult]) -> None:
         spec, inst = catalog.get(sid), cfg.services[sid]
         table.add_row(
             spec.display_name,
-            inst.url(cfg.host),
+            inst.url(cfg.host) if inst.has_web_ui else "tache de fond",
             inst.username or "-",
             inst.password or "-",
             inst.api_key or "-",

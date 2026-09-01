@@ -199,7 +199,7 @@ def test_no_vpn_warning_without_a_download_client():
 def _script_of(page: str) -> str:
     import re
 
-    blocks = re.findall(r"<script>(.*?)</script>", page, re.S)
+    blocks = re.findall(r"<script>(.*?)</script>", page, re.DOTALL)
     assert blocks, "aucun bloc script dans la page"
     return blocks[-1]
 

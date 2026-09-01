@@ -40,7 +40,7 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 | DockSTARTer | oui | non | non |
 | Saltbox | oui | partiel | non |
 | Recyclarr / Configarr | non | non | oui |
-| **arrsenal** | **oui** | **oui** | phase 4 |
+| **arrsenal** | **oui** | **oui** | **oui** (via Recyclarr) |
 
 ---
 
@@ -56,6 +56,7 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 | qBittorrent | lui-même | catégories créées avec leur chemin de sauvegarde |
 | Sonarr, Radarr | Jellyfin | notification de rafraîchissement après import |
 | Jellyfin | système de fichiers | assistant de démarrage + bibliothèques Films, Séries, Musique |
+| Recyclarr | Sonarr, Radarr | profils de qualité et custom formats des TRaSH Guides, adresse et clé posées dans le template officiel |
 
 Les deux clients de téléchargement peuvent coexister : chaque *arr est rattaché aux
 deux, et le routage s'adapte tout seul — qBittorrent a des catégories natives,
@@ -320,7 +321,7 @@ Voir [DISCLAIMER.md](DISCLAIMER.md).
 ## Périmètre actuel
 
 Prowlarr · Sonarr · Radarr · **Lidarr** · Transmission · **qBittorrent** · Jellyfin
-· Flood *(UI optionnelle)*
+· autobrr · Recyclarr · Gluetun *(VPN optionnel)* · Flood et qui *(UI optionnelles)*
 
 Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié**. Bazarr a déjà
 été étudié mais reste absent : sa configuration passe par un fichier YAML et non par
