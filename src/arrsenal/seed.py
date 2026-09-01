@@ -26,9 +26,52 @@ def generate_api_key() -> str:
     return secrets.token_hex(16)
 
 
-def generate_password(length: int = 20) -> str:
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+#: Caracteres speciaux retenus. La liste est courte VOLONTAIREMENT : ces mots de
+#: passe traversent un fichier .env lu par Docker Compose, une ligne de commande
+#: de conteneur, un fichier XML, un INI et plusieurs charges JSON. Sont donc
+#: exclus :
+#:
+#: - `$` : Compose l'interprete comme une interpolation de variable, meme dans un
+#:   .env. Un mot de passe contenant `$HOME` arriverait vide dans le conteneur ;
+#: - `'` : les valeurs du .env sont ecrites entre apostrophes, il les fermerait ;
+#: - `"`, `\`, le backtick et `#` : citation, echappement et commentaires ;
+#: - tout metacaractere de shell (`& ; | < > ( )`) : le .env est parfois source
+#:   par un script, y compris dans notre propre CI.
+#:
+#: Ce qui reste donne 75 caracteres possibles, soit environ 125 bits d'entropie
+#: sur 20 caracteres. Aucun de ces choix ne limite la solidite en pratique.
+PASSWORD_SPECIALS = "!@%^*-_=+.,:?"
+
+PASSWORD_CLASSES = (
+    string.ascii_lowercase,
+    string.ascii_uppercase,
+    string.digits,
+    PASSWORD_SPECIALS,
+)
+
+#: Longueur par defaut. Bien au-dela des 12 caracteres habituellement exiges :
+#: personne n'a a retenir ces mots de passe, ils sont copies depuis la page
+#: d'acces.
+PASSWORD_LENGTH = 20
+
+
+def generate_password(length: int = PASSWORD_LENGTH) -> str:
+    """Mot de passe aleatoire, avec au moins un caractere de chaque classe.
+
+    Tirer au hasard dans l'alphabet complet suffirait presque toujours, mais
+    « presque » ne convient pas : certains services refusent un mot de passe sans
+    chiffre. On garantit donc une occurrence de chaque classe, puis on melange —
+    sinon les premiers caracteres suivraient toujours le meme ordre de classes.
+    """
+    if length < len(PASSWORD_CLASSES):
+        raise ValueError(f"longueur minimale {len(PASSWORD_CLASSES)}, recu {length}")
+
+    alphabet = "".join(PASSWORD_CLASSES)
+    chars = [secrets.choice(group) for group in PASSWORD_CLASSES]
+    chars += [secrets.choice(alphabet) for _ in range(length - len(chars))]
+    # `SystemRandom.shuffle` puise dans la meme source que `secrets`.
+    secrets.SystemRandom().shuffle(chars)
+    return "".join(chars)
 
 
 # --------------------------------------------------------------------------- *arr

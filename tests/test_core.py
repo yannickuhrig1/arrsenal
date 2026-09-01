@@ -124,7 +124,10 @@ def test_env_contains_secrets_and_compose_does_not(tmp_path):
     cfg = make_cfg(tmp_path)
     env = compose.render_env(cfg)
     key = cfg.services["sonarr"].api_key
-    assert f"SONARR_API_KEY={key}" in env
+    # Les valeurs sont protegees par des apostrophes : les mots de passe
+    # contiennent des caracteres speciaux, et les chemins peuvent contenir une
+    # espace.
+    assert f"SONARR_API_KEY='{key}'" in env
     assert key not in compose.render_compose(cfg)
 
 

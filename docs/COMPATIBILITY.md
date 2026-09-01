@@ -913,3 +913,72 @@ La règle du projet est de faire valider chaque lien par l'application cible. El
 appliquée aux liens entre services, pas à l'accès de l'utilisateur lui-même. Une
 vérification qui n'emprunte pas le chemin de l'utilisateur ne prouve rien sur ce
 chemin-là.
+
+---
+
+## Mots de passe : caractères spéciaux — vérifié le 2026-09-01
+
+Demandé à l'usage : des mots de passe aléatoires d'au moins 12 caractères, mêlant
+lettres, chiffres et caractères spéciaux.
+
+Ils étaient déjà aléatoires — `secrets.choice`, 20 caractères, différents à chaque
+installation — mais **uniquement alphanumériques**.
+
+### Pourquoi l'alphabet spécial est court
+
+Ces valeurs traversent un `.env` lu par Docker Compose, une ligne de commande de
+conteneur, un XML, un INI et plusieurs charges JSON. Le danger a été mesuré, pas
+supposé :
+
+```
+.env :        PASS_NU=abc$HOME!def
+compose voit : abcC:\Users\darkl!def
+```
+
+Compose interprète `$` comme une interpolation de variable **dans le fichier `.env`
+lui-même**. Un mot de passe en contenant arriverait déformé dans le conteneur, et
+l'utilisateur ne pourrait jamais se connecter.
+
+Sont donc exclus : `$`, l'apostrophe (elle fermerait la valeur), le guillemet,
+l'antislash, le backtick, `#`, et tout métacaractère de shell — le `.env` est parfois
+sourcé par un script, y compris dans la CI de ce dépôt.
+
+Restent 13 caractères spéciaux, soit 75 possibles au total : environ **125 bits**
+d'entropie sur 20 positions.
+
+Les valeurs du `.env` sont désormais écrites entre apostrophes. Vérifié : une valeur
+protégée contenant `$` arrive **intacte** dans le conteneur, là où la même valeur nue
+était interpolée. Les chemins sont protégés de la même façon — par cohérence, pas par
+nécessité : un chemin contenant une espace fonctionnait déjà.
+
+### La vérification qui compte : le pire cas
+
+Un tirage au hasard aurait probablement fonctionné. Une installation des dix services a
+donc été faite avec, pour **tous** les comptes, le mot de passe le plus hostile possible :
+
+```
+Aa1!@%^*-_=+.,:?zZ9
+```
+
+24 liens sur 24, puis douze vérifications indépendantes :
+
+| Vérification | Résultat |
+|---|---|
+| `.env` protégé et relisible | valeur exacte |
+| `docker compose config` | valide |
+| Sonarr, Radarr, Lidarr, Prowlarr | connexion web, redirection vers `/` |
+| qBittorrent | HTTP 204 + cookie de session |
+| Transmission | authentification RPC, HTTP 200 |
+| autobrr, qui | HTTP 204 / 200 |
+| Jellyfin | HTTP 200 |
+| Flood | mot de passe transmis intact en argument |
+
+Une seule ligne a d'abord échoué : celle de qBittorrent. C'était **le test qui avait
+tort**. L'ancienne API répondait `200 Ok.` ; la 5.2.3 répond **204** et pose un cookie
+`SID`, et refuse par un **401**. L'empreinte PBKDF2 stockée correspondait bien au mot de
+passe, recalcul à l'appui.
+
+### Les installations existantes ne changent pas
+
+Les mots de passe vivent dans `stack.yml`. Une stack déjà installée garde les siens :
+seules les nouvelles installations reçoivent le nouvel alphabet.

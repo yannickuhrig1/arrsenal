@@ -192,16 +192,33 @@ def render_compose(cfg: StackConfig) -> str:
     )
 
 
+def _env_value(value: object) -> str:
+    """Valeur de .env, protegee par des apostrophes.
+
+    Les mots de passe generes contiennent des caracteres speciaux. Sans
+    apostrophes, Compose interpreterait certains d'entre eux, et un `.env` parfois
+    source par un script y verrait des metacaracteres. Les apostrophes empechent
+    aussi l'interpolation, ce qui est exactement ce qu'on veut pour un secret.
+
+    L'apostrophe elle-meme est exclue de l'alphabet des mots de passe ; on la
+    neutralise malgre tout, au cas ou une valeur viendrait d'ailleurs.
+    """
+    text = str(value)
+    return "'" + text.replace("'", "'\\''") + "'"
+
+
 def render_env(cfg: StackConfig) -> str:
     lines = [
         "# Genere par arrsenal. Contient des secrets : ne JAMAIS commiter.",
-        f"COMPOSE_PROJECT_NAME={cfg.project_name}",
-        f"CONFIG_ROOT={cfg.config_root}",
-        f"DATA_ROOT={cfg.data_root}",
-        f"PUID={cfg.puid}",
-        f"PGID={cfg.pgid}",
-        f"TZ={cfg.timezone}",
-        f"UMASK={cfg.umask}",
+        f"COMPOSE_PROJECT_NAME={_env_value(cfg.project_name)}",
+        # Les chemins aussi : un dossier contenant une espace est parfaitement
+        # ordinaire sous Windows comme sur un NAS.
+        f"CONFIG_ROOT={_env_value(cfg.config_root)}",
+        f"DATA_ROOT={_env_value(cfg.data_root)}",
+        f"PUID={_env_value(cfg.puid)}",
+        f"PGID={_env_value(cfg.pgid)}",
+        f"TZ={_env_value(cfg.timezone)}",
+        f"UMASK={_env_value(cfg.umask)}",
         "",
         "# Cles API pre-semees - utilisees par le cablage automatique.",
     ]
@@ -211,11 +228,11 @@ def render_env(cfg: StackConfig) -> str:
             continue
         up = sid.upper()
         if inst.api_key:
-            lines.append(f"{up}_API_KEY={inst.api_key}")
+            lines.append(f"{up}_API_KEY={_env_value(inst.api_key)}")
         if inst.username:
-            lines.append(f"{up}_USER={inst.username}")
+            lines.append(f"{up}_USER={_env_value(inst.username)}")
         if inst.password:
-            lines.append(f"{up}_PASS={inst.password}")
+            lines.append(f"{up}_PASS={_env_value(inst.password)}")
     return "\n".join(lines) + "\n"
 
 

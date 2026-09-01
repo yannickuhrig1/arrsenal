@@ -270,6 +270,24 @@ automatique sans laisser Sonarr et Radarr ouverts à tout le réseau local.
 Les identifiants sont écrits dans `.env` en `chmod 600`, déjà couvert par le
 `.gitignore` généré, et masqués dans les journaux.
 
+**Chaque installation génère ses propres secrets**, tirés par `secrets`, la source
+cryptographique de Python. Rien n'est réutilisé d'une machine à l'autre, et aucun mot de
+passe par défaut n'existe.
+
+| | Composition | Longueur |
+|---|---|---|
+| Mots de passe | minuscules, majuscules, chiffres et `!@%^*-_=+.,:?` — **au moins un de chaque** | 20 |
+| Clés API | hexadécimal, format imposé par les *arr | 32 |
+
+75 caractères possibles sur 20 positions, soit environ **125 bits** d'entropie.
+
+L'alphabet des caractères spéciaux est court **volontairement** : ces valeurs traversent
+un `.env` lu par Docker Compose, une ligne de commande de conteneur, un XML, un INI et
+plusieurs charges JSON. `$` en est exclu — Compose l'interprète comme une interpolation
+de variable, et un mot de passe contenant `$HOME` arriverait déformé dans le conteneur.
+Sont aussi exclus l'apostrophe, le guillemet, l'antislash, le backtick, `#` et tout
+métacaractère de shell. Les valeurs du `.env` sont en outre écrites entre apostrophes.
+
 **Sans VPN**, le trafic BitTorrent sort sur votre IP publique. `arrsenal` vous
 l'affiche au récapitulatif.
 
