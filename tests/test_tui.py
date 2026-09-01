@@ -98,11 +98,19 @@ async def test_selection_is_carried_to_the_app_state(app):
 
 @pytest.mark.asyncio
 async def test_switching_platform_rewrites_the_default_paths(app):
+    """Le profil propose est celui de la MACHINE, pas generic-linux.
+
+    Proposer des chemins Linux a un utilisateur Windows le menait droit dans le
+    piege : Docker Desktop les cree alors a la racine du disque courant.
+    """
+    from arrsenal.layout import PROFILE_DEFAULTS, default_profile
+
     async with app.run_test() as pilot:
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
         screen = pilot.app.screen
-        assert screen.query_one("#data-root", Input).value == "/srv/data"
+        attendu = PROFILE_DEFAULTS[default_profile()].data_root
+        assert screen.query_one("#data-root", Input).value == attendu
 
         screen.query_one("#plat-synology", RadioButton).value = True
         await pilot.pause()

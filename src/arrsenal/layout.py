@@ -8,6 +8,8 @@ hardlinks silencieusement, et chaque import recopie le fichier.
 from __future__ import annotations
 
 import os
+import re
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,6 +63,22 @@ PROFILE_DEFAULTS: dict[PlatformProfile, ProfileDefaults] = {
         pgid=1000,
         prefer_detection=True,
         source="utilisateur courant",
+    ),
+    PlatformProfile.WINDOWS: ProfileDefaults(
+        # Des chemins Windows, evidemment. Sans ce profil, un utilisateur Windows
+        # n'avait AUCUNE option correcte : les trois autres proposent des chemins
+        # Linux, que Docker Desktop cree alors a la racine du disque courant
+        # (`/mnt/user/data` devient `C:\mnt\user\data`) sans que rien ne le dise.
+        config_root="C:/arrsenal/config",
+        data_root="C:/arrsenal/data",
+        # Docker Desktop n'applique pas la propriete Unix aux montages venus de
+        # Windows : ces valeurs n'ont aucun effet ici. On garde 1000:1000, qui est
+        # ce qu'attendent les images LinuxServer, et on le DIT plutot que
+        # d'afficher un avertissement inquietant et sans objet.
+        puid=1000,
+        pgid=1000,
+        prefer_detection=False,
+        source="sans effet sous Docker Desktop : Windows ne porte pas ces droits",
     ),
     PlatformProfile.UNRAID: ProfileDefaults(
         config_root="/mnt/user/appdata/arrsenal",
@@ -181,3 +199,37 @@ def hardlink_supported(data_root: str | Path) -> tuple[bool, str]:
                 p.unlink()
             except OSError:
                 pass
+
+
+def default_profile() -> PlatformProfile:
+    """Profil correspondant a la machine qui execute arrsenal.
+
+    Proposer `generic-linux` a un utilisateur Windows le conduisait droit dans le
+    piege : il gardait des chemins Linux, et Docker Desktop les creait a la racine
+    du disque courant sans que rien ne le signale.
+    """
+    return PlatformProfile.WINDOWS if sys.platform == "win32" else PlatformProfile.GENERIC_LINUX
+
+
+def path_warning(path: str) -> str | None:
+    r"""Avertissement quand un chemin ne correspond pas a cette machine.
+
+    Renvoie None si le chemin est coherent. C'est le controle qui manquait :
+    `/mnt/user/data` saisi sous Windows passait sans un mot, et l'installation
+    partait vers `C:\mnt\user\data`.
+    """
+    texte = path.strip()
+    if not texte:
+        return None
+    # `[\\/]` et non `[\/]` : dans une classe, `\/` ne vaut que la barre oblique.
+    # La forme fautive ne reconnaissait AUCUN chemin a antislash, donc pas meme
+    # `C:\Users\...`, et les signalait tous comme « pas un chemin Windows ».
+    ressemble_windows = bool(re.match(r"^[A-Za-z]:[\\/]", texte))
+    if sys.platform == "win32" and not ressemble_windows:
+        return (
+            f"« {texte} » n'est pas un chemin Windows. Il sera cree dans "
+            f"{Path(texte).resolve()}, ce qui n'est probablement pas voulu."
+        )
+    if sys.platform != "win32" and ressemble_windows:
+        return f"« {texte} » est un chemin Windows, sur une machine qui ne l'est pas."
+    return None

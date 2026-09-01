@@ -16,6 +16,7 @@ from . import admin, catalog, compose, dashboard, discovery, indexers_cli, orche
 from . import adopt as adopt_mod
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
+from .layout import default_profile, path_warning
 from .models import VPN_PROVIDERS, PlatformProfile, StackConfig, VpnConfig
 from .orchestrator import InstallAborted, Progress
 from .runner import Compose
@@ -91,7 +92,9 @@ def install(
     ),
     config_root: str | None = typer.Option(None, help="Racine des configurations."),
     data_root: str | None = typer.Option(None, help="Racine des donnees (monte sur /data)."),
-    platform: PlatformProfile = typer.Option(PlatformProfile.GENERIC_LINUX, help="Profil."),
+    # Defaut : le profil de la machine. Imposer generic-linux sous Windows
+    # proposait des chemins Linux, crees ensuite a la racine du disque courant.
+    platform: PlatformProfile = typer.Option(default_profile(), help="Profil de plateforme."),
     host: str = typer.Option("localhost", help="Hote pour les URL du rapport final."),
     timezone: str = typer.Option("Etc/UTC", "--tz"),
     project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
@@ -182,9 +185,16 @@ def install(
     if not cfg.ids_certain:
         console.print(
             f"[yellow]PUID/PGID {cfg.puid}:{cfg.pgid} - {cfg.ids_source}.[/yellow]\n"
-            f"[dim]Cette valeur decide de qui possede vos medias. Verifiez-la : sur un "
-            f"NAS, lancez `id` en tant que l'utilisateur voulu.[/dim]"
+            f"[dim]C'est l'utilisateur Linux, a l'interieur des conteneurs, qui possedera "
+            f"vos fichiers. Sur un NAS, lancez `id` en tant que l'utilisateur voulu.[/dim]"
         )
+
+    # Un chemin Linux saisi sous Windows est cree a la racine du disque courant,
+    # sans que rien ne le signale : `/mnt/user/data` devient `C:\mnt\user\data`.
+    for label, chemin in (("--data-root", cfg.data_root), ("--config-root", cfg.config_root)):
+        avertissement = path_warning(chemin)
+        if avertissement:
+            console.print(f"[yellow]{label} : {avertissement}[/yellow]")
 
     if not report.print_checks(orchestrator.preflight(cfg)):
         raise typer.Exit(1)

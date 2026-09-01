@@ -24,6 +24,7 @@ class PlatformProfile(str, Enum):
     GENERIC_LINUX = "generic-linux"
     UNRAID = "unraid"
     SYNOLOGY = "synology"
+    WINDOWS = "windows"
 
 
 class ServiceSpec(BaseModel):

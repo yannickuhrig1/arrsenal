@@ -121,6 +121,9 @@ n'est pas signé — une signature de code coûte plusieurs centaines d'euros pa
 Prérequis : Docker Engine (ou Docker Desktop) avec le plugin `docker compose`, et
 Python 3.12 ou plus récent.
 
+Quatre profils de plateforme : `windows`, `generic-linux`, `unraid`, `synology`.
+Celui de la machine est présélectionné, avec les chemins qui vont avec.
+
 ```bash
 pipx install git+https://github.com/yannickuhrig1/arrsenal
 ```

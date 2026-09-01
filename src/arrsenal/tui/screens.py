@@ -30,7 +30,13 @@ from textual.widgets import (
 
 from .. import catalog, orchestrator
 from ..clients import recyclarr as recyclarr_cfg
-from ..layout import PROFILE_DEFAULTS, hardlink_supported, resolve_ids
+from ..layout import (
+    PROFILE_DEFAULTS,
+    default_profile,
+    hardlink_supported,
+    path_warning,
+    resolve_ids,
+)
 from ..models import Category, PlatformProfile
 from ..orchestrator import InstallAborted, Progress
 from ..wiring import StepResult
@@ -207,14 +213,18 @@ class PathsScreen(WizardScreen):
     SUB_TITLE = "Etape 2/3 - Chemins et plateforme"
 
     def content(self) -> ComposeResult:
-        defaults = PROFILE_DEFAULTS[PlatformProfile.GENERIC_LINUX]
+        # Le profil propose est celui de la machine. Proposer generic-linux a un
+        # utilisateur Windows le menait droit dans le piege : il gardait des
+        # chemins Linux, crees ensuite a la racine du disque courant.
+        courant = default_profile()
+        defaults = PROFILE_DEFAULTS[courant]
         with Vertical(id="paths"):
             yield Label("Profil de plateforme", classes="group-title")
             with RadioSet(id="platform"):
                 for profile in PlatformProfile:
                     yield RadioButton(
                         profile.value,
-                        value=profile is PlatformProfile.GENERIC_LINUX,
+                        value=profile is courant,
                         id=f"plat-{profile.value}",
                     )
             yield Static(id="platform-note")
@@ -241,7 +251,7 @@ class PathsScreen(WizardScreen):
         )
 
     def on_mount(self) -> None:
-        self._update_note(PlatformProfile.GENERIC_LINUX)
+        self._update_note(default_profile())
 
     @on(RadioSet.Changed, "#platform")
     def _on_platform(self, event: RadioSet.Changed) -> None:
@@ -251,14 +261,23 @@ class PathsScreen(WizardScreen):
         self.query_one("#data-root", Input).value = defaults.data_root
         self._update_note(profile)
 
+    #: « 1000:1000 » ne dit rien a qui n'a jamais administre un systeme Unix, et
+    #: cette valeur decide pourtant de qui possedera les fichiers telecharges.
+    IDS_EXPLICATION = (
+        "[dim]PUID/PGID = l'utilisateur Linux, a l'interieur des conteneurs, "
+        "qui possedera vos fichiers.[/dim]"
+    )
+
     def _update_note(self, profile: PlatformProfile) -> None:
         uid, gid, source, certain = resolve_ids(profile)
         note = self.query_one("#platform-note", Static)
+        entete = f"[dim]PUID/PGID[/dim] [b]{uid}:{gid}[/b]"
         if certain:
-            note.update(f"[dim]PUID/PGID {uid}:{gid} - {source}[/dim]")
+            note.update(f"{entete} [dim]- {source}[/dim]\n{self.IDS_EXPLICATION}")
         else:
             note.update(
-                f"[yellow]PUID/PGID non detectables ici : repli sur {uid}:{gid}.[/yellow]\n"
+                f"{entete} [yellow]- non detectables ici, valeur de repli.[/yellow]\n"
+                f"{self.IDS_EXPLICATION}\n"
                 f"[dim]Sur un NAS, lancez `id` et corrigez ces valeurs.[/dim]"
             )
 
@@ -273,17 +292,31 @@ class PathsScreen(WizardScreen):
         if not data_root:
             target.update("[red]La racine des donnees ne peut pas etre vide.[/red]")
             return
+
+        lignes: list[str] = []
+        # D'abord OU le dossier va reellement atterrir. Sans cette ligne, le
+        # controle repondait « hardlink OK » pour `/mnt/user/data` saisi sous
+        # Windows — vrai, mais dans `C:\mnt\user\data`, que personne ne voulait.
+        avertissement = path_warning(data_root)
+        if avertissement:
+            lignes.append(f"[yellow]{avertissement}[/yellow]")
+        else:
+            lignes.append(f"[dim]Dossier vise : {Path(data_root).resolve()}[/dim]")
+
         try:
             Path(data_root).mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            target.update(f"[red]Impossible de creer {data_root} : {exc}[/red]")
+            lignes.append(f"[red]Impossible de le creer : {exc}[/red]")
+            target.update("\n".join(lignes))
             return
+
         ok, detail = hardlink_supported(data_root)
         colour = "green" if ok else "yellow"
-        target.update(
-            f"[{colour}]{detail}[/{colour}]\n"
+        lignes.append(f"[{colour}]{detail}[/{colour}]")
+        lignes.append(
             "[dim]Un hardlink reel a ete cree puis supprime entre torrents/ et media/.[/dim]"
         )
+        target.update("\n".join(lignes))
 
     @on(Button.Pressed, "#next")
     def go(self) -> None:

@@ -1033,3 +1033,49 @@ feuille de style oubliée, panne invisible tant que personne ne lance le binaire
 
 Le binaire n'est pas signé. Windows SmartScreen affichera donc un avertissement au
 premier lancement, ce que le README annonce plutôt que de le laisser surprendre.
+
+---
+
+## Windows n'avait aucun profil — corrigé le 2026-09-01
+
+Signalé à l'usage, capture à l'appui : l'assistant, lancé depuis l'exécutable sur
+Windows, ne proposait que `generic-linux`, `unraid` et `synology`. L'utilisateur avait
+choisi **unraid**, et se retrouvait donc avec `/mnt/user/appdata/arrsenal` et
+`/mnt/user/data` sur une machine Windows.
+
+### Ce que faisaient ces chemins
+
+Rien de visible, et c'est le problème. Docker Desktop les crée à la racine du disque
+courant : `/mnt/user/data` devient `C:\mnt\user\data`. L'installation réussit, les
+conteneurs démarrent, et les fichiers atterrissent dans un dossier que personne n'a
+voulu.
+
+Le bouton *Vérifier les chemins* répondait même « hardlink OK » — techniquement vrai,
+puisqu'il venait de créer ce dossier parasite.
+
+### Trois corrections
+
+**Un profil `windows`**, avec `C:/arrsenal/config` et `C:/arrsenal/data`. Le profil
+présélectionné est désormais celui de la machine, dans l'assistant comme en ligne de
+commande (`--platform` prend la même valeur par défaut).
+
+**PUID/PGID expliqué.** « 1000:1000 » ne dit rien à qui n'a jamais administré un système
+Unix, et cette valeur décide pourtant de qui possédera les fichiers téléchargés. Une
+ligne le dit maintenant. Sur le profil Windows, l'avertissement jaune « non détectables »
+disparaît : sous Docker Desktop ces identifiants n'ont aucun effet, et l'écrire
+inquiétait pour rien.
+
+**La vérification dit où le dossier atterrit.** Elle affiche le chemin résolu, et
+signale un chemin incohérent avec la machine :
+
+```
+« /mnt/user/data » n'est pas un chemin Windows. Il sera cree dans
+C:\mnt\user\data, ce qui n'est probablement pas voulu.
+```
+
+### Un défaut trouvé par les tests
+
+La première version de ce contrôle utilisait `[\/]` au lieu de `[\/]`. Dans une classe
+de caractères, `\/` ne vaut que la barre oblique : la forme fautive ne reconnaissait
+**aucun** chemin à antislash, pas même `C:\Users\...`, et les signalait tous comme « pas
+un chemin Windows ». Deux tests l'ont attrapée avant toute publication.
