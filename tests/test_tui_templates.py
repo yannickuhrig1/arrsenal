@@ -33,8 +33,14 @@ def _no_network(monkeypatch):
 async def _goto_templates(pilot, selection) -> TemplatesScreen:
     pilot.app.selection = selection
     pilot.app.push_screen(TemplatesScreen())
-    await pilot.pause()
-    await pilot.pause()
+    # La liste arrive d'un worker en fil separe. Compter les passes d'evenements
+    # ne suffit pas : sous charge, deux ne suffisaient pas et un test echouait
+    # une fois sur plusieurs dizaines. On attend donc ce que le worker ecrit.
+    for _ in range(60):
+        await pilot.pause()
+        note = pilot.app.screen.query(f"#tpl-choices-{selection[0]}")
+        if note and "Chargement" not in str(note.first(Static).content):
+            break
     return pilot.app.screen
 
 

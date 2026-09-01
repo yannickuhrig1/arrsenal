@@ -8,7 +8,7 @@ arrsenal
 
 <p align="center">
   <img src="docs/screenshots/2-services.svg" alt="Sélection des services" width="49%">
-  <img src="docs/screenshots/6-installation.svg" alt="Câblage en cours" width="49%">
+  <img src="docs/screenshots/7-installation.svg" alt="Câblage en cours" width="49%">
 </p>
 
 Vous cochez ce que vous voulez. À la fin, Prowlarr pousse déjà ses indexeurs vers Sonarr,
@@ -200,8 +200,9 @@ régression visuelle apparaît dans le diff d'une pull request.
 | | |
 |---|---|
 | ![Accueil](docs/screenshots/1-accueil.svg) | ![Chemins](docs/screenshots/3-chemins.svg) |
-| ![Récapitulatif](docs/screenshots/5-recapitulatif.svg) | ![Indexeurs](docs/screenshots/7-indexeurs.svg) |
-| ![Profils de qualite](docs/screenshots/4-profils.svg) | ![Rapport](docs/screenshots/8-rapport.svg) |
+| ![VPN](docs/screenshots/4-vpn.svg) | ![Profils de qualite](docs/screenshots/5-profils.svg) |
+| ![Récapitulatif](docs/screenshots/6-recapitulatif.svg) | ![Indexeurs](docs/screenshots/8-indexeurs.svg) |
+| ![Rapport](docs/screenshots/9-rapport.svg) | |
 
 </details>
 
@@ -344,7 +345,9 @@ métacaractère de shell. Les valeurs du `.env` sont en outre écrites entre apo
 **Sans VPN**, le trafic BitTorrent sort sur votre IP publique. `arrsenal` vous
 l'affiche au récapitulatif.
 
-Avec `--vpn`, le client passe par [Gluetun](https://github.com/passteque/gluetun) :
+L'assistant pose la question juste après les chemins, dès qu'un client de
+téléchargement est coché. En ligne de commande, c'est `--vpn` : dans les deux
+cas le client passe par [Gluetun](https://github.com/passteque/gluetun).
 
 ```bash
 arrsenal install --vpn --vpn-provider nordvpn --vpn-key <votre-cle-wireguard>
@@ -440,13 +443,22 @@ Voir [DISCLAIMER.md](DISCLAIMER.md).
 Prowlarr · Sonarr · Radarr · **Lidarr** · Transmission · **qBittorrent** · Jellyfin
 · autobrr · Recyclarr · Gluetun *(VPN optionnel)* · Flood et qui *(UI optionnelles)*
 
-Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié**. Bazarr a déjà
-été étudié mais reste absent : sa configuration passe par un fichier YAML et non par
-une API, et rien n'a encore été vérifié.
-
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
-Suite prévue : Bazarr, SABnzbd, Plex, Seerr, Audiobookshelf, Shelfmark, Shelfarr
-— voir [PROMPT.md](PROMPT.md) pour la feuille de route.
+
+### Feuille de route
+
+| | Ce qu'il reste à faire |
+|---|---|
+| **Plex** | Second serveur média, à côté de Jellyfin. Son jeton s'obtient par `plex.tv`, pas par l'API locale : c'est le point à vérifier avant de l'inscrire. |
+| **Seerr** | Demandes de médias. Jellyseerr et Overseerr ont fusionné sous ce nom ; le câblage vise Sonarr, Radarr et le serveur média. |
+| **Notifiarr** | Notifications centralisées pour toute la stack. Chaque *arr s'y déclare par une clé API. |
+| **Bazarr** | Sous-titres. Étudié, mais sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
+| **SABnzbd** | Client Usenet, à côté des deux clients torrent. |
+| **Silo** | Serveur média compatible API Jellyfin. Deux obstacles connus : c'est une pile de quatre conteneurs, et aucune version n'est publiée — seulement des SHA de commit. |
+| Audiobookshelf, Shelfmark, Shelfarr | Livres et livres audio. |
+
+Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié** contre une
+instance réelle. Voir [PROMPT.md](PROMPT.md) pour le détail.
 
 **Readarr n'est pas au programme** : le projet est archivé depuis le 27 juin 2025.
 

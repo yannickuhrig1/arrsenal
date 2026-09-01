@@ -11,7 +11,7 @@ from pathlib import Path
 from textual.app import App
 
 from .. import orchestrator
-from ..models import PlatformProfile, StackConfig
+from ..models import PlatformProfile, StackConfig, VpnConfig
 from ..wiring import StepResult
 from .screens import WelcomeScreen
 
@@ -29,6 +29,10 @@ class ArrsenalApp(App):
         self.data_root: str | None = None
         self.timezone: str = "Etc/UTC"
         self.username: str = "arrsenal"
+        #: Hote des URL du rapport final. `localhost` ne vaut que si le
+        #: navigateur tourne sur la machine qui heberge la stack.
+        self.host: str = "localhost"
+        self.vpn: VpnConfig = VpnConfig()
         self.platform: PlatformProfile = PlatformProfile.GENERIC_LINUX
         #: Template TRaSH choisi par service. Vide = celui par defaut.
         self.recyclarr_templates: dict[str, str] = {}
@@ -51,8 +55,10 @@ class ArrsenalApp(App):
             platform=self.platform,
             timezone=self.timezone,
             username=self.username,
+            host=self.host,
         )
         cfg.recyclarr_templates = dict(self.recyclarr_templates)
+        cfg.vpn = self.vpn
         return cfg
 
 

@@ -537,10 +537,23 @@ class Wirer:
                 name for _a, name, ctype, path in wanted if jf.ensure_library(name, ctype, path)
             ]
             names = {lib.get("Name") for lib in jf.libraries()}
+            # Les bibliotheques sont creees sans analyse, pour ne pas bloquer
+            # l'installation. Encore faut-il en lancer une : sans elle Jellyfin
+            # garde un index VIDE, et les notifications d'import de Sonarr — qui
+            # repondent pourtant 200 — n'y changent rien. Constate sur une stack
+            # reelle, deux episodes sur le disque et zero dans Jellyfin.
+            analyse = jf.refresh_libraries()
         ok = {name for _a, name, _c, _p in wanted} <= names
         detail = ("assistant execute" if ran else "assistant deja termine")
         detail += f", bibliotheques creees: {', '.join(made) or 'aucune (deja presentes)'}"
-        return StepResult("jellyfin: assistant + bibliotheques", ok=ok, detail=detail, created=ran)
+        detail += ", analyse lancee" if analyse else ""
+        return StepResult(
+            "jellyfin: assistant + bibliotheques",
+            ok=ok,
+            detail=detail,
+            created=ran,
+            warnings=[] if analyse else ["l'analyse des bibliotheques n'a pas pu etre lancee"],
+        )
 
     def step_autobrr(self) -> StepResult:
         """Declare les applications et le client de telechargement dans autobrr.

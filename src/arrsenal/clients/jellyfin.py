@@ -178,6 +178,25 @@ class JellyfinClient:
     def libraries(self) -> list[dict]:
         return self._request("GET", "/Library/VirtualFolders") or []
 
+    def refresh_libraries(self) -> bool:
+        """Declenche une analyse de toutes les bibliotheques.
+
+        Indispensable, et decouvert a l'usage : les bibliotheques sont creees
+        avec `refreshLibrary=false` — pour ne pas bloquer l'installation sur une
+        analyse — mais RIEN ne les analysait ensuite. Jellyfin restait donc avec
+        un index vide.
+
+        Le symptome est deroutant : Sonarr importe l'episode, sa notification
+        « bibliotheque mise a jour » part et repond 200, et pourtant Jellyfin
+        n'affiche rien. Un evenement cible ne construit pas un index qui n'existe
+        pas encore ; il faut une premiere analyse complete. Constate sur une
+        stack reelle : index a zero malgre deux episodes sur le disque, puis deux
+        series et deux episodes apres cet appel.
+
+        L'appel rend la main tout de suite : l'analyse se poursuit en arriere-plan.
+        """
+        return self._request("POST", "/Library/Refresh").status_code in (200, 202, 204)
+
     def ensure_library(self, name: str, collection_type: str, path: str) -> bool:
         """Cree une bibliotheque si aucune du meme nom n'existe. Renvoie True si creee."""
         if any(lib.get("Name") == name for lib in self.libraries()):

@@ -38,7 +38,7 @@ from ..layout import (
     path_warning,
     resolve_ids,
 )
-from ..models import Category, PlatformProfile
+from ..models import VPN_PROVIDERS, Category, PlatformProfile, VpnConfig
 from ..orchestrator import InstallAborted, Progress
 from ..wiring import StepResult
 
@@ -260,6 +260,13 @@ class PathsScreen(WizardScreen):
             yield Label("Fuseau horaire", classes="group-title")
             yield Input(value="Europe/Paris", id="tz")
 
+            yield Label(
+                "Adresse de cette machine "
+                "[dim](a changer si vous naviguerez depuis un autre poste)[/dim]",
+                classes="group-title",
+            )
+            yield Input(value="localhost", id="host")
+
             yield Rule()
             yield Static(id="paths-check")
         yield Horizontal(
@@ -343,15 +350,14 @@ class PathsScreen(WizardScreen):
         self.app.data_root = self.query_one("#data-root", Input).value.strip()
         self.app.timezone = self.query_one("#tz", Input).value.strip() or "Etc/UTC"
         self.app.username = self.query_one("#username", Input).value.strip() or "arrsenal"
+        self.app.host = self.query_one("#host", Input).value.strip() or "localhost"
         self.app.platform = self.platform()
-        # Ecran facultatif : il n'a de sens que si Recyclarr est installe ET s'il a
-        # au moins un *arr a configurer.
-        if "recyclarr" in self.app.selection and any(
-            sid in self.app.selection for sid in TemplatesScreen.SERVICES
-        ):
-            self.app.push_screen(TemplatesScreen())
+        # Le VPN d'abord, s'il y a un trafic a proteger. Puis les profils de
+        # qualite, s'ils ont un sens. Chaque ecran facultatif sait s'effacer.
+        if any(sid in self.app.selection for sid in catalog.DOWNLOAD_CLIENTS):
+            self.app.push_screen(VpnScreen())
         else:
-            self.app.push_screen(SummaryScreen())
+            _suite_apres_vpn(self.app)
 
     @on(Button.Pressed, "#back")
     def back(self) -> None:
@@ -506,6 +512,160 @@ class TemplatesScreen(WizardScreen):
     @on(Button.Pressed, "#back")
     def back(self) -> None:
         self.app.pop_screen()
+
+
+# ------------------------------------------------------------------------ vpn
+
+
+class VpnScreen(WizardScreen):
+    """Choix du VPN pour le client de telechargement.
+
+    Etape facultative, mais elle manquait completement : les sept options
+    `--vpn*` n'existaient qu'en ligne de commande, et le recapitulatif se
+    contentait d'AVERTIR qu'aucun VPN n'etait configure — sans offrir le moindre
+    moyen d'en mettre un. Signale a l'usage.
+
+    L'ecran n'apparait que si un client de telechargement est installe : sans
+    trafic BitTorrent, Gluetun ne protegerait rien.
+    """
+
+    SUB_TITLE = "Etape optionnelle - VPN du client de telechargement"
+
+    def content(self) -> ComposeResult:
+        yield Static(
+            "Sans VPN, le trafic BitTorrent sort sur [b]l'adresse IP publique de cette "
+            "machine[/b], visible par tous les autres pairs.\n"
+            "[dim]Avec Gluetun, le client de telechargement perd son propre reseau : il "
+            "ne demarre pas tant que le tunnel n'est pas etabli, donc aucun paquet ne "
+            "peut sortir en clair.[/dim]",
+            id="vpn-intro",
+        )
+        with VerticalScroll(id="vpn"):
+            with RadioSet(id="vpn-choix"):
+                yield RadioButton("Sans VPN", value=True, id="vpn-non")
+                yield RadioButton("Faire passer le client par un VPN", id="vpn-oui")
+
+            with Vertical(id="vpn-details", classes="hidden"):
+                yield Label("Fournisseur", classes="group-title")
+                yield Select(
+                    [(nom, nom) for nom in VPN_PROVIDERS],
+                    value="mullvad",
+                    allow_blank=False,
+                    id="vpn-provider",
+                )
+
+                yield Label("Protocole", classes="group-title")
+                yield Select(
+                    [("wireguard", "wireguard"), ("openvpn", "openvpn")],
+                    value="wireguard",
+                    allow_blank=False,
+                    id="vpn-type",
+                )
+
+                with Vertical(id="vpn-wireguard"):
+                    yield Label("Cle privee WireGuard", classes="group-title")
+                    yield Input(password=True, id="vpn-key")
+
+                with Vertical(id="vpn-openvpn", classes="hidden"):
+                    yield Label("Identifiant OpenVPN", classes="group-title")
+                    yield Input(id="vpn-user")
+                    yield Label("Mot de passe OpenVPN", classes="group-title")
+                    yield Input(password=True, id="vpn-pass")
+
+                yield Label(
+                    "Pays souhaites [dim](facultatif, separes par des virgules)[/dim]",
+                    classes="group-title",
+                )
+                yield Input(placeholder="Switzerland,Netherlands", id="vpn-countries")
+
+        yield Static(id="vpn-status")
+        yield Horizontal(
+            Button("Continuer", variant="primary", id="next"),
+            Button("Retour", id="back"),
+            classes="actions",
+        )
+
+    @on(RadioSet.Changed, "#vpn-choix")
+    def _on_choice(self) -> None:
+        self.query_one("#vpn-details", Vertical).set_class(not self.vpn_voulu(), "hidden")
+        self._validate()
+
+    @on(Select.Changed, "#vpn-type")
+    def _on_type(self) -> None:
+        wireguard = self.query_one("#vpn-type", Select).value == "wireguard"
+        self.query_one("#vpn-wireguard", Vertical).set_class(not wireguard, "hidden")
+        self.query_one("#vpn-openvpn", Vertical).set_class(wireguard, "hidden")
+        self._validate()
+
+    @on(Input.Changed)
+    def _on_change(self) -> None:
+        self._validate()
+
+    def vpn_voulu(self) -> bool:
+        coche = self.query_one("#vpn-choix", RadioSet).pressed_button
+        return coche is not None and coche.id == "vpn-oui"
+
+    def config(self) -> VpnConfig:
+        """Traduit la saisie. Une valeur invalide est ecartee ici, pas plus tard."""
+        if not self.vpn_voulu():
+            return VpnConfig()
+        fournisseur = self.query_one("#vpn-provider", Select).value
+        try:
+            return VpnConfig(
+                enabled=True,
+                provider=fournisseur if isinstance(fournisseur, str) else "",
+                vpn_type=str(self.query_one("#vpn-type", Select).value),
+                wireguard_private_key=self.query_one("#vpn-key", Input).value.strip(),
+                openvpn_user=self.query_one("#vpn-user", Input).value.strip(),
+                openvpn_password=self.query_one("#vpn-pass", Input).value.strip(),
+                countries=self.query_one("#vpn-countries", Input).value.strip(),
+            )
+        except ValueError:
+            return VpnConfig()
+
+    def _validate(self) -> bool:
+        """Gluetun refuse de demarrer s'il manque un champ, et le client de
+        telechargement reste alors injoignable. Autant le dire ici."""
+        bouton = self.query_one("#next", Button)
+        status = self.query_one("#vpn-status", Static)
+        if not self.vpn_voulu():
+            status.update("")
+            bouton.disabled = False
+            return True
+
+        manques = self.config().missing()
+        if manques:
+            status.update(
+                f"[yellow]Il manque {', '.join(manques)}.[/yellow]\n"
+                "[dim]Sans cela Gluetun refuse de demarrer, et le client de "
+                "telechargement reste injoignable.[/dim]"
+            )
+            bouton.disabled = True
+            return False
+        status.update("[green]Configuration complete.[/green]")
+        bouton.disabled = False
+        return True
+
+    @on(Button.Pressed, "#next")
+    def go(self) -> None:
+        if not self._validate():
+            return
+        self.app.vpn = self.config()
+        _suite_apres_vpn(self.app)
+
+    @on(Button.Pressed, "#back")
+    def back(self) -> None:
+        self.app.pop_screen()
+
+
+def _suite_apres_vpn(app) -> None:
+    """Ecran suivant : les profils de qualite s'ils ont un sens, sinon la fin."""
+    if "recyclarr" in app.selection and any(
+        sid in app.selection for sid in TemplatesScreen.SERVICES
+    ):
+        app.push_screen(TemplatesScreen())
+    else:
+        app.push_screen(SummaryScreen())
 
 
 # ----------------------------------------------------------------- recapitulatif

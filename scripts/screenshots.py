@@ -27,7 +27,15 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from textual.widgets import Label, ListItem, ListView, Static
+from textual.widgets import (
+    Input,
+    Label,
+    ListItem,
+    ListView,
+    RadioButton,
+    Select,
+    Static,
+)
 
 from arrsenal.clients.prowlarr import IndexerDefinition
 from arrsenal.tui.app import ArrsenalApp
@@ -39,6 +47,7 @@ from arrsenal.tui.screens import (
     ServicesScreen,
     SummaryScreen,
     TemplatesScreen,
+    VpnScreen,
 )
 from arrsenal.wiring import StepResult
 
@@ -53,6 +62,11 @@ SHOWN_PROJECT_DIR = PurePosixPath("/opt/arrsenal")
 #: sans cela, deux captures ne seraient jamais identiques.
 SHOWN_API_KEY = "0123456789abcdef0123456789abcdef"
 SHOWN_PASSWORD = "MotDePasseGenere42"
+
+#: Fournisseur montre dans la capture VPN : le premier de la liste par ordre
+#: alphabetique, choisi pour cette seule raison. arrsenal n'en recommande aucun.
+SHOWN_VPN_PROVIDER = "airvpn"
+SHOWN_VPN_KEY = "cle-privee-wireguard"
 
 #: Templates figes pour l'illustration. La liste reelle vient du depot Recyclarr
 #: et change quand il en publie : une capture comparee a l'octet pres ne peut pas
@@ -185,6 +199,16 @@ async def capture() -> None:
         await shot(app, pilot, "3-chemins")
 
         app.data_root, app.config_root = "/srv/data", "/opt/arrsenal/config"
+        app.push_screen(VpnScreen())
+        await pilot.pause()
+        screen = app.screen
+        screen.query_one("#vpn-oui", RadioButton).value = True
+        await pilot.pause()
+        screen.query_one("#vpn-provider", Select).value = SHOWN_VPN_PROVIDER
+        screen.query_one("#vpn-key", Input).value = SHOWN_VPN_KEY
+        await pilot.pause()
+        await shot(app, pilot, "4-vpn")
+
         app.selection = [*app.selection, "recyclarr"]
         app.push_screen(TemplatesScreen())
         # La liste des templates arrive d'un worker : capturer trop tot montrerait
@@ -193,11 +217,11 @@ async def capture() -> None:
             await pilot.pause(0.25)
             if str(app.screen.query_one("#tpl-choices-sonarr", Static).content):
                 break
-        await shot(app, pilot, "4-profils")
+        await shot(app, pilot, "5-profils")
 
         app.push_screen(SummaryScreen())
         await pilot.pause()
-        await shot(app, pilot, "5-recapitulatif")
+        await shot(app, pilot, "6-recapitulatif")
 
         # L'ecran d'installation lance un worker : on le rend inerte pour la
         # capture, puis on injecte des lignes representatives.
@@ -216,7 +240,7 @@ async def capture() -> None:
         for step in FAKE_STEPS:
             screen._log(f"  [green]OK[/green]  {step.name} - {step.detail}")
         await pilot.pause()
-        await shot(app, pilot, "6-installation")
+        await shot(app, pilot, "7-installation")
 
         # Etape indexeurs : rendue hors ligne. Le chargement des definitions est
         # neutralise, on injecte des exemples representatifs de ce que Prowlarr
@@ -234,12 +258,12 @@ async def capture() -> None:
         # champs du formulaire soient rendus.
         for _ in range(4):
             await pilot.pause()
-        await shot(app, pilot, "7-indexeurs")
+        await shot(app, pilot, "8-indexeurs")
 
         app.results = FAKE_STEPS
         app.push_screen(ReportScreen())
         await pilot.pause()
-        await shot(app, pilot, "8-rapport")
+        await shot(app, pilot, "9-rapport")
 
 
 if __name__ == "__main__":
