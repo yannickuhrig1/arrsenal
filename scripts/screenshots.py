@@ -9,12 +9,13 @@ Les fichiers sont regeneres a l'identique a chaque execution ET sur n'importe
 quelle machine, ce qui permet de les versionner et de voir les regressions
 visuelles dans une pull request. La CI le verifie.
 
-Quatre sources de variation sont donc neutralisees ici, et il a fallu les
-trouver : les identifiants Unix detectes (differents sous Windows et sous
-Linux), les secrets generes (tires au hasard a chaque execution), le repertoire
-du projet (le chemin personnel de qui lance le script se retrouvait dans une
-capture publiee) et la liste des templates Recyclarr (elle vient du depot amont
-et bouge sans nous).
+Six sources de variation sont neutralisees ici, et il a fallu les trouver
+une par une : le profil de plateforme propose (il suit la machine), les
+identifiants Unix detectes, le diagnostic Docker (celui de la machine, absent
+sur une CI), les secrets generes (tires au hasard a chaque execution), le
+repertoire du projet (le chemin personnel de qui lance le script se retrouvait
+dans une capture publiee) et la liste des templates Recyclarr (elle vient du
+depot amont et bouge sans nous).
 """
 
 from __future__ import annotations
@@ -91,11 +92,17 @@ SHOWN_DOCKER = (
 def freeze_environment() -> None:
     """Rend la capture independante de la machine qui la produit."""
     from arrsenal import orchestrator, runner, seed
+    from arrsenal.models import PlatformProfile
     from arrsenal.tui import screens
 
     runner.check_docker = lambda: [  # type: ignore[assignment]
         runner.Check(name, True, detail) for name, detail in SHOWN_DOCKER
     ]
+
+    # Le profil propose suit desormais la machine : sans le figer, la capture de
+    # l'ecran des chemins montre « windows » ici et « generic-linux » sur la CI.
+    # Le depot documente une installation Linux, c'est donc celle-la qu'on montre.
+    screens.default_profile = lambda: PlatformProfile.GENERIC_LINUX  # type: ignore[assignment]
 
     fixed_ids = (1000, 1000, "profil generic-linux", True)
     orchestrator.resolve_ids = lambda profile: fixed_ids  # type: ignore[assignment]
