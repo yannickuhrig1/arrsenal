@@ -577,6 +577,52 @@ class Wirer:
             warnings=warnings,
         )
 
+    def step_web_login(self, arr_id: str) -> StepResult:
+        """Garantit que les identifiants annonces ouvrent vraiment l'interface.
+
+        Le pre-semis ecrit `<Username>` et `<Password>` dans config.xml. Sonarr et
+        Radarr les consomment au premier demarrage et creent le compte. **Prowlarr
+        2.5.2 les EFFACE sans creer personne** : son interface devient
+        definitivement inaccessible, puisque sa page de connexion n'offre aucune
+        creation de compte. Le cablage, lui, continuait de fonctionner par cle
+        API — la panne ne se voyait donc nulle part, sauf en essayant de se
+        connecter.
+
+        On teste la connexion comme un navigateur, et on ne repare que si elle
+        echoue : reecrire un mot de passe deja bon serait une modification pour
+        rien.
+        """
+        inst = self.cfg.services[arr_id]
+        username, password = inst.username or "", inst.password or ""
+        client = self.arr(arr_id)
+
+        if not username or not password:
+            return StepResult(
+                f"{arr_id}: acces web",
+                ok=True,
+                detail="aucun identifiant genere, rien a verifier",
+            )
+
+        if client.web_login_works(username, password):
+            return StepResult(f"{arr_id}: acces web", ok=True, detail="connexion verifiee")
+
+        client.ensure_web_user(username, password)
+        repaired = client.web_login_works(username, password)
+        return StepResult(
+            f"{arr_id}: acces web",
+            ok=repaired,
+            detail="compte cree" if repaired else "compte cree, connexion toujours refusee",
+            created=repaired,
+            warnings=[]
+            if repaired
+            else [
+                (
+                    f"les identifiants annonces pour {arr_id} n'ouvrent pas l'interface. "
+                    f"Definissez-en depuis Settings > General."
+                )
+            ],
+        )
+
     def step_qui(self) -> StepResult:
         """Relie l'interface qui a l'instance qBittorrent de la stack.
 
@@ -630,6 +676,13 @@ class Wirer:
         steps: list[WiringStep] = []
         arrs = [a for a in catalog.MANAGED_ARRS if cfg.enabled(a)]
         clients = [d for d in catalog.DOWNLOAD_CLIENTS if cfg.enabled(d)]
+
+        # Prowlarr compris : c'est LUI qui n'ouvrait pas. La verification passe par
+        # la page de connexion, donc elle vaut pour toute la famille.
+        for arr_id in (a for a in catalog.STARTUP_ORDER if cfg.enabled(a) and _is_arr(a)):
+            steps.append(
+                WiringStep(f"{arr_id}/acces-web", lambda a=arr_id: self.step_web_login(a))
+            )
 
         for arr_id in arrs:
             steps.append(
@@ -707,3 +760,8 @@ class Wirer:
             if on_step:
                 on_step(result)
         return results
+
+
+def _is_arr(service_id: str) -> bool:
+    """Un service de la famille *arr, Prowlarr compris."""
+    return catalog.get(service_id).api_family == "arr"

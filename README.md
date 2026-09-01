@@ -56,6 +56,7 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 | qBittorrent | lui-même | catégories créées avec leur chemin de sauvegarde |
 | Sonarr, Radarr | Jellyfin | notification de rafraîchissement après import |
 | Jellyfin | système de fichiers | assistant de démarrage + bibliothèques Films, Séries, Musique |
+| Sonarr, Radarr, Lidarr, Prowlarr | interface web | compte créé, **connexion réellement testée** |
 | Recyclarr | Sonarr, Radarr | profils de qualité et custom formats des TRaSH Guides, adresse et clé posées dans le template officiel, **première synchronisation lancée** |
 | qui | qBittorrent | compte créé, instance déclarée, connexion confirmée par qui |
 | Flood | qBittorrent | URL et identifiants passés au démarrage |

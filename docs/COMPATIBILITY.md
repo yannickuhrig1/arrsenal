@@ -851,3 +851,65 @@ sont écrits et la planification réessaiera. Faire échouer le câblage affiche
 Un piège pour qui referait cette vérification : **Lidarr expose `v1`**, pas `v3`. Mon
 premier script l'interrogeait en v3, recevait 404 et rapportait trois faux échecs.
 `catalog.py` avait raison depuis le début.
+
+---
+
+## Prowlarr laissait son interface inaccessible — corrigé le 2026-09-01
+
+Signalé par un utilisateur : « j'ai voulu me connecter à Prowlarr, identifiants
+incorrects ». Le rapport annonçait pourtant un identifiant et un mot de passe, et le
+câblage affichait tous ses liens en vert.
+
+### Ce qui se passait
+
+Le pré-semis écrit `<Username>`, `<Password>` et `<PasswordConfirmation>` dans
+`config.xml`. Sonarr 4.0.19, Radarr 6.3.0 et Lidarr 3.1.0 les consomment au premier
+démarrage, créent le compte en base, puis effacent ces lignes du fichier.
+
+**Prowlarr 2.5.2 les efface aussi — sans créer personne.** Reproduit sur un conteneur
+jetable, configuration neuve :
+
+| | `Users` en base | `POST /login` |
+|---|---|---|
+| Sonarr, Radarr, Lidarr | `[('arrsenal', …)]` | 302 vers `/` |
+| Prowlarr | **`[]`** | 302 vers `/login?loginFailed=true` |
+
+Et sa page de connexion n'offre **aucune création de compte**. Avec
+`AuthenticationRequired=Enabled`, l'interface devenait donc définitivement
+inaccessible.
+
+Le plus gênant : rien ne le signalait. Le câblage passe par la clé API, qui fonctionnait
+parfaitement. Les vingt-et-un liens étaient réellement posés. La seule façon de voir la
+panne était d'essayer de se connecter — ce qu'aucune vérification ne faisait.
+
+### La correction
+
+Une étape de câblage par *arr, qui **poste le formulaire de connexion comme un
+navigateur**. Un succès redirige vers la racine, un échec vers
+`/login?...loginFailed=true`.
+
+Si la connexion échoue, le compte est créé par la voie supportée :
+`PUT /api/v1/config/host/{id}` avec `username`, `password` et `passwordConfirmation` —
+l'application hache le mot de passe elle-même. Vérifié : **202**, la ligne apparaît dans
+`Users` avec ses 10 000 itérations, et la connexion aboutit.
+
+Si elle fonctionne déjà, **rien n'est écrit** : réécrire un mot de passe correct serait
+une modification pour rien.
+
+Sur une installation neuve de six services :
+
+```
+OK sonarr: acces web - connexion verifiee
+OK radarr: acces web - connexion verifiee
+OK lidarr: acces web - connexion verifiee
+OK prowlarr: acces web - compte cree
+```
+
+Les quatre identifiants annoncés ouvrent ensuite réellement leur interface.
+
+### Ce que cet épisode dit de la méthode
+
+La règle du projet est de faire valider chaque lien par l'application cible. Elle était
+appliquée aux liens entre services, pas à l'accès de l'utilisateur lui-même. Une
+vérification qui n'emprunte pas le chemin de l'utilisateur ne prouve rien sur ce
+chemin-là.

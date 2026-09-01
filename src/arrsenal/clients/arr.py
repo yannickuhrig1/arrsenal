@@ -69,6 +69,48 @@ class ArrClient:
     def post(self, resource: str, payload: dict) -> Any:
         return self._request("POST", resource, json=payload)
 
+    def put(self, resource: str, payload: dict) -> Any:
+        return self._request("PUT", resource, json=payload)
+
+    # -- compte de l'interface web -------------------------------------------
+
+    def web_login_works(self, username: str, password: str) -> bool:
+        """Le couple identifiant/mot de passe ouvre-t-il VRAIMENT l'interface ?
+
+        On poste le formulaire de connexion, comme le ferait un navigateur. Un
+        echec renvoie 302 vers `/login?...loginFailed=true`, un succes 302 vers
+        la racine. C'est la seule verification qui vaut : l'API peut parfaitement
+        repondre alors qu'aucun compte n'existe.
+        """
+        if not username or not password:
+            return False
+        try:
+            resp = self._http.post(
+                "/login",
+                data={"username": username, "password": password, "rememberMe": "on"},
+                follow_redirects=False,
+            )
+        except httpx.HTTPError:
+            return False
+        if resp.status_code not in (301, 302, 303):
+            # Certaines versions repondent 200 sur la page de connexion en cas
+            # d'echec ; un succes redirige toujours.
+            return False
+        return "loginfailed" not in resp.headers.get("location", "").lower()
+
+    def ensure_web_user(self, username: str, password: str) -> None:
+        """Cree ou reinitialise le compte de l'interface web.
+
+        `PUT config/host` est la voie supportee : l'application hache le mot de
+        passe elle-meme. On relit la configuration complete avant de la renvoyer,
+        pour ne modifier que les trois champs qui nous concernent.
+        """
+        host = self.get("config/host")
+        host["username"] = username
+        host["password"] = password
+        host["passwordConfirmation"] = password
+        self.put(f"config/host/{host['id']}", host)
+
     # -- disponibilite -------------------------------------------------------
 
     def status(self) -> dict:
