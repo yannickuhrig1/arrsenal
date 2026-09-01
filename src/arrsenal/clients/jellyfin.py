@@ -194,8 +194,18 @@ class JellyfinClient:
         series et deux episodes apres cet appel.
 
         L'appel rend la main tout de suite : l'analyse se poursuit en arriere-plan.
+
+        Un echec n'interrompt pas l'installation : tout le reste est cable, et
+        une analyse peut se relancer d'un clic depuis Jellyfin. On le signale.
         """
-        return self._request("POST", "/Library/Refresh").status_code in (200, 202, 204)
+        try:
+            # `_request` leve deja sur tout code >= 400 et rend le CORPS decode,
+            # pas la reponse : ici Jellyfin repond 204 sans corps, donc `None`.
+            # Arriver jusqu'au `return` est la seule preuve de succes.
+            self._request("POST", "/Library/Refresh")
+        except WiringError:
+            return False
+        return True
 
     def ensure_library(self, name: str, collection_type: str, path: str) -> bool:
         """Cree une bibliotheque si aucune du meme nom n'existe. Renvoie True si creee."""

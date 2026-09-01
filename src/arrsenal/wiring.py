@@ -15,7 +15,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from . import catalog
+from . import catalog, journal
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
 from .clients.autobrr import AutobrrClient
@@ -904,6 +904,19 @@ class Wirer:
                     conseil = self._conseil_config_existante(service)
                     if conseil:
                         result.warnings.append(conseil)
+            except Exception as exc:  # noqa: BLE001
+                # Un bug dans UNE etape ne doit pas emporter tout le cablage.
+                # Vu en integration : une erreur de programmation a l'avant-
+                # derniere etape a fait echouer l'installation apres 40 etapes
+                # reussies, sans rapport ni page d'acces — alors que tout le
+                # reste etait correctement cable et fonctionnel.
+                journal.LOGGER.exception("etape %s", step.name)
+                result = StepResult(
+                    step.name,
+                    ok=False,
+                    detail=f"erreur inattendue ({type(exc).__name__}) : {exc}",
+                    warnings=["ceci est un defaut d'arrsenal, pas de votre installation"],
+                )
             results.append(result)
             if on_step:
                 on_step(result)

@@ -62,8 +62,9 @@ class ArrsenalApp(App):
         return cfg
 
 
-def run_wizard(project_dir: Path | None = None) -> int:
+def run_wizard(project_dir: Path | None = None, *, open_page: bool = True) -> int:
     """Lance l'assistant. Renvoie le code de sortie."""
     app = ArrsenalApp(project_dir)
+    app.auto_open_page = open_page
     result = app.run()
     return int(result) if isinstance(result, int) else 0

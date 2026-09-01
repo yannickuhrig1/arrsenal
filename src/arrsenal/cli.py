@@ -147,11 +147,19 @@ def _echo(progress: Progress) -> None:
 
 
 @app.command()
-def wizard() -> None:
+def wizard(
+    # Deux reglages qui n'ont pas leur place DANS l'assistant : ils decident de
+    # son lancement, pas de la stack. Ils vivent donc sur la commande, comme
+    # leurs homologues de `install`.
+    project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
+    open_page: bool = typer.Option(
+        True, "--open/--no-open", help="Ouvrir la page d'acces a la fin."
+    ),
+) -> None:
     """Lance l'assistant interactif plein ecran."""
     from .tui.app import run_wizard
 
-    raise typer.Exit(run_wizard())
+    raise typer.Exit(run_wizard(project_dir, open_page=open_page))
 
 
 @app.command()
