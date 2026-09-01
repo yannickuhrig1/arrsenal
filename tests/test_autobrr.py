@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal.clients.autobrr import CLIENT_TYPES, AutobrrClient
+from arrsenal.clients.autobrr import CLIENT_TYPES, AutobrrClient, client_host
 from arrsenal.clients.base import WiringError
 
 
@@ -157,3 +157,46 @@ def test_a_download_client_carries_no_api_key():
 
 def test_every_known_type_is_uppercase():
     assert all(v == v.upper() for v in CLIENT_TYPES.values())
+
+
+# ------------------------------------------------- point d'entree Transmission
+
+
+def test_transmission_est_declare_sur_son_point_d_entree_rpc():
+    """Transmission n'expose pas son RPC a la racine.
+
+    `http://transmission:9091/` repond une redirection HTML ; autobrr attend du
+    JSON et echoue sur « invalid character '<' ». Constate en conditions reelles :
+    une installation complete affichait 19/20 liens pour cette seule raison.
+
+    Verifie contre l'API d'autobrr v1.85.0 : racine -> HTTP 500,
+    `/transmission/rpc` -> HTTP 204.
+    """
+    assert (
+        client_host("transmission", "http://transmission:9091")
+        == "http://transmission:9091/transmission/rpc"
+    )
+
+
+def test_les_autres_services_gardent_leur_racine():
+    """qBittorrent et les *arr repondent bien a la racine : ne rien y ajouter."""
+    for service in ("qbittorrent", "sonarr", "radarr", "lidarr"):
+        assert client_host(service, "http://x:1") == "http://x:1"
+
+
+def test_le_chemin_n_est_pas_double_par_une_barre():
+    assert (
+        client_host("transmission", "http://transmission:9091/")
+        == "http://transmission:9091/transmission/rpc"
+    )
+
+
+def test_ensure_client_envoie_le_chemin_rpc():
+    """Le chemin doit arriver dans la charge utile, pas seulement dans un helper."""
+    fake = FakeClient({})
+    fake._token = "t"
+    fake.ensure_client(name="Transmission", service_id="transmission", host="http://transmission:9091")
+
+    posted = [c for c in fake.calls if c[0] == "POST"]
+    assert posted, "aucun POST emis"
+    assert posted[-1][2]["host"] == "http://transmission:9091/transmission/rpc"

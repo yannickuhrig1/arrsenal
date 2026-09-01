@@ -9,7 +9,9 @@ sur ses succes.
 from __future__ import annotations
 
 import json
+import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -61,7 +63,16 @@ def server(cfg, tmp_path):
     srv.RequestHandlerClass.compose = fake
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
     thread.start()
-    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    port = srv.server_address[1]
+    # Attendre que le port accepte reellement. Sans cela le test se connecte
+    # parfois avant que la boucle d'acceptation ne tourne : constate une fois sur
+    # une suite complete, et un echec au hasard vaut moins qu'une seconde d'attente.
+    for _ in range(50):
+        with socket.socket() as probe:
+            if probe.connect_ex(("127.0.0.1", port)) == 0:
+                break
+        time.sleep(0.02)
+    base = f"http://127.0.0.1:{port}"
     yield base, fake
     srv.shutdown()
     srv.server_close()

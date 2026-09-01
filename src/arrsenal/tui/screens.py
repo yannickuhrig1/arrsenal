@@ -20,6 +20,7 @@ from textual.widgets import (
     Footer,
     Input,
     Label,
+    ProgressBar,
     RadioButton,
     RadioSet,
     RichLog,
@@ -510,6 +511,9 @@ class InstallScreen(WizardScreen):
 
     def content(self) -> ComposeResult:
         yield Static("Preparation...", id="install-phase")
+        # Le telechargement des images est muet et peut durer plusieurs minutes :
+        # sans barre, rien ne distingue « ca travaille » de « c'est bloque ».
+        yield ProgressBar(id="install-progress", show_eta=False)
         yield RichLog(id="install-log", markup=True, wrap=True)
         yield Horizontal(
             Button("Terminer", variant="primary", id="done", disabled=True),
@@ -525,22 +529,36 @@ class InstallScreen(WizardScreen):
     def _phase(self, text: str) -> None:
         self.query_one("#install-phase", Static).update(text)
 
+    def _advance(self) -> None:
+        bar = self.query_one("#install-progress", ProgressBar)
+        # Le total est une estimation : on borne plutot que de depasser 100 %.
+        if bar.total is not None and bar.progress < bar.total:
+            bar.advance(1)
+
+    def _complete(self) -> None:
+        bar = self.query_one("#install-progress", ProgressBar)
+        if bar.total is not None:
+            bar.progress = bar.total
+
     @work(thread=True)
     def run_install(self) -> None:
         app = self.app
         cfg = app.stack_config or app.build_config()
         app.stack_config = cfg
+        app.call_from_thread(self._set_total, orchestrator.expected_events(cfg))
 
         def on_progress(progress: Progress) -> None:
             mark = "[green]OK[/green]" if progress.ok else "[red]ECHEC[/red]"
             app.call_from_thread(self._phase, f"{progress.phase} : {progress.message}")
             app.call_from_thread(self._log, f"  {mark}  {progress.phase} : {progress.message}")
+            app.call_from_thread(self._advance)
 
         def on_step(result: StepResult) -> None:
             mark = "[green]OK[/green]" if result.ok else "[red]ECHEC[/red]"
             app.call_from_thread(self._log, f"  {mark}  {result.name} - {result.detail}")
             for warning in result.warnings:
                 app.call_from_thread(self._log, f"        [yellow]{warning}[/yellow]")
+            app.call_from_thread(self._advance)
 
         try:
             results = orchestrator.install(
@@ -553,8 +571,13 @@ class InstallScreen(WizardScreen):
             return
         app.call_from_thread(self._enable_done, results)
 
+    def _set_total(self, total: int) -> None:
+        self.query_one("#install-progress", ProgressBar).update(total=total, progress=0)
+
     def _enable_done(self, results: list[StepResult]) -> None:
         self.app.results = results
+        # Une barre figee a 94 % apres un succes se lit comme un echec.
+        self._complete()
         ok = sum(1 for r in results if r.ok)
         self._phase(
             f"[green]Termine : {ok}/{len(results)} liens etablis[/green]"

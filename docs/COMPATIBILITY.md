@@ -763,3 +763,91 @@ aucun style chez tous les utilisateurs.
 
 Le README indiquait `pipx install arrsenal`. Le paquet n'est pas sur PyPI (HTTP 404) :
 la commande échouait pour tout le monde. Corrigé en `pipx install git+https://…`.
+
+---
+
+## qui v1.27.0 et le câblage complet — vérifiés le 2026-09-01
+
+Une installation du **catalogue entier** (11 services) sur Docker Desktop, suivie d'une
+vérification service par service via leurs API. Elle a trouvé deux liens manquants ou
+faux que le rapport annonçait pourtant comme posés.
+
+### autobrr ne joignait pas Transmission
+
+Le rapport affichait **19/20**. La cause :
+
+```
+error getting rpc info: http://transmission:9091: can't get session values:
+'session-get' rpc method failed: can't unmarshal request answer body: invalid cha…
+```
+
+Transmission n'expose pas son RPC à la racine. Mesuré depuis le réseau de la pile :
+
+| Adresse | Réponse |
+|---|---|
+| `http://transmission:9091/` | **301**, corps HTML |
+| `http://transmission:9091/transmission/rpc` | **409** — la réponse normale, « il me faut un jeton de session » |
+
+autobrr attend du JSON et s'étrangle sur le `<` du HTML. Confirmé contre son propre
+endpoint de test : racine → **HTTP 500**, `/transmission/rpc` → **HTTP 204**.
+
+Les *arr n'ont pas ce problème : leur gabarit de client de téléchargement porte un champ
+`urlBase` distinct, rempli séparément.
+
+### qui était installée sans être reliée
+
+Plus gênant, parce qu'invisible dans le rapport : `qui` était déployée avec un simple
+`depends_on: qbittorrent` et **aucune connexion**. L'utilisateur ouvrait une interface
+qui lui redemandait l'adresse et les identifiants qu'arrsenal venait de générer. Flood,
+lui, recevait bien son `--qburl` et ses identifiants au démarrage.
+
+Quatre relevés sur l'instance, aucun devinable :
+
+- **tout répond 428** tant que le premier compte n'existe pas, y compris la page de
+  connexion. C'est le signal « installation à terminer », pas une panne ;
+- le point d'entrée de cette création est `POST /api/auth/setup`, et il répond
+  **400 « Setup already completed »** une fois joué. C'est ce qui rend l'étape rejouable ;
+- une instance se déclare avec son **URL complète**. Passer `host` et `port` séparément
+  est accepté avec un 201 rassurant, mais le port est perdu : qui enregistre
+  `http://qbittorrent` et ne se connecte jamais. Vérifié dans les deux cas :
+
+  | Forme envoyée | Enregistré | `connected` | `GET /torrents` |
+  |---|---|---|---|
+  | `host` + `port` | `http://qbittorrent` | **false** | 500 |
+  | URL complète | `http://qbittorrent:8080` | **true** | 200 |
+
+- **les doublons ne sont pas refusés.** Déclarer deux fois la même instance donne deux
+  entrées. Sans vérification préalable, chaque `arrsenal wire` en ajouterait une.
+
+`GET /api/instances` expose `connected` et `connectionStatus` : le lien est donc validé
+par qui elle-même, comme les *arr le sont par leur bouton *Test*.
+
+### Recyclarr synchronise dès l'installation
+
+La configuration était écrite mais la synchronisation attendait la planification
+quotidienne. Juste après l'installation, Sonarr n'avait aucun profil TRaSH : celui qui
+allait vérifier concluait que rien n'avait marché. Le câblage lance désormais la
+première synchronisation et annonce les profils créés, lus dans la sortie de Recyclarr.
+
+L'échec de cette synchronisation reste un **avertissement**, pas un échec : les fichiers
+sont écrits et la planification réessaiera. Faire échouer le câblage afficherait
+« 20/21 liens » alors que les vingt-et-un sont posés.
+
+### Résultat : 21/21, et 27 vérifications indépendantes
+
+| Lien | Vérifié par |
+|---|---|
+| Prowlarr → Sonarr, Radarr, Lidarr | `syncLevel=fullSync` dans `/api/v1/applications` |
+| Prowlarr → Transmission, qBittorrent | `/api/v1/downloadclient` |
+| Sonarr, Radarr, Lidarr → les deux clients | `enable=true` dans `/downloadclient` |
+| Sonarr, Radarr, Lidarr → dossier racine | `/rootfolder` |
+| Sonarr, Radarr → Jellyfin | `/notification` |
+| Recyclarr → Sonarr, Radarr | profils et custom formats dans `/qualityprofile` |
+| autobrr → 5 services | `/api/download_clients` |
+| qui → qBittorrent | `connected: true` |
+| Jellyfin | trois bibliothèques dans `/Library/VirtualFolders` |
+| Flood → qBittorrent | arguments de démarrage du conteneur |
+
+Un piège pour qui referait cette vérification : **Lidarr expose `v1`**, pas `v3`. Mon
+premier script l'interrogeait en v3, recevait 404 et rapportait trois faux échecs.
+`catalog.py` avait raison depuis le début.

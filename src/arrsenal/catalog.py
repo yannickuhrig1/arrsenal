@@ -127,7 +127,7 @@ CATALOG: dict[str, ServiceSpec] = {
         default_host_port=7476,
         config_dir="qui",
         requires=("qbittorrent",),
-        api_family=None,
+        api_family="qui",
         notes="UI web pour qBittorrent. N'est pas un client.",
     ),
     "recyclarr": ServiceSpec(

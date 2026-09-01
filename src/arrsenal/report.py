@@ -81,6 +81,54 @@ def print_step(result: StepResult) -> None:
         console.print(f"         [yellow]attention[/yellow] {warning}")
 
 
+def install_with_progress(cfg: StackConfig, project_dir, install) -> list[StepResult]:
+    """Deroule l'installation sous une barre de progression.
+
+    L'installation dure plusieurs minutes, dont un `docker compose up` muet le
+    temps de telecharger les images. Sans barre, l'utilisateur ne sait pas si le
+    programme travaille ou s'il est bloque.
+
+    Les lignes de detail continuent d'etre imprimees AU-DESSUS de la barre :
+    c'est Rich qui s'en charge, a condition de lui passer la meme console.
+    """
+    from rich.progress import BarColumn, TextColumn, TimeElapsedColumn
+    from rich.progress import Progress as RichProgress
+
+    from . import orchestrator
+
+    total = orchestrator.expected_events(cfg)
+    with RichProgress(
+        TextColumn("[bold]{task.description}"),
+        BarColumn(bar_width=None),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    ) as bar:
+        task = bar.add_task("preparation", total=total)
+
+        def advance(description: str) -> None:
+            # Borne l'avancement : le total est une estimation, et une barre qui
+            # depasse 100 % ferait douter du reste de l'affichage.
+            done = min(bar.tasks[0].completed + 1, total)
+            bar.update(task, completed=done, description=description[:28])
+
+        def on_progress(progress: orchestrator.Progress) -> None:
+            mark = "[green]OK[/green]" if progress.ok else "[red]ECHEC[/red]"
+            console.print(f"  {mark} {progress.phase} : {progress.message}")
+            advance(progress.phase)
+
+        def on_step(result: StepResult) -> None:
+            print_step(result)
+            advance(result.name.split(":")[0])
+
+        try:
+            return install(cfg, project_dir, on_progress=on_progress, on_step=on_step)
+        finally:
+            # Une barre laissee a 94 % apres un succes se lit comme un echec.
+            bar.update(task, completed=total, description="termine")
+
+
 def print_final(cfg: StackConfig, results: list[StepResult]) -> None:
     failed = [r for r in results if not r.ok]
     created = sum(1 for r in results if r.created)

@@ -36,6 +36,17 @@ sonarr:
 """
 
 
+#: Sortie reelle de `recyclarr sync`, relevee sur un conteneur 8.7.1. C'est elle
+#: qui est analysee pour annoncer les profils crees a la fin du cablage.
+SYNC_OUTPUT = """\
+[INF] hd-bluray-web: Processing Radarr server hd-bluray-web
+[INF] hd-bluray-web: Total of 40 custom formats were synced
+[INF] hd-bluray-web: Created 1 Profiles: ["HD Bluray + WEB"]
+[INF] web-1080p: Total of 37 custom formats were synced
+[INF] web-1080p: Created 1 Profiles: ["WEB-1080p"]
+"""
+
+
 def _template(tmp_path: Path, text: str = TEMPLATE, name: str = "web-1080p.yml") -> Path:
     path = tmp_path / name
     path.write_text(text, encoding="utf-8")
@@ -231,16 +242,25 @@ def _cfg(tmp_path, services=("sonarr", "radarr", "recyclarr")):
 class FakeCompose:
     """Remplace `docker compose run` : ecrit ce que Recyclarr aurait ecrit."""
 
-    def __init__(self, config_dir: Path, ok: bool = True):
+    def __init__(self, config_dir: Path, ok: bool = True, sync_ok: bool = True):
         self.config_dir = config_dir
         self.ok = ok
+        self.sync_ok = sync_ok
         self.calls: list[list[str]] = []
+
+    def creations(self) -> list[list[str]]:
+        """Appels a `config create` seulement, hors synchronisations."""
+        return [c for c in self.calls if c[:2] == ["config", "create"]]
 
     def __call__(self, project_dir, project_name):
         return self
 
     def run_once(self, service, args, timeout=600):
         self.calls.append(args)
+        if args and args[0] == "sync":
+            if not self.sync_ok:
+                return False, "[ERR] Sonarr injoignable"
+            return True, SYNC_OUTPUT
         if not self.ok:
             return False, "recyclarr: template inconnu"
         configs = self.config_dir / "configs"
@@ -412,7 +432,7 @@ def test_step_recyclarr_rejoue_ne_redemande_rien(tmp_path, monkeypatch):
     second = Wirer(cfg).step_recyclarr()
 
     assert first.ok and second.ok
-    assert len(fake.calls) == 1, "le second passage a redemande une generation"
+    assert len(fake.creations()) == 1, "le second passage a redemande une generation"
     assert "2 deja configures" in second.detail
     assert not second.created
 
@@ -428,7 +448,7 @@ def test_step_recyclarr_ne_regenere_que_ce_qui_manque(tmp_path, monkeypatch):
     (config_dir / "configs" / "hd-bluray-web.yml").unlink()
     Wirer(cfg).step_recyclarr()
 
-    assert fake.calls[1] == ["config", "create", "--template", "hd-bluray-web"]
+    assert fake.creations()[1] == ["config", "create", "--template", "hd-bluray-web"]
     # Le fichier Sonarr n'a pas ete regenere : son contenu rempli est intact.
     sonarr = (config_dir / "configs" / "web-1080p.yml").read_text(encoding="utf-8")
     assert "Put your" not in sonarr
@@ -453,3 +473,54 @@ def test_le_rapport_n_affiche_pas_d_url_pour_un_service_sans_interface(tmp_path)
     assert "192.168.1.10:0" not in text
     assert "tache de fond" in text
     assert "192.168.1.10:8989" in text
+
+
+# ------------------------------------------------- premiere synchronisation
+
+
+def test_le_cablage_declenche_la_premiere_synchronisation(tmp_path, monkeypatch):
+    """Recyclarr ne synchronise qu'a sa planification quotidienne.
+
+    Sans ce premier passage, l'utilisateur ouvre Sonarr juste apres
+    l'installation, n'y voit aucun profil TRaSH et en conclut que rien n'a
+    marche. La fonctionnalite doit etre visible a la fin du cablage.
+    """
+    cfg = _cfg(tmp_path)
+    fake = FakeCompose(Path(cfg.config_path("recyclarr")))
+    _patch_compose(monkeypatch, fake)
+
+    result = Wirer(cfg).step_recyclarr()
+
+    assert ["sync"] in fake.calls
+    assert fake.calls[-1] == ["sync"], "la synchro doit venir APRES la generation"
+    # Les profils reellement crees sont annonces, lus dans la sortie de Recyclarr.
+    assert "synchronise" in result.detail
+    assert "WEB-1080p" in result.detail and "HD Bluray + WEB" in result.detail
+
+
+def test_une_synchro_echouee_avertit_sans_faire_echouer_le_cablage(tmp_path, monkeypatch):
+    """Les fichiers sont ecrits et la planification quotidienne reessaiera.
+
+    Faire echouer le cablage pour cela afficherait « 10/11 liens » alors que les
+    onze liens sont bien poses.
+    """
+    cfg = _cfg(tmp_path)
+    _patch_compose(monkeypatch, FakeCompose(Path(cfg.config_path("recyclarr")), sync_ok=False))
+
+    result = Wirer(cfg).step_recyclarr()
+
+    assert result.ok, "le cablage lui-meme a reussi"
+    assert any("synchronisation echouee" in w for w in result.warnings)
+    assert any("reessaiera" in w for w in result.warnings)
+
+
+def test_pas_de_synchro_si_rien_n_a_ete_cable(tmp_path, monkeypatch):
+    """Sans configuration remplie, synchroniser n'aurait aucun sens."""
+    cfg = _cfg(tmp_path)
+    cfg.recyclarr_templates = {"sonarr": "", "radarr": ""}
+    fake = FakeCompose(Path(cfg.config_path("recyclarr")))
+    _patch_compose(monkeypatch, fake)
+
+    Wirer(cfg).step_recyclarr()
+
+    assert fake.calls == []

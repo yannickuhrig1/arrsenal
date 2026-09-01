@@ -11,6 +11,7 @@ Toutes les URL de cablage sont des URL INTERNES au reseau compose
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -21,6 +22,7 @@ from .clients.autobrr import AutobrrClient
 from .clients.base import WiringError
 from .clients.jellyfin import JellyfinClient
 from .clients.qbittorrent import QBittorrentClient
+from .clients.qui import QuiClient
 from .downloadclients import ARR_ROUTING, profile_for
 from .layout import CONTAINER_PATHS
 from .models import Category, StackConfig
@@ -545,13 +547,76 @@ class Wirer:
         if kept:
             parts.append(f"{len(kept)} deja configure{'s' if len(kept) > 1 else ''}")
 
+        # Premiere synchronisation immediate. Sans elle, Recyclarr n'ecrit rien
+        # avant son reveil planifie : l'utilisateur ouvre Sonarr juste apres
+        # l'installation, ne voit aucun profil TRaSH et en conclut que rien n'a
+        # marche. La fonctionnalite doit etre visible a la fin du cablage, pas
+        # vingt-quatre heures plus tard.
+        # L'echec de cette synchronisation ne remet pas en cause le cablage : les
+        # fichiers sont ecrits et la planification quotidienne reessaiera. C'est un
+        # avertissement, pas un echec — d'ou ce `ok` calcule avant.
+        wired = not warnings and bool(filled or kept)
+        if wired:
+            synced, message = runner.run_once("recyclarr", ["sync"])
+            if synced:
+                groups = re.findall(r"Created \d+ Profiles: \[([^\]]*)\]", message)
+                names = sorted({n.strip('" ') for group in groups for n in group.split(",")})
+                parts.append(f"synchronise{' : ' + ', '.join(names) if names else ''}")
+            else:
+                last = message.strip().splitlines()[-1][:200] if message.strip() else "aucun detail"
+                warnings.append(
+                    f"premiere synchronisation echouee ({last}). La configuration est "
+                    f"ecrite : Recyclarr reessaiera a sa planification quotidienne."
+                )
+
         return StepResult(
             "recyclarr: profils de qualite",
-            ok=not warnings and bool(filled or kept),
+            ok=wired,
             detail=", ".join(parts) or "aucun fichier rempli",
             created=bool(filled),
             warnings=warnings,
         )
+
+    def step_qui(self) -> StepResult:
+        """Relie l'interface qui a l'instance qBittorrent de la stack.
+
+        qui ne sert a rien seule : c'est une interface pour qBittorrent. Elle
+        etait installee sans lien, et redemandait a l'utilisateur une adresse et
+        des identifiants qu'arrsenal venait de generer.
+        """
+        inst = self.cfg.services["qui"]
+        qb = self.cfg.services["qbittorrent"]
+        host = self.internal_url("qbittorrent")
+
+        with QuiClient(inst.url(self.cfg.host)) as client:
+            client.wait_ready()
+            client.setup(inst.username or "arrsenal", inst.password or "")
+            client.login(inst.username or "arrsenal", inst.password or "")
+            created = client.ensure_instance(
+                name=catalog.get("qbittorrent").display_name,
+                host=host,
+                username=qb.username or "",
+                password=qb.password or "",
+            )
+
+            if not self.run_tests:
+                return StepResult(
+                    "qui: instance qBittorrent",
+                    ok=True,
+                    detail="declaree" if created else "deja declaree",
+                    created=created,
+                )
+
+            # C'est qui elle-meme qui dit si la connexion tient. Un 201 ne prouve
+            # rien : une adresse sans port est acceptee puis ne se connecte jamais.
+            linked, detail = client.connected(host)
+            return StepResult(
+                "qui: instance qBittorrent",
+                ok=linked,
+                detail=("declaree" if created else "deja declaree") + f", {detail}",
+                created=created,
+                warnings=[] if linked else [f"qui ne parvient pas a joindre {host} ({detail})"],
+            )
 
     # -- graphe --------------------------------------------------------------
 
@@ -611,6 +676,12 @@ class Wirer:
 
         if cfg.enabled("autobrr"):
             steps.append(WiringStep("autobrr/clients", self.step_autobrr))
+
+        # qui n'a d'interet que reliee a une instance. Sans cette etape, elle etait
+        # installee puis laissee vide : l'utilisateur ouvrait une interface qui lui
+        # redemandait tout ce qu'arrsenal savait deja.
+        if cfg.enabled("qui") and cfg.enabled("qbittorrent"):
+            steps.append(WiringStep("qui/qbittorrent", self.step_qui))
 
         if cfg.enabled("jellyfin"):
             steps.append(WiringStep("jellyfin/setup", self.step_jellyfin_setup))

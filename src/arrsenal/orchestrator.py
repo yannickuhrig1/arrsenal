@@ -83,7 +83,14 @@ def build_config(
         inst = ServiceInstance(spec_id=sid, host_port=spec.default_host_port, image=spec.image)
         if spec.api_family == "arr":
             inst.api_key = seed.generate_api_key()
-        if spec.api_family in ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr"):
+        if spec.api_family in (
+            "arr",
+            "transmission",
+            "qbittorrent",
+            "jellyfin",
+            "autobrr",
+            "qui",
+        ):
             inst.username = "arrsenal"
             inst.password = seed.generate_password()
         cfg.services[sid] = inst
@@ -114,9 +121,7 @@ def seed_all(cfg: StackConfig) -> list[str]:
     lui imposer la notre.
     """
     actions: list[str] = []
-    for sid in catalog.STARTUP_ORDER:
-        if not cfg.enabled(sid):
-            continue
+    for sid in seeded_services(cfg):
         spec, inst = catalog.get(sid), cfg.services[sid]
         cfg_dir = Path(cfg.config_path(sid))
 
@@ -236,6 +241,41 @@ def has_download_client(cfg: StackConfig) -> bool:
 def planned_links(cfg: StackConfig) -> int:
     """Nombre de liens que le cablage va poser. Sert au recapitulatif."""
     return len(Wirer(cfg).build_plan())
+
+
+#: Evenements emis par install() en dehors du pre-semis, de l'attente et du
+#: cablage : arborescence, artefacts, demarrage, page d'acces, fin.
+_FIXED_EVENTS = 5
+
+
+def seeded_services(cfg: StackConfig) -> list[str]:
+    """Services pour lesquels seed_all emet une action.
+
+    Cette liste et celle de `seed_all` doivent decrire les memes services : c'est
+    `seed_all` qui l'utilise, precisement pour qu'elles ne puissent pas diverger.
+    """
+    return [
+        sid
+        for sid in catalog.STARTUP_ORDER
+        if cfg.enabled(sid)
+        and catalog.get(sid).api_family in ("arr", "qbittorrent", "transmission")
+    ]
+
+
+def expected_events(cfg: StackConfig) -> int:
+    """Nombre total d'evenements que l'installation va emettre.
+
+    Sert a la barre de progression. Un affichage qui n'atteint jamais 100 %, ou
+    qui le depasse, fait douter de tout le reste : les consommateurs bornent donc
+    l'avancement, et cette valeur reste une estimation honnete plutot qu'une
+    promesse.
+    """
+    arrs = [sid for sid in catalog.STARTUP_ORDER if cfg.enabled(sid) and _is_arr(sid)]
+    return _FIXED_EVENTS + len(seeded_services(cfg)) + len(arrs) + planned_links(cfg)
+
+
+def _is_arr(service_id: str) -> bool:
+    return catalog.get(service_id).api_family == "arr"
 
 
 def iter_selected(cfg: StackConfig) -> Iterator[tuple[str, ServiceInstance]]:

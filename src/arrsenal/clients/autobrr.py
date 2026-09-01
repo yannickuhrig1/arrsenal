@@ -34,6 +34,24 @@ CLIENT_TYPES = {
     "lidarr": "LIDARR",
 }
 
+#: Chemin a ajouter a l'adresse du service, quand autobrr attend un point
+#: d'entree precis plutot que la racine.
+#:
+#: Transmission n'expose pas son RPC a la racine : `http://transmission:9091/`
+#: repond une redirection HTML, et autobrr, qui attend du JSON, echoue sur
+#: « invalid character '<' ». Le vrai point d'entree est `/transmission/rpc`, qui
+#: repond 409 (« il me faut un jeton de session ») — c'est la reponse normale.
+#:
+#: Verifie contre l'API d'autobrr v1.85.0 : racine -> HTTP 500,
+#: `/transmission/rpc` -> HTTP 204. Les *arr, eux, n'ont pas ce probleme : leur
+#: gabarit de client de telechargement porte un champ `urlBase` distinct.
+CLIENT_PATHS = {"transmission": "/transmission/rpc"}
+
+
+def client_host(service_id: str, base_url: str) -> str:
+    """Adresse a declarer dans autobrr pour ce service."""
+    return base_url.rstrip("/") + CLIENT_PATHS.get(service_id, "")
+
 
 class AutobrrClient:
     def __init__(self, base_url: str, *, name: str = "autobrr"):
@@ -194,7 +212,7 @@ class AutobrrClient:
             "name": name,
             "type": client_type,
             "enabled": True,
-            "host": host,
+            "host": client_host(service_id, host),
             "username": username,
             "password": password,
             "settings": {"apikey": api_key} if api_key else {},

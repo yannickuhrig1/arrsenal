@@ -200,9 +200,7 @@ def install(
         raise typer.Exit(0)
 
     try:
-        results = orchestrator.install(
-            cfg, project_dir, on_progress=_echo, on_step=report.print_step
-        )
+        results = report.install_with_progress(cfg, project_dir, orchestrator.install)
     except InstallAborted as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
