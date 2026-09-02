@@ -11,6 +11,10 @@ anodine :
   et l'avertissement est explicite ;
 - **jeton obligatoire**, tire au hasard a chaque demarrage, jamais ecrit sur
   disque. Il arrive par l'URL puis est stocke en cookie `HttpOnly` ;
+- **mot de passe optionnel**, pour une console qui tourne en permanence : le
+  jeton ne convient que si quelqu'un lit le terminal au demarrage. Empreinte
+  seule dans `stack.yml`, sessions en memoire, tentatives limitees. Voir
+  `adminauth` ;
 - **comparaison a temps constant**, pour ne pas fuiter le jeton octet par octet ;
 - **listes fermees** : le nom de service est valide contre la configuration et
   l'action contre trois valeurs, avant de rejoindre une ligne de commande.
@@ -29,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import catalog, compose, dashboard, orchestrator, updates
+from . import adminauth, catalog, compose, dashboard, orchestrator, updates
 from .models import StackConfig
 from .runner import Compose
 
@@ -139,12 +143,43 @@ def apply_update(
     return True, f"{previous.rpartition(':')[2]} -> {inst.image.rpartition(':')[2]}"
 
 
+_CONNEXION = """<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>arrsenal — connexion</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; background: #f6f7f9; color: #111827;
+         display: grid; place-items: center; min-height: 100vh; margin: 0; }}
+  form {{ background: #fff; padding: 2rem; border-radius: 12px; min-width: 20rem;
+          box-shadow: 0 1px 3px rgba(0,0,0,.1); }}
+  h1 {{ font-size: 1.1rem; margin: 0 0 1.2rem; }}
+  input {{ width: 100%; padding: .6rem; font-size: 1rem; box-sizing: border-box;
+           border: 1px solid #d1d5db; border-radius: 6px; }}
+  button {{ margin-top: 1rem; width: 100%; padding: .6rem; font-size: 1rem; cursor: pointer;
+            background: #2563eb; color: #fff; border: 0; border-radius: 6px; }}
+  .erreur {{ color: #dc2626; font-size: .9rem; margin-top: .8rem; }}
+</style></head><body>
+<form method="post" action="/login">
+  <h1>Administration arrsenal</h1>
+  <input type="password" name="password" placeholder="Mot de passe" autofocus
+         autocomplete="current-password">
+  <button type="submit">Entrer</button>
+  <p class="erreur">{erreur}</p>
+</form></body></html>
+"""
+
+
+def _page_connexion(erreur: str = "") -> str:
+    return _CONNEXION.format(erreur=erreur)
+
+
 class _Handler(BaseHTTPRequestHandler):
     # Renseignes par serve()
     cfg: StackConfig
     compose: Compose
     token: str
     project_dir: Path
+    sessions: adminauth.Sessions
 
     server_version = "arrsenal"
     sys_version = ""
@@ -166,10 +201,33 @@ class _Handler(BaseHTTPRequestHandler):
         return ""
 
     def _authorised(self) -> bool:
-        # compare_digest : une comparaison naive fuite le jeton octet par octet.
-        return hmac.compare_digest(self._presented_token(), self.token)
+        """Deux voies, et la seconde n'existe que si un mot de passe est pose.
+
+        Le jeton sert au lancement a la main : il s'affiche dans le terminal,
+        juste au-dessus de l'URL. La session sert a une console qui tourne en
+        permanence, ou personne n'ira lire un journal de conteneur pour
+        retrouver un jeton a chaque redemarrage.
+        """
+        presente = self._presented_token()
+        # Comparaison sur des OCTETS, pas sur des chaines. `compare_digest`
+        # refuse les `str` non-ASCII et leve `TypeError` : un cookie contenant
+        # un caractere accentue suffisait donc a tuer le fil de traitement,
+        # sans la moindre authentification. Trouve en essayant un faux jeton
+        # accentue.
+        if hmac.compare_digest(presente.encode("utf-8"), self.token.encode("utf-8")):
+            return True
+        return bool(self.cfg.admin_password_hash) and self.sessions.valid(presente)
 
     def _deny(self) -> None:
+        """Formulaire si un mot de passe existe, message sec sinon.
+
+        Renvoyer un formulaire sans mot de passe configure serait cruel : il n'y
+        aurait rien a y taper.
+        """
+        if self.cfg.admin_password_hash:
+            page = _page_connexion().encode("utf-8")
+            self._send(HTTPStatus.UNAUTHORIZED, page, "text/html; charset=utf-8")
+            return
         body = b"Jeton absent ou invalide. Utilisez l'URL affichee par `arrsenal serve`."
         self.send_response(HTTPStatus.UNAUTHORIZED)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -177,15 +235,62 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send(self, status: HTTPStatus, body: bytes, content_type: str, cookie: bool = False):
+    def _connexion(self) -> None:
+        """Verifie le mot de passe et ouvre une session.
+
+        La limitation des tentatives est indispensable des que la console sort
+        de 127.0.0.1 : sans elle, un mot de passe se devine en quelques heures.
+        """
+        if not self.cfg.admin_password_hash:
+            self._deny()
+            return
+        if self.sessions.locked_out:
+            attente = self.sessions.retry_in()
+            page = _page_connexion(f"Trop de tentatives. Reessayez dans {attente} s.")
+            self._send(HTTPStatus.TOO_MANY_REQUESTS, page.encode("utf-8"),
+                       "text/html; charset=utf-8")
+            return
+
+        longueur = int(self.headers.get("Content-Length") or 0)
+        # 4 Ko : un formulaire de connexion n'a aucune raison d'etre plus gros,
+        # et lire ce qu'on nous annonce sans borne est une invitation.
+        champs = parse_qs(self.rfile.read(min(longueur, 4096)).decode("utf-8", "replace"))
+        propose = (champs.get("password") or [""])[0]
+
+        if not adminauth.verify_password(propose, self.cfg.admin_password_hash):
+            self.sessions.record_failure()
+            page = _page_connexion("Mot de passe refuse.")
+            self._send(HTTPStatus.UNAUTHORIZED, page.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        self.sessions.clear_failures()
+        jeton = self.sessions.open()
+        page = dashboard.render(self.cfg, live=True).encode("utf-8")
+        self._send(HTTPStatus.OK, page, "text/html; charset=utf-8", cookie=True, cookie_value=jeton)
+
+    def _send(
+        self,
+        status: HTTPStatus,
+        body: bytes,
+        content_type: str,
+        cookie: bool = False,
+        cookie_value: str | None = None,
+    ):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        # Une console qui affiche des mots de passe n'a rien a faire dans un
+        # cadre : `frame-ancestors none` interdit le detournement de clic.
+        self.send_header(
+            "Content-Security-Policy", "default-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+        )
+        self.send_header("Referrer-Policy", "no-referrer")
         if cookie:
+            valeur = cookie_value if cookie_value is not None else self.token
             self.send_header(
-                "Set-Cookie", f"{COOKIE}={self.token}; Path=/; HttpOnly; SameSite=Strict"
+                "Set-Cookie", f"{COOKIE}={valeur}; Path=/; HttpOnly; SameSite=Strict"
             )
         self.end_headers()
         self.wfile.write(body)
@@ -211,6 +316,15 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"error": "route inconnue"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
+        route_brute = urlparse(self.path).path
+        if route_brute == "/login":
+            self._connexion()
+            return
+        if route_brute == "/logout":
+            self.sessions.close(self._presented_token())
+            self._send(HTTPStatus.OK, _page_connexion("Deconnecte.").encode("utf-8"),
+                       "text/html; charset=utf-8", cookie=True, cookie_value="")
+            return
         if not self._authorised():
             self._deny()
             return
@@ -330,6 +444,9 @@ def build_server(
             "compose": Compose(project_dir, cfg.project_name),
             "token": token,
             "project_dir": project_dir,
+            # UNE instance partagee par toutes les requetes : les sessions et le
+            # compteur de tentatives n'ont aucun sens s'ils sont par connexion.
+            "sessions": adminauth.Sessions(),
         },
     )
     server = _Server((host, port), handler)

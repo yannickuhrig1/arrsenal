@@ -174,6 +174,17 @@ Un fichier `administration.cmd` (`administration.sh` ailleurs) est déposé à c
 artefacts : **double-cliquez dessus**. Il connaît le chemin de votre installation, donc
 il fonctionne même sans `arrsenal` dans le PATH.
 
+L'accès se fait par un jeton tiré au hasard à chaque démarrage, affiché juste
+au-dessus de l'URL. C'est suffisant tant que vous lancez la console à la main.
+Si vous la laissez tourner, posez plutôt un mot de passe :
+
+```bash
+arrsenal admin-password
+```
+
+Seule son empreinte rejoint `stack.yml` — PBKDF2, 600 000 itérations. Les
+tentatives sont limitées, et une session expire au bout de douze heures.
+
 ### En cas de problème
 
 Chaque installation écrit un journal complet à côté de `docker-compose.yml` :

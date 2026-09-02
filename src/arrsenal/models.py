@@ -250,6 +250,12 @@ class StackConfig(BaseModel):
     #: demande a l'usage, tout le monde ne veut pas ce nom-la.
     username: str = "arrsenal"
 
+    #: Empreinte du mot de passe de la console d'administration. Vide = la
+    #: console n'accepte que le jeton tire a chaque demarrage, ce qui suffit
+    #: quand on la lance a la main. Voir `adminauth`. JAMAIS le mot de passe en
+    #: clair : ce fichier est celui qu'on ouvre pour retrouver un port.
+    admin_password_hash: str = ""
+
     #: D'ou viennent puid/pgid. Affiche a l'utilisateur : des identifiants faux
     #: cassent les permissions de toute la stack, il doit pouvoir les juger.
     ids_source: str = "non renseigne"

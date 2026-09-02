@@ -15,6 +15,7 @@ import yaml
 from . import (
     __version__,
     admin,
+    adminauth,
     catalog,
     compose,
     dashboard,
@@ -534,6 +535,42 @@ def serve(
         console.print(f"[red]Impossible d'ecouter sur {host}:{port} : {exc}[/red]")
         raise typer.Exit(1) from exc
     console.print("Serveur arrete.")
+
+
+@app.command("admin-password")
+def admin_password(
+    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
+    clear: bool = typer.Option(False, "--clear", help="Retirer le mot de passe."),
+) -> None:
+    """Pose le mot de passe de la page d'administration.
+
+    Sans mot de passe, la console n'accepte que le jeton tire a chaque
+    demarrage : c'est parfait pour un lancement a la main, ou le jeton s'affiche
+    juste au-dessus de l'URL. Cela ne convient plus des qu'elle tourne en
+    permanence — personne n'ira lire un journal pour retrouver un jeton.
+
+    Le mot de passe n'est JAMAIS ecrit en clair : seule son empreinte rejoint
+    `stack.yml`, avec PBKDF2 et 600 000 iterations.
+    """
+    cfg = _load_config(project_dir)
+
+    if clear:
+        cfg.admin_password_hash = ""
+        compose.write_artifacts(cfg, project_dir)
+        console.print("Mot de passe retire. Seul le jeton de session ouvre desormais la console.")
+        return
+
+    mot_de_passe = typer.prompt("Nouveau mot de passe", hide_input=True, confirmation_prompt=True)
+    if len(mot_de_passe) < 8:
+        console.print("[red]Huit caracteres au minimum.[/red]")
+        raise typer.Exit(1)
+
+    cfg.admin_password_hash = adminauth.hash_password(mot_de_passe)
+    compose.write_artifacts(cfg, project_dir)
+    console.print(
+        "Mot de passe enregistre. La console demandera desormais ce mot de passe, "
+        "et acceptera toujours le jeton affiche par `arrsenal serve`."
+    )
 
 
 @app.command()
