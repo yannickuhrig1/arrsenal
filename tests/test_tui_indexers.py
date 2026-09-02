@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from rich.text import Text
 from textual.widgets import Button, Input, Label, Static
 
 from arrsenal.clients.prowlarr import IndexerDefinition
@@ -250,28 +249,37 @@ class _FauxCatalogue:
 
 @pytest.mark.asyncio
 async def test_un_message_de_prowlarr_a_balise_ne_ferme_pas_l_assistant(screen_app):
-    """Les messages d'erreur viennent de Prowlarr et de l'indexeur contacte.
+    """Les messages viennent de Prowlarr et de l'indexeur contacte.
 
-    Ils atterrissaient dans notre balisage sans etre echappes : une balise
-    fermante isolee levait `MarkupError` en plein rendu, donc dans le rappel
-    d'un worker, donc l'assistant se fermait.
+    Ils atterrissaient dans NOTRE balisage. Le message reel de C411 le montre :
+
+        Unable to connect: ... [401:Unauthorized] [GET] at [https://c411.org
+        /api/torznab?apikey=...&t=search&l
+
+    tronque en pleine URL, il laisse un `[` ouvert et Textual leve « Expected
+    markup value ». Ni `rich.markup.escape` ni `textual.markup.escape` n'y
+    changent rien — tous deux rendent cette chaine INCHANGEE. Le contenu est
+    donc assemble, jamais analyse.
     """
+    reel = (
+        "Unable to connect: to indexer. HTTP request failed: [401:Unauthorized] [GET] at "
+        "[https://c411.org/api/torznab?apikey=...&t=search&l"
+    )
     async with screen_app.run_test() as pilot:
         pilot.app.push_screen(IndexersScreen())
         await pilot.pause()
         screen = pilot.app.screen
 
-        screen._added("C411", False, "echec [/dim] du test [bold] sur l'indexeur", ["Torrent[CORE]"])
+        screen._added("C411", False, reel, ["Torrent[CORE]"])
         await pilot.pause()
 
-        # `update()` ne fait que ranger la chaine : c'est le RENDU qui analyse
-        # le balisage et qui levait. On force donc l'analyse ici.
-        texte = str(screen.query_one("#indexer-status", Static).content)
-        rendu = Text.from_markup(texte)
+        affiche = screen.query_one("#indexer-status", Static).content.plain
 
-        assert "C411" in rendu.plain
-        assert "Torrent[CORE]" in rendu.plain
-        assert "[/dim]" in rendu.plain, "le message de Prowlarr doit rester lisible tel quel"
+        # Tout doit survivre a l'affichage : un diagnostic ampute ne sert a rien.
+        assert "C411" in affiche
+        assert "[401:Unauthorized]" in affiche
+        assert "[GET]" in affiche, "l'analyseur de balisage mangeait ce jeton"
+        assert "Torrent[CORE]" in affiche, "l'analyseur amputait ce nom de moitie"
 
 
 @pytest.mark.asyncio

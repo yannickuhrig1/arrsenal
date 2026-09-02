@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import platform
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -28,12 +29,52 @@ FILENAME = "arrsenal.log"
 MIN_SECRET = 8
 
 
+#: Secrets passes en parametre d'URL. Ceux-la, arrsenal ne les connait PAS : ce
+#: sont les cles que l'utilisateur tape lui-meme pour ses indexeurs, et que
+#: Prowlarr renvoie telles quelles dans ses messages d'erreur — l'URL complete
+#: de l'appel echoue, parametres compris. Constate sur un tracker reel :
+#:
+#:   HTTP request failed: [401:Unauthorized] [GET] at
+#:   [https://exemple.org/api/torznab?apikey=<la cle de l'utilisateur>&t=search
+#:
+#: Le masquage par valeur connue ne pouvait rien pour elles, et la cle partait
+#: dans le fichier qu'on demande aux gens de nous envoyer quand ca casse.
+_SECRET_EN_URL = re.compile(
+    r"((?:api_?key|pass_?key|rss_?key|auth_?key|torrent_pass|token|secret|digest|passwd?"
+    r"|password)=)([^&\s\"'\]]{4,})",
+    re.IGNORECASE,
+)
+
+
+def _caviarder(texte: str) -> str:
+    return _SECRET_EN_URL.sub(lambda m: f"{m.group(1)}<masque>", texte)
+
+
+class _Formatter(logging.Formatter):
+    """Masque aussi la TRACE, pas seulement le message.
+
+    Un filtre de `logging` ne voit que `record.getMessage()`. La trace d'une
+    exception est mise en forme ici, plus tard, et echappait donc entierement
+    au masquage — alors que c'est precisement la qu'atterrit le texte d'erreur
+    d'un service tiers.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        return _caviarder(super().format(record))
+
+
 class _Masker(logging.Filter):
     """Remplace les secrets connus par leur nom, avant ecriture.
 
-    Le filtre porte sur les VALEURS enregistrees explicitement, jamais sur une
-    forme devinee. Un filtre qui tente de reconnaitre « ce qui ressemble a un
-    secret » laisse forcement passer ce qu'il n'a pas prevu.
+    Le filtre porte d'abord sur les VALEURS enregistrees explicitement, jamais
+    sur une forme devinee : un filtre qui tente de reconnaitre « ce qui
+    ressemble a un secret » laisse forcement passer ce qu'il n'a pas prevu.
+
+    S'y ajoute UNE regle de forme, et une seule, pour ce que le masquage par
+    valeur ne peut pas atteindre : les cles que l'utilisateur saisit pour ses
+    indexeurs. arrsenal ne les stocke jamais, il ne peut donc pas les
+    reconnaitre — mais il sait a quoi ressemble un parametre d'URL qui en porte
+    une. Cette regle complete le masquage exact, elle ne le remplace pas.
     """
 
     def __init__(self) -> None:
@@ -48,7 +89,7 @@ class _Masker(logging.Filter):
         message = record.getMessage()
         for value, replacement in self._secrets.items():
             message = message.replace(value, replacement)
-        record.msg, record.args = message, ()
+        record.msg, record.args = _caviarder(message), ()
         return True
 
 
@@ -82,7 +123,7 @@ def start(project_dir: Path, commande: str) -> Path:
     LOGGER.propagate = False
 
     handler = logging.FileHandler(path, encoding="utf-8")
-    handler.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s"))
+    handler.setFormatter(_Formatter("%(asctime)s  %(levelname)-7s %(message)s"))
     handler.addFilter(_MASKER)
     LOGGER.addHandler(handler)
 

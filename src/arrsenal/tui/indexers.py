@@ -12,6 +12,7 @@ from rich.markup import escape
 from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.content import Content
 from textual.widgets import Button, Input, Label, ListItem, ListView, Static
 
 from .. import catalog, journal
@@ -214,15 +215,27 @@ class IndexersScreen(WizardScreen):
             journal.LOGGER.exception("affichage du resultat pour %s", definition.name)
 
     def _added(self, name: str, ok: bool, message: str, already: list[str]) -> None:
-        colour = "green" if ok else "red"
-        # `escape` : ces trois textes viennent de Prowlarr et de l'indexeur, pas
-        # de nous, et ils atterrissent dans NOTRE balisage. Une balise fermante
-        # isolee dans un message d'erreur suffirait a lever `MarkupError` en
-        # plein rendu — donc a fermer l'assistant.
-        noms = ", ".join(escape(n) for n in already) or "aucun"
-        self._set_status(
-            f"[{colour}]{escape(name)} : {escape(message)}[/{colour}]\n"
-            f"[dim]Configures : {noms}[/dim]"
+        # On ASSEMBLE le contenu au lieu de l'ecrire en balisage. Ces trois
+        # textes viennent de Prowlarr et de l'indexeur contacte : les faire
+        # passer par l'analyseur de balisage revient a lui donner du texte
+        # arbitraire. Le message reel de C411 le montre bien :
+        #
+        #   Unable to connect: ... [401:Unauthorized] [GET] at [https://c411.org
+        #   /api/torznab?apikey=...&t=search&l
+        #
+        # tronque en pleine URL, il laisse un `[` ouvert et Textual leve
+        # « Expected markup value ». L'assistant se fermait la, sans une ligne
+        # de journal. Ni `rich.markup.escape` ni `textual.markup.escape` n'y
+        # changent quoi que ce soit : verifie, tous deux rendent cette chaine
+        # INCHANGEE. Seul un `Content` construit a la main est sur — et il
+        # preserve au passage les noms comme `Torrent[CORE]`, que l'analyseur
+        # amputait de la moitie.
+        couleur = "green" if ok else "red"
+        noms = ", ".join(already) or "aucun"
+        self.query_one("#indexer-status", Static).update(
+            Content(f"{name} : {message}").stylize(couleur)
+            + Content("\n")
+            + Content(f"Configures : {noms}").stylize("dim")
         )
         self.query_one("#add", Button).disabled = False
         self.query_one("#skip", Button).label = "Continuer"

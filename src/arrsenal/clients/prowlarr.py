@@ -11,8 +11,10 @@ Il n'existe donc pas de moyen d'enregistrer un indexeur hors ligne. La contrepar
 est agreable : si l'enregistrement reussit, les identifiants sont bons.
 """
 
+
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -133,8 +135,19 @@ def is_tuning(name: str) -> bool:
     return name.startswith(_TUNING_PREFIXES) or name.startswith("info_")
 
 
+#: Noms qui designent un secret, quoi qu'en dise la definition. Le repli par le
+#: nom est necessaire : les definitions Cardigann ne renseignent pas toutes
+#: `privacy`. Constate sur C411, dont le champ `apikey` arrive en `type:
+#: textbox` sans `privacy` — la cle se tapait donc EN CLAIR a l'ecran.
+_NOMS_SECRETS = ("apikey", "api_key", "passkey", "password", "passphrase", "token", "cookie",
+                 "rsskey", "secret", "authkey", "digest")
+
+
 def is_secret(raw: dict) -> bool:
-    return raw.get("type") == "password" or raw.get("privacy") in ("apiKey", "password")
+    if raw.get("type") == "password" or raw.get("privacy") in ("apiKey", "password"):
+        return True
+    nom = raw.get("name", "").lower()
+    return any(motif in nom for motif in _NOMS_SECRETS)
 
 
 def is_credential(raw: dict) -> bool:
@@ -257,8 +270,25 @@ class ProwlarrIndexers:
         return True, "ajoute et valide par Prowlarr"
 
 
+#: Parametres d'URL a caviarder dans les messages d'erreur. Prowlarr RENVOIE
+#: l'URL complete de son appel echoue : `... [GET] at [https://exemple/api/
+#: torznab?apikey=<votre cle>&t=search...`. Sans ce filtre, la cle de
+#: l'utilisateur s'affichait a l'ecran et partait dans le journal — celui-la
+#: meme qu'on lui demande de nous envoyer quand quelque chose casse.
+_PARAM_SECRET = re.compile(
+    r"((?:api_?key|pass_?key|rss_?key|auth_?key|token|secret|digest)=)([^&\s\]]+)",
+    re.IGNORECASE,
+)
+
+
+def redact(message: str) -> str:
+    """Remplace la valeur des parametres sensibles par des points."""
+    return _PARAM_SECRET.sub(lambda m: f"{m.group(1)}...", message)
+
+
 def _readable(message: str) -> str:
     """Extrait la ligne utile d'une erreur Prowlarr, souvent tres verbeuse."""
+    message = redact(message)
     for marker in ("Unable to connect", "Invalid API Key", "Authentication failed", "errorMessage"):
         if marker in message:
             fragment = message.split(marker, 1)[1][:180].strip(' ":,')

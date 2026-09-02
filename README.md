@@ -447,6 +447,27 @@ Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ### Feuille de route
 
+**La console arrsenal** est le prochain gros morceau, et le seul qui ne soit pas
+un service de plus au catalogue. Aujourd'hui l'assistant installe puis s'efface :
+la page d'accès est un fichier HTML mort, et tout ce qui vient après se fait à la
+main, service par service. Une console web, dans son propre conteneur, tiendrait
+la stack dans la durée :
+
+| | |
+|---|---|
+| État des services | En marche, arrêté, en panne, et depuis quand. `docker ps` le sait déjà ; c'est l'affichage qui manque. |
+| Démarrer, arrêter, redémarrer | Sans passer par Docker Desktop ni la ligne de commande. |
+| Mises à jour | Voir qu'une image plus récente existe, et l'appliquer. Le catalogue épingle des versions exactes : c'est justement ce qui rend la comparaison fiable. |
+| Mots de passe et clés API | Changer en un clic, et **re-câbler dans la foulée** — c'est là que tout se joue. Une clé changée à la main casse aujourd'hui six liaisons en silence. |
+| Ajouter un service | Installer et câbler un service absent de l'installation initiale, sans tout reprendre. `arrsenal wire` sait déjà le faire ; il lui manque une interface. |
+
+Deux questions à trancher avant d'écrire quoi que ce soit : le conteneur doit
+piloter Docker, donc accéder au socket Docker — ce qui revient à donner les
+pleins pouvoirs sur la machine, et doit être dit clairement. Et une console qui
+change des mots de passe doit s'authentifier elle-même, sérieusement.
+
+Côté services, dans l'ordre où ils seront étudiés :
+
 | | Ce qu'il reste à faire |
 |---|---|
 | **Plex** | Second serveur média, à côté de Jellyfin. Son jeton s'obtient par `plex.tv`, pas par l'API locale : c'est le point à vérifier avant de l'inscrire. |
