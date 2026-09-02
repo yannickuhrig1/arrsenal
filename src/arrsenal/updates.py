@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from . import catalog
+from . import catalog, imageref
 from .models import StackConfig
 
 #: Qualificatifs qui designent une image instable. Un tag qui en contient un
@@ -78,10 +78,15 @@ def _same_shape(candidate: str, current: str) -> bool:
 
 def newer_tags(image: str, *, timeout: float = 15.0) -> tuple[list[str], str | None]:
     """Tags plus recents que celui deploye. Renvoie (tags_tries, probleme)."""
-    reference, _, current_tag = image.rpartition(":")
+    ref = imageref.parse(image)
+    reference, current_tag = ref.repository, ref.tag
     current = parse_version(current_tag)
     if current is None:
-        return [], f"le tag deploye ({current_tag}) n'est pas une version comparable"
+        # Sans tag lisible, il n'y a rien a comparer. C'est le cas d'une image
+        # epinglee par digest seul, et de Silo, dont les 488 tags sont des SHA
+        # de commit. Le controle de reconstruction, lui, continue de valoir.
+        manque = "aucun tag" if not current_tag else f"le tag deploye ({current_tag})"
+        return [], f"{manque} n'est pas une version comparable"
 
     tags, problem = list_tags(reference, timeout=timeout)
     if problem:
@@ -250,8 +255,21 @@ def remote_digest(image: str) -> str | None:
 
 
 def check_service(image: str, *, check_tags: bool = True) -> UpdateInfo:
-    _reference, _, tag = image.rpartition(":")
-    info = UpdateInfo(service="", image=image, current_tag=tag)
+    ref = imageref.parse(image)
+    info = UpdateInfo(service="", image=image, current_tag=ref.tag)
+
+    if ref.pinned:
+        # Une reference epinglee par digest ne peut PAS etre reconstruite : le
+        # condensat designe un contenu, pas un nom. Comparer local et distant
+        # reviendrait a comparer une chose a elle-meme. Sans cette sortie, la
+        # page affichait « image reconstruite » sur une image immuable.
+        if check_tags:
+            newer, probleme = newer_tags(image)
+            if probleme:
+                info.problems.append(probleme)
+            elif newer:
+                info.latest_tag = newer[-1]
+        return info
 
     here, there = local_digest(image), remote_digest(image)
     if here is None:

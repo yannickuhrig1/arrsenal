@@ -33,7 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import adminauth, catalog, compose, dashboard, orchestrator, updates
+from . import adminauth, catalog, compose, dashboard, imageref, orchestrator, updates
 from .models import StackConfig
 from .runner import Compose
 
@@ -126,8 +126,10 @@ def apply_update(
     previous = inst.image or catalog.get(service).image
 
     if target:
-        reference = previous.rpartition(":")[0]
-        inst.image = f"{reference}:{target}"
+        # `with_tag` laisse tomber un eventuel digest : garder l'ancien
+        # condensat avec un nouveau tag donnerait une reference qui ment, Docker
+        # retenant le digest.
+        inst.image = imageref.with_tag(previous, target)
         compose.write_artifacts(cfg, project_dir)
 
     ok, message = runner.pull(service)
