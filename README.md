@@ -357,6 +357,14 @@ arrsenal install --vpn --vpn-provider nordvpn --vpn-key <votre-cle-wireguard>
 arrsenal vpn-providers   # les 25 fournisseurs acceptes
 ```
 
+L'assistant propose ensuite les **serveurs que Gluetun connaît pour ce
+fournisseur**, en liste cliquable, plutôt qu'un champ libre où une valeur
+inventée ferait échouer le démarrage. Attention, tous ne se filtrent pas par
+pays : Windscribe, VyprVPN, Giganews et Private Internet Access classent leurs
+serveurs par **région**, Perfect Privacy par **ville**. `arrsenal` pose donc
+`SERVER_COUNTRIES`, `SERVER_REGIONS` ou `SERVER_CITIES` selon le cas. Les listes
+sont extraites de l'image **épinglée** par `python scripts/vpn_countries.py`.
+
 Ce qui compte n'est pas que le tunnel existe, c'est qu'**aucun paquet ne puisse sortir
 sans lui**. Le client de téléchargement ne démarre pas tant que Gluetun n'est pas
 *healthy* — vérifié avec des identifiants volontairement faux : Gluetun reste

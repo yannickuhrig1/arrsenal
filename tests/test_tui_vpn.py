@@ -9,7 +9,7 @@ moyen d'en mettre un.
 from __future__ import annotations
 
 import pytest
-from textual.widgets import Button, Input, RadioButton, Select, Static
+from textual.widgets import Button, Input, RadioButton, Select, SelectionList, Static
 
 from arrsenal.models import VPN_PROVIDERS, VpnConfig
 from arrsenal.tui.app import ArrsenalApp
@@ -151,7 +151,10 @@ async def test_le_choix_atteint_la_configuration(app):
         await pilot.pause()
         screen.query_one("#vpn-provider", Select).value = "protonvpn"
         screen.query_one("#vpn-key", Input).value = "ma-cle"
-        screen.query_one("#vpn-countries", Input).value = "Switzerland"
+        # La liste est repeuplee par le changement de fournisseur : il faut
+        # laisser passer l'evenement avant de pouvoir y choisir quoi que ce soit.
+        await pilot.pause()
+        screen.query_one("#vpn-lieux", SelectionList).select("Switzerland")
         await pilot.pause()
         screen.query_one("#next", Button).press()
         await pilot.pause()

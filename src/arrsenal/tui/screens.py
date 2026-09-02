@@ -26,10 +26,11 @@ from textual.widgets import (
     RichLog,
     Rule,
     Select,
+    SelectionList,
     Static,
 )
 
-from .. import catalog, journal, orchestrator
+from .. import catalog, journal, orchestrator, vpnservers
 from ..clients import recyclarr as recyclarr_cfg
 from ..layout import (
     PROFILE_DEFAULTS,
@@ -576,11 +577,13 @@ class VpnScreen(WizardScreen):
                     yield Label("Mot de passe OpenVPN", classes="group-title")
                     yield Input(password=True, id="vpn-pass")
 
-                yield Label(
-                    "Pays souhaites [dim](facultatif, separes par des virgules)[/dim]",
-                    classes="group-title",
-                )
-                yield Input(placeholder="Switzerland,Netherlands", id="vpn-countries")
+                yield Label("", id="vpn-lieux-titre", classes="group-title")
+                # Liste cliquable plutot que saisie libre : une valeur inventee
+                # fait echouer Gluetun au demarrage, et le client de
+                # telechargement reste alors injoignable sans explication. Les
+                # valeurs viennent de l'image epinglee elle-meme.
+                yield SelectionList[str](id="vpn-lieux")
+                yield Static(id="vpn-lieux-note", classes="service-note")
 
         yield Static(id="vpn-status")
         yield Horizontal(
@@ -589,10 +592,50 @@ class VpnScreen(WizardScreen):
             classes="actions",
         )
 
+    def on_mount(self) -> None:
+        self._peupler_lieux()
+
     @on(RadioSet.Changed, "#vpn-choix")
     def _on_choice(self) -> None:
         self.query_one("#vpn-details", Vertical).set_class(not self.vpn_voulu(), "hidden")
         self._validate()
+
+    @on(Select.Changed, "#vpn-provider")
+    def _on_provider(self) -> None:
+        """Chaque fournisseur a SA liste, et pas toujours des pays.
+
+        Windscribe, VyprVPN, Giganews et Private Internet Access classent leurs
+        serveurs par region ; Perfect Privacy par ville. Proposer « pays » a
+        tout le monde offrirait un filtre qui ne filtre rien.
+        """
+        self._peupler_lieux()
+        self._validate()
+
+    def _peupler_lieux(self) -> None:
+        fournisseur = self.query_one("#vpn-provider", Select).value
+        fournisseur = fournisseur if isinstance(fournisseur, str) else ""
+        liste = self.query_one("#vpn-lieux", SelectionList)
+        liste.clear_options()
+        choix = vpnservers.choices(fournisseur)
+        titre = self.query_one("#vpn-lieux-titre", Label)
+        note = self.query_one("#vpn-lieux-note", Static)
+        if choix:
+            liste.add_options([(lieu, lieu) for lieu in choix])
+            liste.display = True
+            titre.update(f"{vpnservers.label(fournisseur)} [dim](facultatif)[/dim]")
+            note.update(
+                f"[dim]{len(choix)} choix proposes par Gluetun {vpnservers.gluetun_version()}. "
+                f"Sans selection, le VPN choisit pour vous.[/dim]"
+            )
+        else:
+            # `custom` n'a par construction aucune liste : l'utilisateur fournit
+            # sa propre configuration, Gluetun ne connait aucun serveur pour lui.
+            liste.display = False
+            titre.update("")
+            note.update(
+                "[dim]Ce fournisseur ne propose pas de filtre geographique : "
+                "les serveurs viennent de votre propre configuration.[/dim]"
+            )
 
     @on(Select.Changed, "#vpn-type")
     def _on_type(self) -> None:
@@ -622,7 +665,7 @@ class VpnScreen(WizardScreen):
                 wireguard_private_key=self.query_one("#vpn-key", Input).value.strip(),
                 openvpn_user=self.query_one("#vpn-user", Input).value.strip(),
                 openvpn_password=self.query_one("#vpn-pass", Input).value.strip(),
-                countries=self.query_one("#vpn-countries", Input).value.strip(),
+                countries=",".join(self.query_one("#vpn-lieux", SelectionList).selected),
             )
         except ValueError:
             return VpnConfig()

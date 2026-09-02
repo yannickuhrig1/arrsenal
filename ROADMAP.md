@@ -41,7 +41,7 @@ l'installation initiale**.
 | **Rotation des mots de passe** | ✅ livré en 0.1.7 | qBittorrent, Transmission et les *arr. Vérifié sur une stack de onze services : 25 liaisons sur 25 réalignées. |
 | **Rotation des clés API** | ✅ livré, non publié | Sur les *arr. Piège vérifié contre Sonarr 4.0.19 : `PUT config/host` répond **202 Accepted** et ne change rien — la clé relue vaut toujours l'ancienne une minute plus tard. Seule la réécriture de `config.xml` suivie d'un redémarrage fonctionne. |
 | **Ajouter un service après coup** | ✅ livré, non publié | Section « Ajouter un service » sur la page d'administration. Vérifié en vrai : stack Sonarr seul, puis ajout de Prowlarr — 4 liaisons câblées, clé et mot de passe de Sonarr intacts. |
-| **Liste des pays du VPN** | à faire | Source identifiée : `qdm12/gluetun-servers`, un JSON par fournisseur. À extraire à la génération pour ne pas dépendre du réseau pendant l'assistant. |
+| **Liste des pays du VPN** | ✅ livré, non publié | Liste cliquable, extraite de l'image **épinglée**. Piège trouvé au passage : cinq fournisseurs n'exposent aucun pays — quatre classent par région, un par ville. `SERVER_COUNTRIES` ne filtrait rien chez eux. |
 
 ---
 

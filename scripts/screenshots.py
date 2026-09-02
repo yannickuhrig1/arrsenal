@@ -36,6 +36,7 @@ from textual.widgets import (
     ListView,
     RadioButton,
     Select,
+    SelectionList,
     Static,
 )
 
@@ -69,6 +70,8 @@ SHOWN_PASSWORD = "MotDePasseGenere42"
 #: alphabetique, choisi pour cette seule raison. arrsenal n'en recommande aucun.
 SHOWN_VPN_PROVIDER = "airvpn"
 SHOWN_VPN_KEY = "cle-privee-wireguard"
+#: Deux lieux coches, pour montrer que la liste se selectionne au clic.
+SHOWN_VPN_LIEUX = ("Netherlands", "Switzerland")
 
 #: Templates figes pour l'illustration. La liste reelle vient du depot Recyclarr
 #: et change quand il en publie : une capture comparee a l'octet pres ne peut pas
@@ -215,7 +218,16 @@ async def capture() -> None:
         await pilot.pause()
         screen.query_one("#vpn-provider", Select).value = SHOWN_VPN_PROVIDER
         screen.query_one("#vpn-key", Input).value = SHOWN_VPN_KEY
+        # La liste des lieux est repeuplee par le changement de fournisseur.
         await pilot.pause()
+        liste = screen.query_one("#vpn-lieux", SelectionList)
+        for lieu in SHOWN_VPN_LIEUX:
+            liste.select(lieu)
+        # L'ecran defile : sans cela la capture montrerait la liste coupee a sa
+        # premiere ligne, c'est-a-dire une boite vide.
+        liste.scroll_visible(animate=False)
+        for _ in range(4):
+            await pilot.pause()
         await shot(app, pilot, "4-vpn")
         # Ce que fait le bouton « Continuer ». Sans cela le recapitulatif suivant
         # avertirait qu'aucun VPN n'est configure, juste apres une capture qui en

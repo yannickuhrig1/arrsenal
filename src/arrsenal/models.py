@@ -85,7 +85,9 @@ class VpnConfig(BaseModel):
     openvpn_password: str = ""
     wireguard_private_key: str = ""
     wireguard_addresses: str = ""
-    #: Filtre de pays, facultatif. Ex : "Switzerland,Netherlands".
+    #: Filtre geographique, facultatif. Ex : "Switzerland,Netherlands".
+    #: Le nom du champ dit « pays » par histoire ; la variable Gluetun qu'il
+    #: alimente depend du fournisseur — voir `vpnservers.filter_env`.
     countries: str = ""
 
     @field_validator("provider")
@@ -135,7 +137,13 @@ class VpnConfig(BaseModel):
             env["OPENVPN_USER"] = self.openvpn_user
             env["OPENVPN_PASSWORD"] = self.openvpn_password
         if self.countries:
-            env["SERVER_COUNTRIES"] = self.countries
+            # PAS toujours SERVER_COUNTRIES. Cinq fournisseurs n'exposent aucun
+            # pays dans les donnees de Gluetun : Windscribe, VyprVPN, Giganews
+            # et Private Internet Access classent par region, Perfect Privacy
+            # par ville. Leur poser SERVER_COUNTRIES ne filtrait rien.
+            from .vpnservers import filter_env
+
+            env[filter_env(self.provider)] = self.countries
         return env
 
 

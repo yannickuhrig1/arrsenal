@@ -23,6 +23,14 @@ Header {
     height: auto;
 }
 
+/* La liste des lieux peut compter deux cents entrees : lui laisser prendre
+   toute la place ferait disparaitre le bouton Continuer. Hauteur bornee, et
+   c'est elle qui defile. */
+#vpn-lieux {
+    height: 8;
+    border: tall $panel;
+}
+
 #pitch {
     padding: 1 2;
     background: $panel;
