@@ -215,7 +215,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._deny()
             return
         route = urlparse(self.path).path
-        if route not in ("/api/action", "/api/update", "/api/rotate"):
+        if route not in ("/api/action", "/api/update", "/api/rotate", "/api/add"):
             self._json({"error": "route inconnue"}, HTTPStatus.NOT_FOUND)
             return
 
@@ -227,6 +227,22 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         service = str(payload.get("service", ""))
+        if route == "/api/add":
+            # Liste fermee : seuls les services ABSENTS sont installables, et le
+            # nom finit dans une ligne de commande docker compose.
+            if service not in orchestrator.installable(self.cfg):
+                self._json(
+                    {"error": f"service inconnu ou deja installe: {service}"},
+                    HTTPStatus.BAD_REQUEST,
+                )
+                return
+            ok, message, ajoutes = orchestrator.add_service(self.cfg, self.project_dir, service)
+            self._json(
+                {"ok": ok, "service": service, "message": message, "added": ajoutes},
+                HTTPStatus.OK if ok else HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            return
+
         if route == "/api/rotate":
             if not self.cfg.enabled(service):
                 self._json({"error": f"service inconnu: {service}"}, HTTPStatus.BAD_REQUEST)

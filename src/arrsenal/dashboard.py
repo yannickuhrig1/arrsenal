@@ -177,6 +177,44 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
     return "\n".join(blocks)
 
 
+def _ajouts(cfg: StackConfig) -> str:
+    """Section « ajouter un service », sur la page pilotee uniquement.
+
+    Une stack grandit. Jusqu'ici, ajouter Lidarr six mois apres imposait de
+    relancer l'installation entiere en cochant tout — avec le risque de perdre
+    les mots de passe des services qui ne stockent que des empreintes.
+    """
+    absents = [sid for sid in catalog.STARTUP_ORDER if not cfg.enabled(sid)]
+    if not absents:
+        return ""
+    lignes = ""
+    for sid in absents:
+        spec = catalog.get(sid)
+        prerequis = [d for d in spec.requires if not cfg.enabled(d)]
+        note = html.escape(spec.notes)
+        if prerequis:
+            noms = ", ".join(catalog.get(d).display_name for d in prerequis)
+            note += f' <span class="dim">— tirera aussi {html.escape(noms)}</span>'
+        lignes += (
+            f'      <article class="card add" data-add="{spec.id}">\n'
+            f'        <div class="title headless"><span class="badge">'
+            f"{html.escape(spec.display_name[0])}</span>"
+            f"<span><strong>{html.escape(spec.display_name)}</strong>"
+            f'<span class="url">pas encore installe</span></span></div>\n'
+            f'        <p class="note">{note}</p>\n'
+            f'        <div class="state"><span class="actions">'
+            f'<button class="install" data-service="{spec.id}">installer et cabler</button>'
+            f"</span></div>\n      </article>\n"
+        )
+    return (
+        "\n  <h2>Ajouter un service</h2>\n"
+        '  <p class="note">Le service est installe puis <b>cable dans les deux sens</b> : '
+        "il apprend a parler aux autres, et les autres apprennent a lui parler. Rien "
+        "n'est arrete, et aucun mot de passe existant n'est touche.</p>\n"
+        f'  <div class="grid">\n{lignes}  </div>\n'
+    )
+
+
 def _has_download_client(cfg: StackConfig) -> bool:
     return any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS)
 
@@ -249,6 +287,7 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
         count=count,
         cards=_cards(cfg, host, live=live),
         paths=_paths(cfg),
+        ajouts=_ajouts(cfg) if live else "",
         banner=banner,
         data_root=html.escape(cfg.data_root),
         version=__version__,
@@ -380,6 +419,14 @@ _TEMPLATE = """<!doctype html>
   }}
   button.rotate:hover:not(:disabled) {{ color: var(--text); border-color: var(--accent); }}
   button.rotate:disabled {{ opacity: .5; cursor: progress; }}
+  .card.add {{ opacity: .85; border-style: dashed; }}
+  .card.add:hover {{ opacity: 1; }}
+  button.install {{
+    font-size: .82rem; padding: .3rem .8rem; cursor: pointer; border-radius: 6px;
+    border: 1px solid var(--accent); background: none; color: var(--accent);
+  }}
+  button.install:hover:not(:disabled) {{ background: var(--accent); color: #fff; }}
+  button.install:disabled {{ opacity: .5; cursor: progress; }}
   .echec {{ color: #ef4444; font-size: .8rem; margin-right: .4rem; }}
   .upd {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .upd .tag {{
@@ -408,6 +455,7 @@ _TEMPLATE = """<!doctype html>
 {cards}
   </div>
 
+{ajouts}
   <h2>Dossiers</h2>
   <table>
     <thead><tr><th>Contenu</th><th>Sur cette machine</th><th>Vu par les conteneurs</th><th></th></tr></thead>
@@ -531,6 +579,50 @@ _LIVE_SCRIPT = """<script>
         .catch(function (e) {
           btn.disabled = false;
           btn.textContent = avant;
+        });
+    });
+  });
+
+  // Ajout d'un service absent de l'installation. L'operation est longue : elle
+  // telecharge une image, demarre le conteneur, puis rejoue tout le cablage —
+  // c'est la seule facon de relier le nouveau venu aux anciens DANS LES DEUX
+  // SENS. Un client de telechargement ajoute doit apparaitre dans les quatre
+  // *arr, et un *arr ajoute doit apparaitre dans Prowlarr et dans autobrr.
+  document.querySelectorAll('button.install').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var carte = btn.closest('.card');
+      if (!window.confirm(
+            'Installer ce service et le cabler ?
+
+'
+            + 'Son image sera telechargee, ce qui peut prendre plusieurs minutes. '
+            + 'Aucun service en marche n'est arrete, et aucun mot de passe existant '
+            + 'n'est touche.')) {
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'installation…';
+      fetch('/api/add', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: btn.dataset.service})
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            btn.disabled = false;
+            btn.textContent = 'installer et cabler';
+            carte.insertAdjacentHTML('beforeend', '<p class="echec"></p>');
+            carte.querySelector('.echec').textContent = d.message || d.error;
+            return;
+          }
+          // La carte du nouveau service doit apparaitre avec son adresse et ses
+          // identifiants : seul un rechargement les connait.
+          btn.textContent = 'installe, rechargement…';
+          window.location.reload();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          btn.textContent = 'installer et cabler';
         });
     });
   });

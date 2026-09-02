@@ -82,22 +82,30 @@ def build_config(
         username=username,
     )
     for sid in catalog.resolve_dependencies(services):
-        spec = catalog.get(sid)
-        inst = ServiceInstance(spec_id=sid, host_port=spec.default_host_port, image=spec.image)
-        if spec.api_family == "arr":
-            inst.api_key = seed.generate_api_key()
-        if spec.api_family in (
-            "arr",
-            "transmission",
-            "qbittorrent",
-            "jellyfin",
-            "autobrr",
-            "qui",
-        ):
-            inst.username = cfg.username
-            inst.password = seed.generate_password()
-        cfg.services[sid] = inst
+        cfg.services[sid] = new_instance(cfg, sid)
     return cfg
+
+
+#: Familles qui recoivent un identifiant et un mot de passe.
+_AVEC_COMPTE = ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr", "qui")
+
+
+def new_instance(cfg: StackConfig, service_id: str) -> ServiceInstance:
+    """Instance neuve d'un service, secrets generes.
+
+    Extrait de `build_config` pour que l'ajout d'un service APRES l'installation
+    produise exactement la meme chose qu'une installation initiale. Deux
+    fabriques auraient fini par diverger, et la difference ne se serait vue que
+    chez quelqu'un dont la stack a grandi.
+    """
+    spec = catalog.get(service_id)
+    inst = ServiceInstance(spec_id=service_id, host_port=spec.default_host_port, image=spec.image)
+    if spec.api_family == "arr":
+        inst.api_key = seed.generate_api_key()
+    if spec.api_family in _AVEC_COMPTE:
+        inst.username = cfg.username
+        inst.password = seed.generate_password()
+    return inst
 
 
 def our_published_ports(cfg: StackConfig, project_dir: Path | None) -> set[int]:
@@ -700,3 +708,108 @@ def rotate_api_key(
     if echecs:
         return True, f"cle API changee, mais {len(echecs)} liaison(s) en echec", nouvelle
     return True, f"cle API changee et {len(results)} liaisons recablees", nouvelle
+
+
+# ------------------------------------------------------- ajout apres coup
+
+
+def installable(cfg: StackConfig) -> list[str]:
+    """Services du catalogue absents de l'installation, dans l'ordre d'affichage."""
+    return [sid for sid in catalog.STARTUP_ORDER if not cfg.enabled(sid)]
+
+
+def add_service(
+    cfg: StackConfig,
+    project_dir: Path,
+    service_id: str,
+    *,
+    on_progress: ProgressFn = _noop,
+) -> tuple[bool, str, list[str]]:
+    """Installe et cable un service absent de l'installation initiale.
+
+    Renvoie (succes, message, services reellement ajoutes) — au pluriel, parce
+    qu'un service peut en tirer d'autres : cocher Flood tire Transmission, et
+    l'ajouter sans son prerequis produirait une interface qui ne pilote rien.
+
+    Deux garde-fous avant d'ecrire quoi que ce soit :
+
+    - le port doit etre LIBRE. Ajouter un service dont le port est deja pris par
+      autre chose ferait echouer `docker compose up` pour toute la pile, pas
+      seulement pour le nouveau venu ;
+    - on ne pre-seme QUE les nouveaux. Repasser sur les anciens reecrirait des
+      configurations en marche, ce que l'installation evite deja en arretant
+      tout d'abord — un ajout, lui, ne doit rien arreter.
+
+    Le cablage est ensuite rejoue en entier. Il est idempotent, et c'est la
+    seule facon de relier le nouveau venu aux anciens dans les deux sens : un
+    client de telechargement ajoute doit apparaitre dans les quatre *arr, et un
+    *arr ajoute doit apparaitre dans Prowlarr et dans autobrr.
+    """
+    from .wiring import Wirer
+
+    try:
+        catalog.get(service_id)
+    except Exception:  # noqa: BLE001 - le catalogue leve un message deja lisible
+        return False, f"service inconnu : {service_id}", []
+    if cfg.enabled(service_id):
+        return False, f"{catalog.get(service_id).display_name} est deja installe", []
+
+    cfg.project_dir = project_dir
+    nouveaux = [
+        sid for sid in catalog.resolve_dependencies([service_id, *cfg.services]) if not cfg.enabled(sid)
+    ]
+
+    # Les instances D'ABORD, le controle de port ENSUITE : c'est l'instance qui
+    # decide du port publie, pas le catalogue. Verifier le defaut du catalogue
+    # reviendrait a controler un port qui n'est pas celui qu'on va ouvrir.
+    instances = {sid: new_instance(cfg, sid) for sid in nouveaux}
+
+    nos_ports = our_published_ports(cfg, project_dir)
+    for sid, inst in instances.items():
+        port = inst.host_port
+        if not port or port in nos_ports:
+            continue
+        if not check_port_free(port, sid).ok:
+            return False, f"port {port} deja occupe ({catalog.get(sid).display_name})", []
+
+    cfg.services.update(instances)
+    on_progress(Progress("ajout", ", ".join(catalog.get(s).display_name for s in nouveaux)))
+
+    create_tree(cfg.data_root, cfg.config_root, nouveaux)
+    compose.write_artifacts(cfg, project_dir)
+
+    # Pre-semis limite aux nouveaux : les anciens tournent, et reecrire la
+    # configuration d'un service en marche est sans effet au mieux, destructeur
+    # au pire — Transmission reecrit son fichier en s'arretant.
+    partiel = cfg.model_copy(update={"services": {s: cfg.services[s] for s in nouveaux}})
+    partiel.project_dir = project_dir
+    for action in seed_all(partiel):
+        on_progress(Progress("pre-semis", action))
+    compose.write_artifacts(cfg, project_dir)
+
+    runner = Compose(project_dir, cfg.project_name)
+    valide, message = runner.config_valid()
+    if not valide:
+        return False, f"compose genere invalide : {message[:300]}", []
+
+    on_progress(Progress("demarrage", "docker compose up"))
+    ok, message = runner.up()
+    if not ok:
+        return False, f"docker compose up a echoue : {message[:300]}", []
+
+    wait_for_arrs(cfg, on_progress)
+    wait_for_download_clients(cfg, on_progress)
+
+    wirer = Wirer(cfg)
+    try:
+        results = wirer.execute()
+    finally:
+        wirer.close()
+    compose.write_artifacts(cfg, project_dir)
+    echecs = [r.name for r in results if not r.ok]
+    dashboard.write(cfg, project_dir, failed=len(echecs))
+
+    noms = ", ".join(catalog.get(s).display_name for s in nouveaux)
+    if echecs:
+        return True, f"{noms} installe, mais {len(echecs)} liaison(s) en echec", nouveaux
+    return True, f"{noms} installe et {len(results)} liaisons cablees", nouveaux

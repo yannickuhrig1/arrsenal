@@ -28,8 +28,9 @@ un écart apparaît.
 
 La page d'administration (`arrsenal serve`) donne l'état des services, les
 démarre, les arrête, les redémarre, signale les mises à jour et les applique,
-affiche les identifiants, et **renouvelle un mot de passe ou une clé API en
-recâblant tout ce qui en dépend**.
+affiche les identifiants, **renouvelle un mot de passe ou une clé API en
+recâblant tout ce qui en dépend**, et **installe un service absent de
+l'installation initiale**.
 
 ---
 
@@ -39,7 +40,7 @@ recâblant tout ce qui en dépend**.
 |---|---|---|
 | **Rotation des mots de passe** | ✅ livré en 0.1.7 | qBittorrent, Transmission et les *arr. Vérifié sur une stack de onze services : 25 liaisons sur 25 réalignées. |
 | **Rotation des clés API** | ✅ livré, non publié | Sur les *arr. Piège vérifié contre Sonarr 4.0.19 : `PUT config/host` répond **202 Accepted** et ne change rien — la clé relue vaut toujours l'ancienne une minute plus tard. Seule la réécriture de `config.xml` suivie d'un redémarrage fonctionne. |
-| **Ajouter un service après coup** | à faire | `arrsenal wire` sait déjà le faire ; il manque le bouton et la reprise du compose. |
+| **Ajouter un service après coup** | ✅ livré, non publié | Section « Ajouter un service » sur la page d'administration. Vérifié en vrai : stack Sonarr seul, puis ajout de Prowlarr — 4 liaisons câblées, clé et mot de passe de Sonarr intacts. |
 | **Liste des pays du VPN** | à faire | Source identifiée : `qdm12/gluetun-servers`, un JSON par fournisseur. À extraire à la génération pour ne pas dépendre du réseau pendant l'assistant. |
 
 ---
@@ -81,7 +82,7 @@ reste une commande à lancer.
 | Voir et appliquer les mises à jour | ✅ |
 | Renouveler un mot de passe, avec recâblage | ✅ |
 | Renouveler une clé API, avec recâblage | ✅ |
-| Ajouter un service absent de l'installation | à faire |
+| Ajouter un service absent de l'installation | ✅ |
 | Conteneur autonome plutôt que commande | à faire |
 
 Deux questions à trancher avant d'en faire un conteneur : il devra piloter
