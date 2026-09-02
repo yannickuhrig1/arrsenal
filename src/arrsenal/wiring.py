@@ -657,6 +657,20 @@ class Wirer:
                 )
 
         filled, kept, warnings = [], [], []
+
+        # Un service configure par PLUSIEURS fichiers est une panne muette :
+        # Recyclarr groupe ses instances par `base_url` et ecarte tout groupe qui
+        # en compte plus d'une. Deux profils vises pour un meme Sonarr, et c'est
+        # ZERO profil pose — Recyclarr sortant malgre tout en code 0. Le cas
+        # arrive tout seul : deux installations avec des choix differents
+        # laissent deux fichiers, l'ancien n'etant jamais efface.
+        for path, service in recyclarr_cfg.resolve_split_instances(config_dir, wanted):
+            warnings.append(
+                f"{path.name} ecarte : {service} etait configure par plusieurs "
+                f"fichiers, ce que Recyclarr refuse — il n'en synchronisait alors "
+                f"aucun. Le fichier est renomme, pas efface."
+            )
+
         for path in sorted((config_dir / "configs").glob("*.yml")):
             service = recyclarr_cfg.target_service(path)
             if service is None or not self.cfg.enabled(service):
@@ -674,11 +688,14 @@ class Wirer:
                 f"{path.stem} -> {service}"
             )
 
-        for leftover in recyclarr_cfg.pending_markers(config_dir):
-            warnings.append(
-                f"{leftover.name} contient encore un marqueur : la synchronisation "
-                f"echouera tant qu'il est la"
-            )
+        # Un marqueur restant EMPECHE la synchronisation : c'est bloquant. Un
+        # fichier ecarte plus haut ne l'est pas, il a justement ete repare.
+        bloquants = [
+            f"{leftover.name} contient encore un marqueur : la synchronisation "
+            f"echouera tant qu'il est la"
+            for leftover in recyclarr_cfg.pending_markers(config_dir)
+        ]
+        warnings.extend(bloquants)
 
         parts = list(filled)
         if kept:
@@ -692,13 +709,28 @@ class Wirer:
         # L'echec de cette synchronisation ne remet pas en cause le cablage : les
         # fichiers sont ecrits et la planification quotidienne reessaiera. C'est un
         # avertissement, pas un echec — d'ou ce `ok` calcule avant.
-        wired = not warnings and bool(filled or kept)
+        # Un fichier ecarte est un probleme REPARE : le signaler ne doit pas faire
+        # echouer l'etape, sinon reparer reviendrait a echouer.
+        wired = not bloquants and bool(filled or kept)
         if wired:
             synced, message = runner.run_once("recyclarr", ["sync"])
             if synced:
                 groups = re.findall(r"Created \d+ Profiles: \[([^\]]*)\]", message)
                 names = sorted({n.strip('" ') for group in groups for n in group.split(",")})
-                parts.append(f"synchronise{' : ' + ', '.join(names) if names else ''}")
+                if names:
+                    parts.append(f"synchronise : {', '.join(names)}")
+                elif "Split instances" in message:
+                    # Ne devrait plus arriver, la reparation passe avant. Si le cas
+                    # revient, il ne doit surtout pas se lire comme un succes.
+                    warnings.append(
+                        "Recyclarr a ecarte des instances en double : aucun profil "
+                        "n'a ete pose. Verifiez le contenu de configs/."
+                    )
+                    wired = False
+                else:
+                    # Recyclarr sort en code 0 sans rien faire quand il n'a rien a
+                    # poser. « synchronise » tout court se lisait comme un succes.
+                    parts.append("synchronise, aucun profil a creer")
             else:
                 last = message.strip().splitlines()[-1][:200] if message.strip() else "aucun detail"
                 warnings.append(

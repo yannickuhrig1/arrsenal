@@ -194,3 +194,61 @@ def pending_markers(config_dir: Path) -> list[Path]:
         for path in sorted(configs.glob("*.yml"))
         if "Put your" in path.read_text(encoding="utf-8")
     ]
+
+
+#: Suffixe donne aux fichiers ecartes. On ne SUPPRIME pas : le fichier a pu etre
+#: modifie a la main, et Recyclarr ignore tout ce qui ne finit pas par `.yml`.
+DISABLED_SUFFIX = ".yml.desactive"
+
+
+def split_instances(config_dir: Path) -> dict[str, list[Path]]:
+    """Services configures par PLUSIEURS fichiers. Chacun est une panne muette.
+
+    Recyclarr groupe ses instances par `base_url` et **ecarte tout groupe qui en
+    compte plus d'une** — c'est `SplitInstancesFilter`, verifie dans son code
+    source. Or arrsenal ecrit toujours la meme URL interne pour un service donne
+    : deux fichiers visant Sonarr, ce sont deux instances sur la meme URL, donc
+    ZERO instance synchronisee. Pas « la derniere gagne » : plus rien du tout.
+
+    Constate sur une stack reelle. Deux installations successives avec des
+    profils differents avaient laisse quatre fichiers, deux par service :
+
+        [DBG] Split instances: [{"BaseUrl":"http://sonarr:8989",
+                                 "InstanceNames":["web-1080p","web-2160p"]}]
+        [INF] Found 0 config files with 0 Radarr and 0 Sonarr instances
+
+    Recyclarr sortait malgre tout en code 0, et arrsenal annoncait
+    « synchronise ». Aucun profil TRaSH n'etait pose depuis des semaines.
+    """
+    configs = config_dir / "configs"
+    if not configs.is_dir():
+        return {}
+    par_service: dict[str, list[Path]] = {}
+    for path in sorted(configs.glob("*.yml")):
+        service = target_service(path)
+        if service:
+            par_service.setdefault(service, []).append(path)
+    return {service: paths for service, paths in par_service.items() if len(paths) > 1}
+
+
+def resolve_split_instances(config_dir: Path, keep: dict[str, str]) -> list[tuple[Path, str]]:
+    """Ne laisse qu'un fichier par service. Renvoie (fichier, service) ecartes.
+
+    `keep` donne le template retenu par service ; a defaut, le plus recemment
+    modifie est conserve — c'est le dernier choix de l'utilisateur.
+
+    Les autres sont RENOMMES, jamais effaces : l'un d'eux a pu etre ajuste a la
+    main, et le rendre a nouveau actif ne demande qu'un changement d'extension.
+    """
+    ecartes: list[tuple[Path, str]] = []
+    for service, paths in split_instances(config_dir).items():
+        voulu = keep.get(service)
+        garde = next((p for p in paths if p.stem == voulu), None)
+        if garde is None:
+            garde = max(paths, key=lambda p: p.stat().st_mtime)
+        for path in paths:
+            if path == garde:
+                continue
+            path.rename(path.with_suffix("").with_suffix(DISABLED_SUFFIX))
+            ecartes.append((path, service))
+    return ecartes
