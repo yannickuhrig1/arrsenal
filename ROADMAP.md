@@ -3,7 +3,7 @@
 Où en est arrsenal, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.9**
+**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.10**
 
 ---
 
@@ -36,10 +36,15 @@ l'installation initiale**.
 
 ## Prochaine étape
 
-À définir. La liste des demandes en cours est vide.
+**Silo**, avec un préalable partagé : épingler une image qui ne publie pas de
+version. Silo n'expose que des SHA de commit, et Wizarr publie des tags datés
+qui ne correspondent pas à leur contenu — son tag `2025.7.8` contient la
+version 2.2.1, et sa version courante 2026.9.0 n'existe que sous `latest`.
 
-Pistes ouvertes : les services de la liste ci-dessous, en commençant par Wizarr
-(le plus autonome) ou Plex (celui qui débloque Tautulli et Seerr).
+Le catalogue épingle des versions exactes : c'est ce qui rend fiable la
+détection de mises à jour et garantit qu'une installation d'aujourd'hui redonne
+la même chose demain. Il faut donc savoir épingler par **digest** tout en
+affichant une version lisible. Résolu une fois, cela débloque les deux.
 
 ---
 
@@ -129,6 +134,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.1.10** | **0.1.8 et 0.1.9 etaient ininstallables** : le fichier des pays VPN n'entrait ni dans l'exécutable ni dans le paquet, et l'assistant mourait sur l'écran VPN. Un test compare désormais les fichiers non-Python réels aux deux déclarations d'empaquetage, et le contrôle de l'exe parcourt l'assistant au lieu de l'ouvrir. |
 | **0.1.9** | La console démarre toute seule, sur l'hôte, et se protège par un mot de passe. Un cookie contenant un caractère accentué tuait la requête sans authentification. |
 | **0.1.8** | Rotation des clés API, ajout d'un service depuis la page d'administration, et filtre géographique du VPN en liste cliquable. Un même défaut trouvé trois fois : un service qui garde l'ancien secret sans que rien ne le dise — autobrr, puis l'entrée Application de Prowlarr. |
 | **0.1.7** | Recyclarr ne posait plus aucun profil, silencieusement, dès qu'un service se retrouvait avec deux fichiers de configuration. Renouvellement d'un mot de passe depuis la page d'administration. autobrr gardait l'ancien mot de passe d'un client de téléchargement. |

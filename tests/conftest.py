@@ -1,0 +1,64 @@
+"""Outils partages par les tests de l'assistant.
+
+`appuyer` existe pour une raison precise : quatre tests differents ont echoue,
+chacun une fois sur plusieurs dizaines, toujours de la meme facon.
+
+    screen.query_one("#next", Button).press()
+    await pilot.pause()
+    assert pilot.app.username == "yannick"
+
+`press()` ne fait qu'ENVOYER un message. Une passe d'evenements suffit
+d'ordinaire, mais pas quand la machine est chargee — et une suite de 580 tests
+charge la machine. Compter les passes revient a parier sur une duree.
+
+On attend donc le RESULTAT. Le test dit ce qu'il attend, et n'a plus a deviner
+combien de tours de boucle cela demande.
+
+Ce sont des FIXTURES et non des fonctions importables : `tests/` n'est pas sur
+le chemin d'import, et pytest decouvre les fixtures d'un conftest sans qu'on ait
+rien a importer.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+import pytest
+from textual.widgets import Button
+
+#: 60 passes : largement au-dela de ce qu'il faut, et sans consequence quand la
+#: condition est vraie tout de suite — la boucle sort a la premiere.
+PASSES_MAX = 60
+
+
+@pytest.fixture
+def appuyer():
+    """Appuie sur un bouton, puis attend que la condition soit vraie.
+
+    Renvoie False si elle ne l'est jamais : le test echoue alors sur SON
+    assertion, avec son propre message, pas sur un delai depasse.
+    """
+
+    async def _appuyer(pilot, selecteur: str, jusqu_a: Callable[[], bool]) -> bool:
+        pilot.app.screen.query_one(selecteur, Button).press()
+        for _ in range(PASSES_MAX):
+            await pilot.pause()
+            if jusqu_a():
+                return True
+        return False
+
+    return _appuyer
+
+
+@pytest.fixture
+def attendre():
+    """Meme chose sans appui : pour ce qu'un worker met a jour en arriere-plan."""
+
+    async def _attendre(pilot, jusqu_a: Callable[[], bool]) -> bool:
+        for _ in range(PASSES_MAX):
+            await pilot.pause()
+            if jusqu_a():
+                return True
+        return False
+
+    return _attendre

@@ -62,14 +62,14 @@ async def test_intro_warns_that_adding_contacts_the_indexer(screen_app):
 
 
 @pytest.mark.asyncio
-async def test_the_step_can_be_skipped(screen_app):
+async def test_the_step_can_be_skipped(screen_app, appuyer):
     async with screen_app.run_test() as pilot:
         pilot.app.push_screen(IndexersScreen())
         await pilot.pause()
         pilot.app.results = []
-        pilot.app.screen.query_one("#skip", Button).press()
-        await pilot.pause()
-        assert isinstance(pilot.app.screen, ReportScreen)
+        assert await appuyer(
+            pilot, "#skip", lambda: isinstance(pilot.app.screen, ReportScreen)
+        )
 
 
 @pytest.mark.asyncio

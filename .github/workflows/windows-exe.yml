@@ -37,14 +37,18 @@ jobs:
         shell: pwsh
 
       - name: L'assistant vit dans l'executable
-        # Ce qui casse le plus facilement a l'empaquetage est `app.tcss` : sans
-        # lui, Textual leve StylesheetError et l'assistant ne s'ouvre pas.
-        # Verifie en construisant volontairement sans lui : code de sortie 1.
+        # Ce qui casse le plus facilement a l'empaquetage est un fichier
+        # non-Python absent de l'archive. `app.tcss` manquant : Textual leve
+        # StylesheetError et l'assistant ne s'ouvre pas. `vpn_countries.json`
+        # manquant en 0.1.8 : l'assistant s'ouvrait tres bien et plantait plus
+        # loin, sur l'ecran VPN. Ce controle parcourt donc l'assistant jusque-la
+        # au lieu de se contenter de l'ouvrir.
         run: |
           pyinstaller packaging/smoke_tui.py --onefile --console --noconfirm `
             --name smoke --distpath dist-smoke --workpath build-smoke --specpath build-smoke `
             --paths src --collect-all textual `
-            --add-data "${{ github.workspace }}/src/arrsenal/tui/app.tcss;arrsenal/tui"
+            --add-data "${{ github.workspace }}/src/arrsenal/tui/app.tcss;arrsenal/tui" `
+            --add-data "${{ github.workspace }}/src/arrsenal/data/vpn_countries.json;arrsenal/data"
           dist-smoke\smoke.exe
         shell: pwsh
 

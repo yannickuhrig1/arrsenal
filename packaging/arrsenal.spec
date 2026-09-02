@@ -9,6 +9,10 @@
 #   parent. D'ou `packaging/launcher.py` ;
 # - `app.tcss` doit etre embarque explicitement. Sans lui, Textual leve
 #   `StylesheetError` au demarrage et l'assistant ne s'ouvre pas du tout ;
+# - TOUT autre fichier non-Python aussi. Oubli reel en 0.1.8 : le fichier des
+#   pays VPN etait absent de l'executable ET du paquet, et l'assistant plantait
+#   sur l'ecran VPN. Un test compare desormais les deux listes au contenu reel
+#   du paquet ;
 # - Textual charge des ressources et des widgets par nom : `collect_all` evite
 #   d'avoir a lister ses modules internes un par un.
 #
@@ -28,7 +32,14 @@ a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(SRC)],
     binaries=textual_binaries,
-    datas=[(str(SRC / "arrsenal" / "tui" / "app.tcss"), "arrsenal/tui"), *textual_datas],
+    datas=[
+        (str(SRC / "arrsenal" / "tui" / "app.tcss"), "arrsenal/tui"),
+        # Les pays, regions et villes acceptes par chaque fournisseur VPN. Sans
+        # eux, l'ecran VPN de l'assistant leve `FileNotFoundError` — donc des
+        # qu'un client de telechargement est coche, c'est-a-dire toujours.
+        (str(SRC / "arrsenal" / "data" / "vpn_countries.json"), "arrsenal/data"),
+        *textual_datas,
+    ],
     hiddenimports=[
         *textual_hidden,
         # Importes tardivement dans le code : PyInstaller ne peut pas les voir.

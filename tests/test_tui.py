@@ -85,14 +85,13 @@ async def test_empty_selection_blocks_the_next_button(app):
 
 
 @pytest.mark.asyncio
-async def test_selection_is_carried_to_the_app_state(app):
+async def test_selection_is_carried_to_the_app_state(app, appuyer):
     async with app.run_test() as pilot:
         screen = await _goto_services(pilot)
         for box in screen.query(Checkbox):
             box.value = box.id in ("svc-sonarr", "svc-prowlarr")
         await pilot.pause()
-        screen.query_one("#next", Button).press()
-        await pilot.pause()
+        assert await appuyer(pilot, "#next", lambda: bool(pilot.app.selection))
         assert set(pilot.app.selection) == {"sonarr", "prowlarr"}
 
 
@@ -233,7 +232,7 @@ async def test_aucune_ouverture_si_la_page_manque(app, tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_l_identifiant_se_choisit_dans_l_assistant(app):
+async def test_l_identifiant_se_choisit_dans_l_assistant(app, appuyer):
     """Demande a l'usage : tout le monde ne veut pas s'appeler « arrsenal »."""
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr"]
@@ -244,15 +243,14 @@ async def test_l_identifiant_se_choisit_dans_l_assistant(app):
         assert screen.query_one("#username", Input).value == "arrsenal"
         screen.query_one("#username", Input).value = "yannick"
         await pilot.pause()
-        screen.query_one("#next", Button).press()
-        await pilot.pause()
+        assert await appuyer(pilot, "#next", lambda: pilot.app.username == "yannick")
 
         assert pilot.app.username == "yannick"
         assert pilot.app.build_config().services["sonarr"].username == "yannick"
 
 
 @pytest.mark.asyncio
-async def test_un_identifiant_vide_retombe_sur_le_defaut(app):
+async def test_un_identifiant_vide_retombe_sur_le_defaut(app, appuyer):
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr"]
         pilot.app.push_screen(PathsScreen())
@@ -260,7 +258,6 @@ async def test_un_identifiant_vide_retombe_sur_le_defaut(app):
         screen = pilot.app.screen
         screen.query_one("#username", Input).value = "   "
         await pilot.pause()
-        screen.query_one("#next", Button).press()
-        await pilot.pause()
+        assert await appuyer(pilot, "#next", lambda: pilot.app.username == "arrsenal")
 
         assert pilot.app.username == "arrsenal"

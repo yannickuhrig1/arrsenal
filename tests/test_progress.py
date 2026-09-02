@@ -65,6 +65,19 @@ def test_le_total_annonce_correspond_aux_evenements_emis(tmp_path, monkeypatch, 
             if c.enabled(sid) and catalog.get(sid).api_family == "arr"
         ],
     )
+    # `wait_for_download_clients` interroge REELLEMENT les clients par HTTP, avec
+    # 180 s d'attente chacun. Non remplace, ce test attendait des services qui
+    # n'existent pas : 738 s a lui seul sur les 913 de la suite entiere, soit
+    # 81 %. Il emet un evenement par client, comme le vrai.
+    monkeypatch.setattr(
+        orchestrator,
+        "wait_for_download_clients",
+        lambda c, on_progress=None: [
+            on_progress(Progress("attente", sid))
+            for sid in catalog.DOWNLOAD_CLIENTS
+            if c.enabled(sid) and not c.services[sid].adopted
+        ],
+    )
     monkeypatch.setattr(
         orchestrator.Wirer,
         "execute",

@@ -113,7 +113,13 @@ async def test_un_choix_atteint_la_configuration(app):
         screen.query_one("#tpl-radarr", Select).value = "french-multi-vf-hd-bluray-web"
         await pilot.pause()
         screen.query_one("#next", Button).press()
-        await pilot.pause()
+        # `press()` poste un message : compter les passes d'evenements suffit
+        # d'ordinaire, mais pas sous charge. Troisieme test de la suite a
+        # echouer ainsi une fois sur plusieurs dizaines. On attend le resultat.
+        for _ in range(60):
+            await pilot.pause()
+            if pilot.app.recyclarr_templates:
+                break
 
         cfg = pilot.app.build_config()
         assert cfg.recyclarr_templates["radarr"] == "french-multi-vf-hd-bluray-web"
@@ -133,41 +139,38 @@ async def test_un_manifeste_injoignable_n_empeche_pas_de_continuer(app, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_l_ecran_est_saute_sans_recyclarr(app):
+async def test_l_ecran_est_saute_sans_recyclarr(app, appuyer):
     """L'etape ne doit pas apparaitre pour une stack qui n'en a pas l'usage."""
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr", "radarr"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
-        pilot.app.screen.query_one("#next", Button).press()
-        await pilot.pause()
-
-        assert isinstance(pilot.app.screen, SummaryScreen)
+        assert await appuyer(
+            pilot, "#next", lambda: isinstance(pilot.app.screen, SummaryScreen)
+        )
 
 
 @pytest.mark.asyncio
-async def test_l_ecran_apparait_avec_recyclarr(app):
+async def test_l_ecran_apparait_avec_recyclarr(app, appuyer):
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr", "recyclarr"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
-        pilot.app.screen.query_one("#next", Button).press()
-        await pilot.pause()
-
-        assert isinstance(pilot.app.screen, TemplatesScreen)
+        assert await appuyer(
+            pilot, "#next", lambda: isinstance(pilot.app.screen, TemplatesScreen)
+        )
 
 
 @pytest.mark.asyncio
-async def test_recyclarr_seul_ne_declenche_pas_l_ecran(app):
+async def test_recyclarr_seul_ne_declenche_pas_l_ecran(app, appuyer):
     """Sans Sonarr ni Radarr, Recyclarr n'a rien a configurer."""
     async with app.run_test() as pilot:
         pilot.app.selection = ["recyclarr", "jellyfin"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
-        pilot.app.screen.query_one("#next", Button).press()
-        await pilot.pause()
-
-        assert isinstance(pilot.app.screen, SummaryScreen)
+        assert await appuyer(
+            pilot, "#next", lambda: isinstance(pilot.app.screen, SummaryScreen)
+        )
 
 
 @pytest.mark.asyncio

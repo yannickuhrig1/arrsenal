@@ -29,7 +29,10 @@ path = "src/arrsenal/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/arrsenal"]
-artifacts = ["*.tcss"]
+# TOUT fichier non-Python dont le code a besoin a l'execution. Un oubli ici ne
+# se voit pas au developpement — le fichier est la, dans l'arborescence source —
+# mais fait planter le paquet installe. Voir tests/test_empaquetage.py.
+artifacts = ["*.tcss", "*.json"]
 
 [tool.ruff]
 line-length = 100

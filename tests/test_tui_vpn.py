@@ -32,38 +32,33 @@ async def _vpn(pilot, selection=("sonarr", "qbittorrent")) -> VpnScreen:
 
 
 @pytest.mark.asyncio
-async def test_l_ecran_apparait_avec_un_client_de_telechargement(app):
+async def test_l_ecran_apparait_avec_un_client_de_telechargement(app, appuyer):
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr", "transmission"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
-        pilot.app.screen.query_one("#next", Button).press()
-        await pilot.pause()
-
-        assert isinstance(pilot.app.screen, VpnScreen)
+        assert await appuyer(pilot, "#next", lambda: isinstance(pilot.app.screen, VpnScreen))
 
 
 @pytest.mark.asyncio
-async def test_il_est_saute_sans_client_de_telechargement(app):
+async def test_il_est_saute_sans_client_de_telechargement(app, appuyer):
     """Sans trafic BitTorrent, Gluetun ne protegerait rien."""
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr", "jellyfin"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
-        pilot.app.screen.query_one("#next", Button).press()
-        await pilot.pause()
-
-        assert isinstance(pilot.app.screen, SummaryScreen)
+        assert await appuyer(
+            pilot, "#next", lambda: isinstance(pilot.app.screen, SummaryScreen)
+        )
 
 
 @pytest.mark.asyncio
-async def test_les_profils_suivent_toujours_le_vpn(app):
+async def test_les_profils_suivent_toujours_le_vpn(app, appuyer):
     async with app.run_test() as pilot:
-        screen = await _vpn(pilot, ("sonarr", "qbittorrent", "recyclarr"))
-        screen.query_one("#next", Button).press()
-        await pilot.pause()
-
-        assert isinstance(pilot.app.screen, TemplatesScreen)
+        await _vpn(pilot, ("sonarr", "qbittorrent", "recyclarr"))
+        assert await appuyer(
+            pilot, "#next", lambda: isinstance(pilot.app.screen, TemplatesScreen)
+        )
 
 
 # ------------------------------------------------------------------- saisie
@@ -168,7 +163,7 @@ async def test_le_choix_atteint_la_configuration(app):
 
 
 @pytest.mark.asyncio
-async def test_l_hote_du_rapport_se_saisit_dans_l_assistant(app):
+async def test_l_hote_du_rapport_se_saisit_dans_l_assistant(app, appuyer):
     """Derniere option qui n'existait qu'en ligne de commande (`--host`).
 
     Sur un NAS pilote en SSH, `localhost` designe le NAS et non le poste qui
@@ -182,22 +177,20 @@ async def test_l_hote_du_rapport_se_saisit_dans_l_assistant(app):
 
         assert screen.query_one("#host", Input).value == "localhost"
         screen.query_one("#host", Input).value = "192.168.1.42"
-        screen.query_one("#next", Button).press()
-        await pilot.pause()
+        assert await appuyer(pilot, "#next", lambda: pilot.app.host == "192.168.1.42")
 
         assert pilot.app.build_config().host == "192.168.1.42"
 
 
 @pytest.mark.asyncio
-async def test_un_hote_vide_retombe_sur_localhost(app):
+async def test_un_hote_vide_retombe_sur_localhost(app, appuyer):
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
         screen = pilot.app.screen
         screen.query_one("#host", Input).value = "   "
-        screen.query_one("#next", Button).press()
-        await pilot.pause()
+        assert await appuyer(pilot, "#next", lambda: pilot.app.host == "localhost")
 
         assert pilot.app.build_config().host == "localhost"
 
