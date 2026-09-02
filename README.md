@@ -185,6 +185,23 @@ arrsenal admin-password
 Seule son empreinte rejoint `stack.yml` — PBKDF2, 600 000 itérations. Les
 tentatives sont limitées, et une session expire au bout de douze heures.
 
+Pour ne plus avoir à la lancer du tout :
+
+```bash
+arrsenal autostart
+```
+
+La console démarre alors à chaque ouverture de session — **sur l'hôte, pas dans
+un conteneur**. Ce n'est pas un détail de mise en œuvre : la console doit créer
+et démarrer des conteneurs, et un conteneur qui en est capable peut monter la
+racine de la machine et tourner en root. L'y enfermer reviendrait à exposer sur
+le réseau un service aux pleins pouvoirs, sans rien gagner. Ici elle tourne sous
+votre compte, écoute sur `127.0.0.1`, et reste hors du réseau Docker.
+
+Windows dépose un script dans votre dossier Démarrage ; Linux installe une unité
+systemd *utilisateur*. Aucun des deux ne demande les droits administrateur.
+`arrsenal autostart --disable` retire tout.
+
 ### En cas de problème
 
 Chaque installation écrit un journal complet à côté de `docker-compose.yml` :

@@ -26,6 +26,7 @@ from . import (
     report,
 )
 from . import adopt as adopt_mod
+from . import autostart as autostart_mod
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
 from .layout import default_profile, path_warning
@@ -571,6 +572,61 @@ def admin_password(
         "Mot de passe enregistre. La console demandera desormais ce mot de passe, "
         "et acceptera toujours le jeton affiche par `arrsenal serve`."
     )
+
+
+@app.command()
+def autostart(
+    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
+    disable: bool = typer.Option(False, "--disable", help="Retirer le lancement automatique."),
+    host: str = typer.Option("127.0.0.1", help="Adresse d'ecoute de la console."),
+    port: int = typer.Option(7373, help="Port d'ecoute de la console."),
+) -> None:
+    """Lance la console d'administration a chaque ouverture de session.
+
+    Sur l'HOTE, pas dans un conteneur. La console doit creer et demarrer des
+    conteneurs : un conteneur qui en est capable peut monter la racine de la
+    machine et tourner en root. L'y enfermer reviendrait a exposer sur le reseau
+    un service aux pleins pouvoirs, sans rien gagner.
+
+    Ici elle tourne sous votre compte, ecoute sur 127.0.0.1, et reste hors du
+    reseau Docker.
+    """
+    cfg = _load_config(project_dir)
+    etat = autostart_mod.status(project_dir)
+
+    if disable:
+        ok, message = autostart_mod.disable(project_dir)
+        console.print(message if ok else f"[red]{message}[/red]")
+        raise typer.Exit(0 if ok else 1)
+
+    # Verrou : sans mot de passe, la console n'accepte que le jeton tire a chaque
+    # demarrage. Lancee toute seule, ce jeton n'est lu par personne — la console
+    # serait donc strictement inutilisable. Autant le dire avant de l'installer.
+    if not cfg.admin_password_hash:
+        console.print("[yellow]Aucun mot de passe n'est pose sur la console.[/yellow]")
+        console.print(
+            "[dim]Lancee automatiquement, elle n'afficherait son jeton dans aucun "
+            "terminal : personne ne pourrait y entrer. Posez-en un d'abord :[/dim]"
+        )
+        console.print("  arrsenal admin-password")
+        raise typer.Exit(1)
+
+    if etat.actif:
+        console.print(f"[dim]Deja installe : {etat.chemin}. Reecriture.[/dim]")
+
+    ok, message = autostart_mod.enable(project_dir, host=host, port=port)
+    if not ok:
+        console.print(f"[yellow]{message}[/yellow]")
+        raise typer.Exit(1)
+
+    console.print(message)
+    console.print(f"[dim]Console : http://{host}:{port} — au prochain demarrage de session.[/dim]")
+    if autostart_mod.mecanisme() == "systemd-utilisateur":
+        console.print(
+            "[dim]Une unite utilisateur s'arrete a la deconnexion. Pour qu'elle "
+            "survive :[/dim]"
+        )
+        console.print("  loginctl enable-linger $USER")
 
 
 @app.command()

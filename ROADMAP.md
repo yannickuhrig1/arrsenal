@@ -36,12 +36,10 @@ l'installation initiale**.
 
 ## Prochaine étape
 
-**La console en conteneur.** `arrsenal serve` fait déjà presque tout, mais reste
-une commande à lancer. Deux questions à trancher avant d'écrire la moindre
-ligne : le conteneur devra piloter Docker, donc accéder au socket Docker — ce
-qui revient à donner les pleins pouvoirs sur la machine, et doit être dit
-clairement. Et une console qui change des mots de passe doit s'authentifier
-elle-même, sérieusement.
+À définir. La liste des demandes en cours est vide.
+
+Pistes ouvertes : les services de la liste ci-dessous, en commençant par Wizarr
+(le plus autonome) ou Plex (celui qui débloque Tautulli et Seerr).
 
 ---
 
@@ -94,12 +92,21 @@ reste une commande à lancer.
 | Renouveler un mot de passe, avec recâblage | ✅ |
 | Renouveler une clé API, avec recâblage | ✅ |
 | Ajouter un service absent de l'installation | ✅ |
-| Conteneur autonome plutôt que commande | à faire |
+| Démarrage automatique, sans lancer de commande | ✅ non publié |
 
-Deux questions à trancher avant d'en faire un conteneur : il devra piloter
-Docker, donc accéder au socket Docker — ce qui revient à donner les pleins
-pouvoirs sur la machine, et doit être dit clairement. Et une console qui change
-des mots de passe doit s'authentifier elle-même, sérieusement.
+**Pourquoi pas un conteneur.** La question a été tranchée en la mesurant. La
+console doit créer, démarrer et recréer des conteneurs — soit
+`POST /containers/create` puis `/start` dans l'API Docker. Or un conteneur qu'on
+crée peut monter la racine de l'hôte et tourner en root : un proxy de socket qui
+autorise ces deux appels n'enferme rien, et sans eux la console ne sert plus à
+rien. L'y enfermer reviendrait donc à exposer sur le réseau un service aux
+pleins pouvoirs, sans rien gagner.
+
+Elle tourne donc sur l'hôte, sous le compte de l'utilisateur, sur `127.0.0.1`,
+et démarre toute seule avec `arrsenal autostart`. Le confort recherché est le
+même. Et parce qu'une console qui change des mots de passe doit s'authentifier
+sérieusement, `arrsenal admin-password` pose un mot de passe : empreinte seule
+dans `stack.yml`, sessions expirables, tentatives limitées.
 
 ---
 
