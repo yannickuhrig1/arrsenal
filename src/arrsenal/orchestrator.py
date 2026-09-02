@@ -633,3 +633,70 @@ def rotate_password(
     if echecs:
         return True, f"mot de passe change, mais {len(echecs)} liaison(s) en echec", nouveau
     return True, f"mot de passe change et {len(results)} liaisons recablees", nouveau
+
+
+def rotate_api_key(
+    cfg: StackConfig,
+    project_dir: Path,
+    service_id: str,
+    *,
+    on_progress: ProgressFn = _noop,
+) -> tuple[bool, str, str]:
+    """Change la cle API d'un *arr, puis RECABLE ce qui la porte.
+
+    Renvoie (succes, message, nouvelle cle).
+
+    Une cle API n'est pas un mot de passe : elle ne sert pas a se connecter, elle
+    sert a ce que les AUTRES services parlent a celui-ci. La changer sans
+    recabler ne casse donc pas une connexion — elle casse le cablage entier, en
+    silence, du cote de ceux qui l'utilisaient.
+
+    Trois choses la portent, et les trois sont realignees par le cablage :
+    l'entree Application de Prowlarr, la notification de rafraichissement
+    Jellyfin, et la page d'acces.
+
+    Le chemin passe par `config.xml` et un redemarrage, PAS par l'API. Verifie
+    contre Sonarr 4.0.19 : `PUT config/host` avec une nouvelle cle repond
+    **202 Accepted** et ne change rien — soixante secondes plus tard la cle
+    relue est toujours l'ancienne, et la nouvelle repond 401. Seuls les *arr
+    sont concernes ; les autres familles n'ont pas de cle qu'arrsenal choisisse.
+    """
+    from .runner import Compose
+    from .wiring import Wirer
+
+    if not cfg.enabled(service_id):
+        return False, f"service inconnu : {service_id}", ""
+    spec, inst = catalog.get(service_id), cfg.services[service_id]
+    if spec.api_family != "arr":
+        return False, f"{spec.display_name} n'a pas de cle API geree par arrsenal", ""
+
+    cfg.project_dir = project_dir
+    nouvelle = seed.generate_api_key()
+
+    if not seed.replace_arr_api_key(Path(cfg.config_path(service_id)), nouvelle):
+        return False, f"config.xml de {spec.display_name} introuvable ou inattendu", ""
+
+    inst.api_key = nouvelle
+    # Persister AVANT le redemarrage : la cle est deja celle de l'application,
+    # et un .env resté sur l'ancienne rendrait la stack injoignable.
+    compose.write_artifacts(cfg, project_dir)
+
+    runner = Compose(project_dir, cfg.project_name)
+    ok, message = runner.control("restart", service_id)
+    if not ok:
+        return False, f"cle changee mais redemarrage impossible : {message[:200]}", nouvelle
+    on_progress(Progress("rotation", f"{spec.display_name} : cle API changee"))
+
+    wait_for_arrs(cfg, on_progress)
+    wirer = Wirer(cfg)
+    try:
+        results = wirer.execute()
+    finally:
+        wirer.close()
+    compose.write_artifacts(cfg, project_dir)
+    echecs = [r.name for r in results if not r.ok]
+    dashboard.write(cfg, project_dir, failed=len(echecs))
+
+    if echecs:
+        return True, f"cle API changee, mais {len(echecs)} liaison(s) en echec", nouvelle
+    return True, f"cle API changee et {len(results)} liaisons recablees", nouvelle

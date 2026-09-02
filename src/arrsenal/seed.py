@@ -362,3 +362,34 @@ def _replace_transmission_credentials(
     reglages["rpc-authentication-required"] = True
     target.write_text(json.dumps(reglages, indent=4) + "\n", encoding="utf-8")
     return True, "settings.json existant : identifiants RPC mis a jour"
+
+
+def replace_arr_api_key(config_dir: Path, api_key: str) -> bool:
+    """Remplace la cle API dans un config.xml existant. Renvoie True si ecrit.
+
+    C'est la SEULE voie qui fonctionne, et elle a demande un essai pour le
+    savoir. `PUT config/host` accepte pourtant la nouvelle cle, repond **202
+    Accepted**, et ne change rien : verifie contre Sonarr 4.0.19, la cle relue
+    par l'API vaut toujours l'ancienne soixante secondes plus tard, et la
+    nouvelle repond 401. Un code de retour n'est pas une preuve.
+
+    On ne reecrit pas le fichier entier : apres son premier demarrage il
+    contient bien plus que la cle, et le regenerer effacerait tout le reste.
+
+    L'application relit le fichier au demarrage, et ne le reecrit PAS a l'arret
+    — contrairement a Transmission. Une modification a chaud survit donc, et un
+    simple redemarrage suffit a la prendre en compte : constate en changeant la
+    cle sur une instance en marche, redemarrage, nouvelle cle acceptee en cinq
+    secondes et ancienne refusee.
+    """
+    target = config_dir / "config.xml"
+    if not target.is_file():
+        return False
+    texte = target.read_text(encoding="utf-8")
+    remplace, nombre = re.subn(
+        r"<ApiKey>[^<]*</ApiKey>", f"<ApiKey>{api_key}</ApiKey>", texte, count=1
+    )
+    if not nombre:
+        return False
+    target.write_text(remplace, encoding="utf-8")
+    return True

@@ -3,7 +3,7 @@
 Où en est arrsenal, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.6**
+**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.7**
 
 ---
 
@@ -28,8 +28,8 @@ un écart apparaît.
 
 La page d'administration (`arrsenal serve`) donne l'état des services, les
 démarre, les arrête, les redémarre, signale les mises à jour et les applique,
-affiche les identifiants, et **renouvelle un mot de passe en recâblant tout ce
-qui en dépend**.
+affiche les identifiants, et **renouvelle un mot de passe ou une clé API en
+recâblant tout ce qui en dépend**.
 
 ---
 
@@ -37,8 +37,8 @@ qui en dépend**.
 
 | | État | Note |
 |---|---|---|
-| **Rotation des mots de passe** | ✅ livré, non publié | qBittorrent, Transmission et les *arr. Vérifié sur une stack de onze services : 25 liaisons sur 25 réalignées. |
-| **Rotation des clés API** | à faire | Plus délicat : la clé vit dans `config.xml`, changer demande un redémarrage, et tout ce qui la référence doit suivre. |
+| **Rotation des mots de passe** | ✅ livré en 0.1.7 | qBittorrent, Transmission et les *arr. Vérifié sur une stack de onze services : 25 liaisons sur 25 réalignées. |
+| **Rotation des clés API** | ✅ livré, non publié | Sur les *arr. Piège vérifié contre Sonarr 4.0.19 : `PUT config/host` répond **202 Accepted** et ne change rien — la clé relue vaut toujours l'ancienne une minute plus tard. Seule la réécriture de `config.xml` suivie d'un redémarrage fonctionne. |
 | **Ajouter un service après coup** | à faire | `arrsenal wire` sait déjà le faire ; il manque le bouton et la reprise du compose. |
 | **Liste des pays du VPN** | à faire | Source identifiée : `qdm12/gluetun-servers`, un JSON par fournisseur. À extraire à la génération pour ne pas dépendre du réseau pendant l'assistant. |
 
@@ -80,7 +80,7 @@ reste une commande à lancer.
 | Démarrer, arrêter, redémarrer | ✅ |
 | Voir et appliquer les mises à jour | ✅ |
 | Renouveler un mot de passe, avec recâblage | ✅ |
-| Renouveler une clé API, avec recâblage | à faire |
+| Renouveler une clé API, avec recâblage | ✅ |
 | Ajouter un service absent de l'installation | à faire |
 | Conteneur autonome plutôt que commande | à faire |
 
@@ -110,6 +110,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.1.7** | Recyclarr ne posait plus aucun profil, silencieusement, dès qu'un service se retrouvait avec deux fichiers de configuration. Renouvellement d'un mot de passe depuis la page d'administration. autobrr gardait l'ancien mot de passe d'un client de téléchargement. |
 | **0.1.6** | Trois plantages de l'assistant : deuxième indexeur sélectionné (`DuplicateIds`), message d'erreur d'un indexeur contenant un crochet ouvert, et champs devenus inaccessibles sur une fenêtre courte. La clé d'un indexeur ne fuit plus à l'écran ni au journal. |
 | **0.1.5** | Le VPN et l'adresse de la machine entrent dans l'assistant. Jellyfin gardait un index vide : rien ne lançait d'analyse après la création des bibliothèques. Une étape qui plante n'emporte plus tout le câblage. |
 | **0.1.4** | Identifiant au choix, page d'administration accessible. |

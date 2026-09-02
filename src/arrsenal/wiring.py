@@ -408,10 +408,21 @@ class Wirer:
             if skipped
             else []
         )
+        etat = "cree" if created else "deja present"
+        if not created:
+            # Prowlarr garde la cle API du *arr DANS son entree Application.
+            # `ensure_resource` ne touche jamais a l'existant : apres une
+            # rotation de cle, Prowlarr continuait donc a presenter l'ancienne
+            # et ne poussait plus aucun indexeur — sans que rien ne le dise.
+            # Meme angle mort que pour les clients de telechargement et autobrr,
+            # a ceci pres que celui-la se declare « deja present » et vert.
+            modifies = prowlarr.sync_fields("applications", obj, values)
+            if modifies:
+                etat = f"realigne ({', '.join(modifies)})"
         result = StepResult(
             f"prowlarr -> {arr_id} (Application, fullSync)",
             ok=prowlarr.find_by_name("applications", implementation) is not None,
-            detail=("cree" if created else "deja present") + f" (id={obj.get('id', '?')})",
+            detail=etat + f" (id={obj.get('id', '?')})",
             created=created,
             warnings=warnings,
         )

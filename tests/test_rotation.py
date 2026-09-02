@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import catalog, orchestrator
+from arrsenal import catalog, orchestrator, seed
 from arrsenal.clients.autobrr import AutobrrClient
 
 # ------------------------------------------------------------- garde-fous
@@ -222,3 +222,79 @@ def test_une_entree_sans_identifiant_est_laissee_tranquille():
 
     assert (cree, message) == (False, "deja present")
     assert client.appels == []
+
+
+# ------------------------------------------------------------- la cle API
+
+
+CONFIG_XML = """<Config>
+  <BindAddress>*</BindAddress>
+  <Port>8989</Port>
+  <ApiKey>c3829ffb4c844cf88a607996efc459f1</ApiKey>
+  <AuthenticationMethod>Forms</AuthenticationMethod>
+  <InstanceName>Sonarr</InstanceName>
+</Config>
+"""
+
+
+def test_la_cle_est_remplacee_dans_le_config_xml(tmp_path):
+    (tmp_path / "config.xml").write_text(CONFIG_XML, encoding="utf-8")
+
+    assert seed.replace_arr_api_key(tmp_path, "f" * 32) is True
+
+    texte = (tmp_path / "config.xml").read_text(encoding="utf-8")
+    assert f"<ApiKey>{'f' * 32}</ApiKey>" in texte
+    assert "c3829ffb" not in texte
+
+
+def test_le_reste_du_fichier_est_intact(tmp_path):
+    """Apres son premier demarrage, config.xml contient bien plus que la cle :
+    le regenerer effacerait tout le reste."""
+    (tmp_path / "config.xml").write_text(CONFIG_XML, encoding="utf-8")
+
+    seed.replace_arr_api_key(tmp_path, "f" * 32)
+
+    texte = (tmp_path / "config.xml").read_text(encoding="utf-8")
+    for garde in ("<Port>8989</Port>", "<AuthenticationMethod>Forms<", "<InstanceName>Sonarr<"):
+        assert garde in texte
+
+
+def test_un_fichier_absent_est_signale(tmp_path):
+    assert seed.replace_arr_api_key(tmp_path, "f" * 32) is False
+
+
+def test_un_fichier_sans_cle_est_signale(tmp_path):
+    (tmp_path / "config.xml").write_text("<Config><Port>8989</Port></Config>", encoding="utf-8")
+
+    assert seed.replace_arr_api_key(tmp_path, "f" * 32) is False
+
+
+def test_seuls_les_arr_ont_une_cle_renouvelable(cfg, tmp_path):
+    """Celle de Jellyfin est emise par Jellyfin, pas choisie par arrsenal."""
+    ok, message, secret = orchestrator.rotate_api_key(cfg, tmp_path, "jellyfin")
+
+    assert ok is False
+    assert "n'a pas de cle API geree par arrsenal" in message
+    assert secret == ""
+
+
+def test_un_config_xml_introuvable_arrete_tout(cfg, tmp_path):
+    """Sans reecriture reussie, on ne redemarre rien et on ne touche a rien."""
+    avant = cfg.services["sonarr"].api_key
+    ok, message, _secret = orchestrator.rotate_api_key(cfg, tmp_path, "sonarr")
+
+    assert ok is False
+    assert "config.xml" in message
+    assert cfg.services["sonarr"].api_key == avant
+
+
+def test_le_bouton_de_cle_ne_vise_que_les_arr():
+    from arrsenal import dashboard
+
+    config = orchestrator.build_config(
+        services=["sonarr", "qbittorrent", "jellyfin"], config_root="/c", data_root="/d"
+    )
+    page = dashboard.render(config, live=True)
+
+    assert page.count('data-what="api_key"') == 1
+    assert 'data-service="sonarr" data-what="api_key"' in page

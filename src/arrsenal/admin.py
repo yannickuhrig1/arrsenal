@@ -231,13 +231,19 @@ class _Handler(BaseHTTPRequestHandler):
             if not self.cfg.enabled(service):
                 self._json({"error": f"service inconnu: {service}"}, HTTPStatus.BAD_REQUEST)
                 return
-            ok, message, mot_de_passe = orchestrator.rotate_password(
-                self.cfg, self.project_dir, service
+            quoi = str(payload.get("what", "password"))
+            # Liste fermee : ce choix designe une fonction, pas une chaine libre.
+            if quoi not in ("password", "api_key"):
+                self._json({"error": f"secret inconnu: {quoi}"}, HTTPStatus.BAD_REQUEST)
+                return
+            rotation = (
+                orchestrator.rotate_password if quoi == "password" else orchestrator.rotate_api_key
             )
-            # Le mot de passe part vers la page qui vient de le demander, et
-            # nulle part ailleurs : ni journal, ni sortie terminal.
+            ok, message, secret = rotation(self.cfg, self.project_dir, service)
+            # Le secret part vers la page qui vient de le demander, et nulle part
+            # ailleurs : ni journal, ni sortie terminal.
             self._json(
-                {"ok": ok, "service": service, "message": message, "password": mot_de_passe},
+                {"ok": ok, "service": service, "what": quoi, "message": message, "secret": secret},
                 HTTPStatus.OK if ok else HTTPStatus.INTERNAL_SERVER_ERROR,
             )
             return

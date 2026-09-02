@@ -82,6 +82,32 @@ def _secret(value: str | None, label: str) -> str:
     )
 
 
+#: Ce que chaque rotation sait faire, et pour qui. Un secret dont le
+#: renouvellement n'a pas ete verifie contre le service n'a pas de bouton : un
+#: bouton qui casse vaut moins que pas de bouton.
+_ROTATIONS = {
+    "password": (catalog.ROTATABLE_FAMILIES, "Tirer un nouveau mot de passe et recabler"),
+    # Seuls les *arr ont une cle API qu'arrsenal choisit. Celle de Jellyfin est
+    # emise par Jellyfin lui-meme, lors de son assistant de demarrage.
+    "api_key": (("arr",), "Tirer une nouvelle cle API et recabler"),
+}
+
+
+def _bouton_rotation(spec, quoi: str, live: bool) -> str:
+    """Bouton de renouvellement, sur la page PILOTEE uniquement.
+
+    La page statique n'execute rien : un bouton mort y serait pire que pas de
+    bouton du tout.
+    """
+    familles, infobulle = _ROTATIONS[quoi]
+    if not live or spec.api_family not in familles:
+        return ""
+    return (
+        f'<button class="rotate" data-service="{spec.id}" data-what="{quoi}" '
+        f'title="{infobulle}">renouveler</button>'
+    )
+
+
 _CONTROLS = """        <div class="state" data-service="{sid}">
           <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
           <span class="upd" data-service="{sid}" hidden></span>
@@ -109,23 +135,18 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
                 f'<span class="v mono">{html.escape(inst.username)}</span></div>'
             )
         if inst.password:
-            # Le bouton n'apparait que sur la page pilotee : la page statique
-            # n'execute rien, un bouton mort y serait pire que pas de bouton.
-            renouveler = (
-                f'<button class="rotate" data-service="{spec.id}" '
-                f'title="Tirer un nouveau mot de passe et recabler">renouveler</button>'
-                if live and spec.api_family in catalog.ROTATABLE_FAMILIES
-                else ""
-            )
             rows += (
                 f'<div class="row"><span class="k">Mot de passe</span>'
-                f'<span class="v" data-pass="{spec.id}">'
-                f'{_secret(inst.password, "le mot de passe")}{renouveler}</span></div>'
+                f'<span class="v" data-secret="{spec.id}:password">'
+                f'{_secret(inst.password, "le mot de passe")}'
+                f'{_bouton_rotation(spec, "password", live)}</span></div>'
             )
         if inst.api_key:
             rows += (
                 f'<div class="row"><span class="k">Cle API</span>'
-                f'<span class="v">{_secret(inst.api_key, "la cle API")}</span></div>'
+                f'<span class="v" data-secret="{spec.id}:api_key">'
+                f'{_secret(inst.api_key, "la cle API")}'
+                f'{_bouton_rotation(spec, "api_key", live)}</span></div>'
             )
         controls = _CONTROLS.format(sid=spec.id) if live else ""
         # Un service sans port publie n'a pas d'interface a ouvrir. Recyclarr
@@ -468,10 +489,16 @@ _LIVE_SCRIPT = """<script>
   // en silence et leur bouton Test echouerait sans rien expliquer.
   document.querySelectorAll('button.rotate').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var cellule = btn.closest('[data-pass]');
+      var cellule = btn.closest('[data-secret]');
+      var quoi = btn.dataset.what;
+      var nom = (quoi === 'api_key') ? 'la cle API' : 'le mot de passe';
+      // Une cle API redemarre le service : le dire, c'est eviter que quelqu'un
+      // se demande pourquoi sa serie s'est arretee de telecharger.
+      var suite = (quoi === 'api_key')
+        ? 'Le service va REDEMARRER, puis toutes les liaisons seront recablees.'
+        : 'Le nouveau sera applique puis toutes les liaisons seront recablees.';
       if (!window.confirm(
-            'Renouveler le mot de passe de ce service ?\\n\\n'
-            + 'Le nouveau sera applique puis toutes les liaisons seront recablees. '
+            'Renouveler ' + nom + ' de ce service ?\\n\\n' + suite + ' '
             + 'Toute application exterieure utilisant l\\'ancien devra etre mise a jour.')) {
         return;
       }
@@ -481,7 +508,7 @@ _LIVE_SCRIPT = """<script>
       fetch('/api/rotate', {
         method: 'POST', credentials: 'same-origin',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({service: btn.dataset.service})
+        body: JSON.stringify({service: btn.dataset.service, what: quoi})
       }).then(function (r) { return r.json(); })
         .then(function (d) {
           btn.disabled = false;
@@ -492,14 +519,14 @@ _LIVE_SCRIPT = """<script>
             cellule.querySelector('.echec').textContent = d.message || d.error;
             return;
           }
-          // Le nouveau mot de passe remplace l'ancien sur place, deja devoile :
-          // c'est le seul moment ou l'utilisateur peut le noter.
+          // Le nouveau secret remplace l'ancien sur place, deja devoile : c'est
+          // le seul moment ou l'utilisateur peut le noter.
           var secret = cellule.querySelector('.secret');
-          secret.dataset.value = d.password;
-          secret.textContent = d.password;
+          secret.dataset.value = d.secret;
+          secret.textContent = d.secret;
           secret.classList.add('devoile');
           var copie = cellule.querySelector('button.copy');
-          if (copie) copie.dataset.value = d.password;
+          if (copie) copie.dataset.value = d.secret;
         })
         .catch(function (e) {
           btn.disabled = false;
