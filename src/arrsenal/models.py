@@ -39,6 +39,22 @@ class ServiceSpec(BaseModel):
     default_host_port: int
     #: Sous-dossier sous CONFIG_ROOT. None = le service n'a pas de config persistante.
     config_dir: str | None = None
+
+    #: Ports PUBLIES en plus du principal, sous la forme (libelle, port interne).
+    #: Silo en expose trois : son interface sur 8080, une API compatible Jellyfin
+    #: sur 8096 et une API compatible Audiobookshelf sur 13378. Le libelle sert a
+    #: l'affichage — « API Jellyfin » dit quelque chose, « port 8096 » non.
+    extra_ports: tuple[tuple[str, int], ...] = ()
+
+    #: Conteneur d'appoint : tire comme prerequis, jamais propose au choix.
+    #: Une base de donnees n'est pas un service qu'on coche — c'est une piece de
+    #: celui qui en depend. Sans ce drapeau, PostgreSQL apparaitrait dans
+    #: l'assistant a cote de Sonarr, et sur la page d'acces avec un lien mort.
+    internal: bool = False
+
+    #: Services qui doivent etre SAINS avant celui-ci, pas seulement demarres.
+    #: Silo refuse de demarrer si sa base n'a pas fini son initialisation.
+    depends_on_healthy: tuple[str, ...] = ()
     #: Services requis pour que celui-ci ait un sens. Tous obligatoires.
     requires: tuple[str, ...] = ()
     #: Au moins UN de ces services est necessaire. Sert aux interfaces qui
@@ -164,6 +180,13 @@ class ServiceInstance(BaseModel):
     container: str | None = None
     #: `UrlBase` du service, quand il n'est pas servi a la racine.
     url_base: str = ""
+
+    #: Ports supplementaires REELLEMENT publies, {port interne: port hote}.
+    #: Le catalogue donne les valeurs par defaut ; celles-ci peuvent etre
+    #: decalees pour eviter un conflit. C'est ainsi que Silo peut exposer son
+    #: API compatible Jellyfin ailleurs que sur 8096, la ou Jellyfin ecoute
+    #: deja : son conteneur garde 8096 en interne, seul le cote hote bouge.
+    extra_ports: dict[int, int] = Field(default_factory=dict)
 
     #: Image REELLEMENT deployee, tag compris. Le catalogue ne fournit que la
     #: valeur par defaut : sans ce champ, la version serait figee dans le code

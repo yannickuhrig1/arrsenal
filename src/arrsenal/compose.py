@@ -163,6 +163,21 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
     elif spec.internal_port:
         block["ports"] = [f"{inst.host_port}:{spec.internal_port}"]
 
+    # Un service peut en publier plusieurs. Silo expose son interface, une API
+    # compatible Jellyfin et une API compatible Audiobookshelf : trois portes
+    # differentes sur le meme conteneur.
+    for interne, hote in sorted(inst.extra_ports.items()):
+        block.setdefault("ports", []).append(f"{hote}:{interne}")
+
+    if spec.depends_on_healthy:
+        # SAIN, pas seulement demarre. Silo refuse de demarrer si sa base n'a
+        # pas fini son initialisation, et un `depends_on` nu ne l'attend pas.
+        block["depends_on"] = {
+            dep: {"condition": "service_healthy"}
+            for dep in spec.depends_on_healthy
+            if cfg.enabled(dep)
+        }
+
     return block
 
 

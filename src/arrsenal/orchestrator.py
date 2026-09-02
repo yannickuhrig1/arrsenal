@@ -99,7 +99,14 @@ def new_instance(cfg: StackConfig, service_id: str) -> ServiceInstance:
     chez quelqu'un dont la stack a grandi.
     """
     spec = catalog.get(service_id)
-    inst = ServiceInstance(spec_id=service_id, host_port=spec.default_host_port, image=spec.image)
+    inst = ServiceInstance(
+        spec_id=service_id,
+        host_port=spec.default_host_port,
+        image=spec.image,
+        # Par defaut, le port hote vaut le port interne. Le decalage se decide
+        # au moment ou un conflit apparait, pas ici.
+        extra_ports={interne: interne for _libelle, interne in spec.extra_ports},
+    )
     if spec.api_family == "arr":
         inst.api_key = seed.generate_api_key()
     if spec.api_family in _AVEC_COMPTE:
@@ -134,8 +141,15 @@ def preflight(cfg: StackConfig, project_dir: Path | None = None) -> list[Check]:
         # Un service sans interface web ne publie rien : Recyclarr tourne sur une
         # planification. Le controler afficherait « port 0 : libre », une ligne
         # qui n'apprend rien et fait douter du reste du tableau.
-        if cfg.enabled(sid) and cfg.services[sid].host_port:
-            port = cfg.services[sid].host_port
+        if not cfg.enabled(sid):
+            continue
+        inst = cfg.services[sid]
+        # TOUS les ports publies, pas seulement le principal : un service peut
+        # en ouvrir plusieurs, et un seul conflit fait echouer `compose up`
+        # pour la pile entiere.
+        for port in [inst.host_port, *sorted(inst.extra_ports.values())]:
+            if not port:
+                continue
             if port in nos_ports:
                 checks.append(
                     Check(f"port {port} ({sid})", True, "occupe par votre propre pile arrsenal")
@@ -715,7 +729,11 @@ def rotate_api_key(
 
 def installable(cfg: StackConfig) -> list[str]:
     """Services du catalogue absents de l'installation, dans l'ordre d'affichage."""
-    return [sid for sid in catalog.STARTUP_ORDER if not cfg.enabled(sid)]
+    return [
+        sid
+        for sid in catalog.STARTUP_ORDER
+        if not cfg.enabled(sid) and not catalog.get(sid).internal
+    ]
 
 
 def add_service(

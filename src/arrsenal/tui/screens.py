@@ -159,7 +159,7 @@ class ServicesScreen(WizardScreen):
             for index, categories in enumerate(self.COLUMNS):
                 with VerticalScroll(classes="service-column", id=f"column-{index}"):
                     for category in categories:
-                        specs = [s for s in catalog.CATALOG.values() if s.category is category]
+                        specs = [s for s in catalog.selectable() if s.category is category]
                         if not specs:
                             continue
                         yield Label(CATEGORY_TITLES[category], classes="group-title")

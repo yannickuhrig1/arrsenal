@@ -184,7 +184,11 @@ def _ajouts(cfg: StackConfig) -> str:
     relancer l'installation entiere en cochant tout — avec le risque de perdre
     les mots de passe des services qui ne stockent que des empreintes.
     """
-    absents = [sid for sid in catalog.STARTUP_ORDER if not cfg.enabled(sid)]
+    absents = [
+        sid
+        for sid in catalog.STARTUP_ORDER
+        if not cfg.enabled(sid) and not catalog.get(sid).internal
+    ]
     if not absents:
         return ""
     lignes = ""

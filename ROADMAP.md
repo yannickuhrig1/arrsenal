@@ -36,15 +36,30 @@ l'installation initiale**.
 
 ## Prochaine étape
 
-**Silo**, avec un préalable partagé : épingler une image qui ne publie pas de
-version. Silo n'expose que des SHA de commit, et Wizarr publie des tags datés
-qui ne correspondent pas à leur contenu — son tag `2025.7.8` contient la
-version 2.2.1, et sa version courante 2026.9.0 n'existe que sous `latest`.
+**Silo.** Deux socles sur trois sont posés.
 
-Le catalogue épingle des versions exactes : c'est ce qui rend fiable la
-détection de mises à jour et garantit qu'une installation d'aujourd'hui redonne
-la même chose demain. Il faut donc savoir épingler par **digest** tout en
-affichant une version lisible. Résolu une fois, cela débloque les deux.
+| | État |
+|---|---|
+| Lire une référence d'image, digest compris | ✅ non publié |
+| Un service = plusieurs conteneurs et plusieurs ports | ✅ non publié |
+| Silo lui-même | à faire |
+
+Ce que Silo demande réellement, mesuré et non supposé :
+
+- **quatre conteneurs** — `pgvector/pgvector:pg18`, `redis:alpine`,
+  `getmeili/meilisearch:latest` et `ghcr.io/silo-server/silo-server:latest` ;
+- **aucune version publiée** : 488 tags sur son registre, tous des SHA de
+  commit, plus `latest` et `nightly` ;
+- **trois des quatre images ont un tag flottant**. Épingler Silo ne suffira pas ;
+- **trois ports** : son interface, une API compatible Jellyfin sur 8096, une API
+  compatible Audiobookshelf sur 13378 ;
+- **`SECRET_KEY` obligatoire**, sans quoi il refuse de démarrer. Sa perte rend
+  les secrets chiffrés irrécupérables : arrsenal devra le dire, pas seulement le
+  générer.
+
+Le conflit de port avec Jellyfin **n'en est pas un** : son compose prévoit
+explicitement le décalage côté hôte (« PORT and JF_PORT in .env are host-side
+published-port overrides »). Le conteneur garde 8096 en interne.
 
 ---
 

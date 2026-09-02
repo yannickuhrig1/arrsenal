@@ -170,7 +170,8 @@ def install(
         ",".join(catalog.DEFAULT_SELECTION),
         "--services",
         "-s",
-        help="Liste separee par des virgules. Connus: " + ", ".join(sorted(catalog.CATALOG)),
+        help="Liste separee par des virgules. Connus: "
+        + ", ".join(sorted(s.id for s in catalog.selectable())),
     ),
     config_root: str | None = typer.Option(None, help="Racine des configurations."),
     data_root: str | None = typer.Option(None, help="Racine des donnees (monte sur /data)."),

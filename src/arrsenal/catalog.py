@@ -225,6 +225,16 @@ def resolve_dependencies(selection: list[str]) -> list[str]:
     return [sid for sid in STARTUP_ORDER if sid in wanted]
 
 
+def selectable() -> list[ServiceSpec]:
+    """Services qu'un utilisateur peut cocher.
+
+    Les conteneurs d'appoint en sont exclus : une base de donnees n'est pas un
+    service qu'on choisit, c'est une piece de celui qui en depend. La proposer a
+    cote de Sonarr n'aurait aucun sens, et l'installer seule non plus.
+    """
+    return [spec for spec in CATALOG.values() if not spec.internal]
+
+
 #: Familles dont le mot de passe peut etre change sans reinstaller. Liste fermee :
 #: chaque entree correspond a un chemin VERIFIE contre le service, pas a une
 #: supposition. Elle vit ici parce que deux modules en ont besoin — la page
