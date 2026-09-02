@@ -6,6 +6,7 @@ cablage passe par les *arr, qui parlent directement a qBittorrent.
 
 from __future__ import annotations
 
+import json
 from typing import Self
 
 import httpx
@@ -116,3 +117,26 @@ class QBittorrentClient:
                 "la session est-elle bien authentifiee ?",
             )
         return True
+
+    def set_password(self, password: str) -> None:
+        """Change le mot de passe de la WebUI par l'API de qBittorrent.
+
+        `setPreferences` attend un JSON dans un champ de formulaire nomme `json` :
+        ce n'est pas un corps JSON. Verifie contre 5.2.3.
+
+        Passer par l'API plutot que par `qBittorrent.conf` evite d'arreter le
+        conteneur : qBittorrent garde sa configuration en memoire et reecrit le
+        fichier a l'arret, donc une modification a chaud du fichier serait
+        purement et simplement perdue.
+        """
+        resp = self._http.post(
+            "/api/v2/app/setPreferences",
+            data={"json": json.dumps({"web_ui_password": password})},
+        )
+        if resp.status_code >= 400:
+            raise WiringError(
+                f"{self.name}: changement de mot de passe refuse",
+                f"HTTP {resp.status_code} - {resp.text[:200]}",
+                "la session est-elle bien authentifiee ?",
+            )
+        self._password = password

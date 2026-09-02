@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import catalog, compose, dashboard, updates
+from . import catalog, compose, dashboard, orchestrator, updates
 from .models import StackConfig
 from .runner import Compose
 
@@ -215,7 +215,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._deny()
             return
         route = urlparse(self.path).path
-        if route not in ("/api/action", "/api/update"):
+        if route not in ("/api/action", "/api/update", "/api/rotate"):
             self._json({"error": "route inconnue"}, HTTPStatus.NOT_FOUND)
             return
 
@@ -227,6 +227,21 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         service = str(payload.get("service", ""))
+        if route == "/api/rotate":
+            if not self.cfg.enabled(service):
+                self._json({"error": f"service inconnu: {service}"}, HTTPStatus.BAD_REQUEST)
+                return
+            ok, message, mot_de_passe = orchestrator.rotate_password(
+                self.cfg, self.project_dir, service
+            )
+            # Le mot de passe part vers la page qui vient de le demander, et
+            # nulle part ailleurs : ni journal, ni sortie terminal.
+            self._json(
+                {"ok": ok, "service": service, "message": message, "password": mot_de_passe},
+                HTTPStatus.OK if ok else HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            return
+
         if route == "/api/update":
             if not self.cfg.enabled(service):
                 self._json({"error": f"service inconnu: {service}"}, HTTPStatus.BAD_REQUEST)

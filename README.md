@@ -447,6 +447,9 @@ Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ### Feuille de route
 
+Le détail vit dans [ROADMAP.md](ROADMAP.md), tenue à jour : ce qui marche, ce
+qui est en cours, ce qu'on ne fera pas et pourquoi. Résumé ci-dessous.
+
 **La console arrsenal** est le prochain gros morceau, et le seul qui ne soit pas
 un service de plus au catalogue. Aujourd'hui l'assistant installe puis s'efface :
 la page d'accès est un fichier HTML mort, et tout ce qui vient après se fait à la

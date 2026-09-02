@@ -524,3 +524,112 @@ def iter_selected(cfg: StackConfig) -> Iterator[tuple[str, ServiceInstance]]:
     for sid in catalog.STARTUP_ORDER:
         if cfg.enabled(sid):
             yield sid, cfg.services[sid]
+
+
+# --------------------------------------------------------------- rotation
+
+
+#: Familles dont le mot de passe peut etre change sans reinstaller. La liste vit
+#: dans catalog : la page d'administration en a besoin, et elle ne peut pas
+#: importer orchestrator, qui l'importe deja.
+ROTATABLE = catalog.ROTATABLE_FAMILIES
+
+
+def rotate_password(
+    cfg: StackConfig,
+    project_dir: Path,
+    service_id: str,
+    *,
+    on_progress: ProgressFn = _noop,
+) -> tuple[bool, str, str]:
+    """Change le mot de passe d'un service, puis RECABLE ce qui en depend.
+
+    Renvoie (succes, message, nouveau mot de passe). Le mot de passe n'est
+    renvoye que pour etre affiche a qui vient de le demander ; il n'est
+    journalise nulle part.
+
+    Le recablage est le coeur du sujet, et la raison pour laquelle cette
+    fonction existe. Un mot de passe de client de telechargement change a la
+    main casse SIX liaisons en silence : les quatre *arr et Prowlarr gardent
+    l'ancien, leur bouton Test echoue, et rien ne l'explique. `Wirer.execute`
+    est idempotent et `sync_fields` met a jour les entrees existantes : rejouer
+    le cablage suffit donc a tout realigner.
+
+    Chaque famille a son chemin, et un seul est verifie par famille :
+
+    - **arr** : `PUT config/host`, l'application hache elle-meme ;
+    - **qBittorrent** : `setPreferences`, a chaud. Reecrire son fichier serait
+      inutile — il garde sa configuration en memoire et la reecrit a l'arret ;
+    - **Transmission** : son settings.json, conteneur ARRETE. Son RPC ne sait
+      pas changer `rpc-password` ; c'est la voie prevue, et il rehache au
+      demarrage suivant.
+    """
+    from .clients.arr import ArrClient
+    from .clients.qbittorrent import QBittorrentClient
+    from .runner import Compose
+    from .wiring import Wirer
+
+    if not cfg.enabled(service_id):
+        return False, f"service inconnu : {service_id}", ""
+    spec, inst = catalog.get(service_id), cfg.services[service_id]
+    if spec.api_family not in ROTATABLE:
+        return False, f"{spec.display_name} ne sait pas changer son mot de passe ici", ""
+
+    cfg.project_dir = project_dir
+    nouveau = seed.generate_password()
+    ancien = inst.password or ""
+    runner = Compose(project_dir, cfg.project_name)
+    url = inst.url(cfg.host)
+
+    try:
+        if spec.api_family == "arr":
+            client = ArrClient(
+                url, inst.api_key or "", api_version=spec.api_version, name=service_id
+            )
+            try:
+                client.ensure_web_user(inst.username or cfg.username, nouveau)
+            finally:
+                client.close()
+        elif spec.api_family == "qbittorrent":
+            with QBittorrentClient(url, inst.username or cfg.username, ancien) as client:
+                client.login()
+                client.set_password(nouveau)
+        else:
+            # Transmission REECRIT son settings.json a l'arret : le modifier
+            # pendant qu'il tourne reviendrait a l'effacer quelques minutes plus
+            # tard. On l'arrete donc avant, comme le fait l'installation.
+            arrete, message = runner.control("stop", service_id)
+            if not arrete:
+                return False, f"arret impossible : {message[:200]}", ""
+            seed.seed_transmission(
+                Path(cfg.config_path(service_id)),
+                rpc_username=inst.username or cfg.username,
+                rpc_password=nouveau,
+            )
+            demarre, message = runner.control("start", service_id)
+            if not demarre:
+                return False, f"redemarrage impossible : {message[:200]}", ""
+    except Exception as exc:  # noqa: BLE001 - remonte a l'appelant, jamais au terminal
+        return False, f"{type(exc).__name__} : {exc}", ""
+
+    inst.password = nouveau
+    on_progress(Progress("rotation", f"{spec.display_name} : mot de passe change"))
+
+    # Persister AVANT de recabler : si le cablage echoue, le nouveau mot de passe
+    # est deja celui du service, et .env doit le refleter — sinon arrsenal
+    # afficherait un mot de passe qui n'ouvre plus rien.
+    compose.write_artifacts(cfg, project_dir)
+
+    wait_for_download_clients(cfg, on_progress)
+    wirer = Wirer(cfg)
+    try:
+        results = wirer.execute()
+    finally:
+        wirer.close()
+    compose.write_artifacts(cfg, project_dir)
+    echecs = [r.name for r in results if not r.ok]
+    dashboard.write(cfg, project_dir, failed=len(echecs))
+
+    if echecs:
+        return True, f"mot de passe change, mais {len(echecs)} liaison(s) en echec", nouveau
+    return True, f"mot de passe change et {len(results)} liaisons recablees", nouveau

@@ -205,9 +205,6 @@ class AutobrrClient:
                 "completez CLIENT_TYPES apres verification contre une instance",
             )
 
-        if any(c.get("name") == name for c in self.clients()):
-            return False, "deja present"
-
         payload: dict[str, Any] = {
             "name": name,
             "type": client_type,
@@ -217,6 +214,34 @@ class AutobrrClient:
             "password": password,
             "settings": {"apikey": api_key} if api_key else {},
         }
+
+        existant = next((c for c in self.clients() if c.get("name") == name), None)
+        if existant is not None:
+            # « Deja present » ne suffisait pas : apres un changement de mot de
+            # passe, autobrr gardait l'ancien et son test echouait en 401 sans
+            # que rien ne l'explique. Les *arr, eux, etaient realignes par
+            # `sync_fields` — autobrr etait le seul angle mort du recablage.
+            # Constate en renouvelant le mot de passe de qBittorrent :
+            #   error logging into client: http://qbittorrent:8080:
+            #   login error; status code: 401
+            identique = all(existant.get(cle) == valeur for cle, valeur in payload.items())
+            # Sans identifiant, impossible de designer l'entree a modifier. On
+            # laisse alors les choses en place plutot que de tenter un appel qui
+            # echouerait : mieux vaut ne rien faire que casser l'existant.
+            if identique or "id" not in existant:
+                return False, "deja present"
+            payload["id"] = existant["id"]
+            # PUT sur la COLLECTION, pas sur `/{id}` : autobrr declare
+            # `r.Put("/", h.update)` et l'identifiant voyage dans le corps.
+            # `/{id}` n'accepte que GET et DELETE, et repond 405 au reste.
+            self._expect(
+                self._request("PUT", "/api/download_clients", json=payload),
+                f"mise a jour de {name}",
+                200,
+                204,
+            )
+            return False, "identifiants mis a jour"
+
         self._expect(
             self._request("POST", "/api/download_clients", json=payload),
             f"ajout de {name}",

@@ -109,9 +109,18 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
                 f'<span class="v mono">{html.escape(inst.username)}</span></div>'
             )
         if inst.password:
+            # Le bouton n'apparait que sur la page pilotee : la page statique
+            # n'execute rien, un bouton mort y serait pire que pas de bouton.
+            renouveler = (
+                f'<button class="rotate" data-service="{spec.id}" '
+                f'title="Tirer un nouveau mot de passe et recabler">renouveler</button>'
+                if live and spec.api_family in catalog.ROTATABLE_FAMILIES
+                else ""
+            )
             rows += (
                 f'<div class="row"><span class="k">Mot de passe</span>'
-                f'<span class="v">{_secret(inst.password, "le mot de passe")}</span></div>'
+                f'<span class="v" data-pass="{spec.id}">'
+                f'{_secret(inst.password, "le mot de passe")}{renouveler}</span></div>'
             )
         if inst.api_key:
             rows += (
@@ -344,6 +353,13 @@ _TEMPLATE = """<!doctype html>
   button.act:hover:not(:disabled) {{ color: var(--text); border-color: var(--accent); }}
   button.act.danger:hover:not(:disabled) {{ color: #ef4444; border-color: #ef4444; }}
   button.act:disabled {{ opacity: .4; cursor: not-allowed; }}
+  button.rotate {{
+    margin-left: .5rem; font-size: .78rem; padding: .1rem .5rem; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 5px; background: none; color: var(--muted);
+  }}
+  button.rotate:hover:not(:disabled) {{ color: var(--text); border-color: var(--accent); }}
+  button.rotate:disabled {{ opacity: .5; cursor: progress; }}
+  .echec {{ color: #ef4444; font-size: .8rem; margin-right: .4rem; }}
   .upd {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .upd .tag {{
     font-size: .7rem; padding: .05rem .4rem; border-radius: 999px;
@@ -445,6 +461,52 @@ _LIVE_SCRIPT = """<script>
       .then(function (d) { peindre(d.services); })
       .catch(function () {});
   }
+
+  // Renouvellement d'un mot de passe. L'operation dure : elle change le mot de
+  // passe DANS le service, puis rejoue tout le cablage pour que les *arr et
+  // Prowlarr apprennent le nouveau. Sans ce recablage, six liaisons casseraient
+  // en silence et leur bouton Test echouerait sans rien expliquer.
+  document.querySelectorAll('button.rotate').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var cellule = btn.closest('[data-pass]');
+      if (!window.confirm(
+            'Renouveler le mot de passe de ce service ?\\n\\n'
+            + 'Le nouveau sera applique puis toutes les liaisons seront recablees. '
+            + 'Toute application exterieure utilisant l\\'ancien devra etre mise a jour.')) {
+        return;
+      }
+      var avant = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'en cours…';
+      fetch('/api/rotate', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: btn.dataset.service})
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          btn.disabled = false;
+          btn.textContent = avant;
+          if (!d.ok) {
+            btn.insertAdjacentHTML('beforebegin',
+              '<span class="echec"></span>');
+            cellule.querySelector('.echec').textContent = d.message || d.error;
+            return;
+          }
+          // Le nouveau mot de passe remplace l'ancien sur place, deja devoile :
+          // c'est le seul moment ou l'utilisateur peut le noter.
+          var secret = cellule.querySelector('.secret');
+          secret.dataset.value = d.password;
+          secret.textContent = d.password;
+          secret.classList.add('devoile');
+          var copie = cellule.querySelector('button.copy');
+          if (copie) copie.dataset.value = d.password;
+        })
+        .catch(function (e) {
+          btn.disabled = false;
+          btn.textContent = avant;
+        });
+    });
+  });
 
   document.querySelectorAll('button.act').forEach(function (btn) {
     btn.addEventListener('click', function () {

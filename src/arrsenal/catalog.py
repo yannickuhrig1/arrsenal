@@ -223,3 +223,11 @@ def resolve_dependencies(selection: list[str]) -> list[str]:
                 wanted.add(spec.requires_one_of[0])
                 changed = True
     return [sid for sid in STARTUP_ORDER if sid in wanted]
+
+
+#: Familles dont le mot de passe peut etre change sans reinstaller. Liste fermee :
+#: chaque entree correspond a un chemin VERIFIE contre le service, pas a une
+#: supposition. Elle vit ici parce que deux modules en ont besoin — la page
+#: d'administration pour afficher le bouton, l'orchestrateur pour agir — et que
+#: la page ne peut pas importer l'orchestrateur, qui l'importe deja.
+ROTATABLE_FAMILIES = ("arr", "qbittorrent", "transmission")
