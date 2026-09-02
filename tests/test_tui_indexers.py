@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from rich.text import Text
 from textual.widgets import Button, Input, Label, Static
 
 from arrsenal.clients.prowlarr import IndexerDefinition
@@ -245,3 +246,58 @@ class _FauxCatalogue:
     def search(self, terme, limite):
         besoin = terme.strip().lower()
         return [d for d in self._definitions if besoin in d.name.lower()][:limite]
+
+
+@pytest.mark.asyncio
+async def test_un_message_de_prowlarr_a_balise_ne_ferme_pas_l_assistant(screen_app):
+    """Les messages d'erreur viennent de Prowlarr et de l'indexeur contacte.
+
+    Ils atterrissaient dans notre balisage sans etre echappes : une balise
+    fermante isolee levait `MarkupError` en plein rendu, donc dans le rappel
+    d'un worker, donc l'assistant se fermait.
+    """
+    async with screen_app.run_test() as pilot:
+        pilot.app.push_screen(IndexersScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+
+        screen._added("C411", False, "echec [/dim] du test [bold] sur l'indexeur", ["Torrent[CORE]"])
+        await pilot.pause()
+
+        # `update()` ne fait que ranger la chaine : c'est le RENDU qui analyse
+        # le balisage et qui levait. On force donc l'analyse ici.
+        texte = str(screen.query_one("#indexer-status", Static).content)
+        rendu = Text.from_markup(texte)
+
+        assert "C411" in rendu.plain
+        assert "Torrent[CORE]" in rendu.plain
+        assert "[/dim]" in rendu.plain, "le message de Prowlarr doit rester lisible tel quel"
+
+
+@pytest.mark.asyncio
+async def test_une_erreur_d_affichage_ne_remonte_pas_dans_le_worker(screen_app, monkeypatch):
+    """`call_from_thread` RENVOIE au fil appelant ce que le rappel a leve.
+
+    L'appel etait hors de la garde : une erreur d'affichage remontait donc dans
+    le worker, hors de tout `try`, et Textual arretait l'application.
+    """
+    async with screen_app.run_test() as pilot:
+        pilot.app.push_screen(IndexersScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+        screen._indexers = _FauxCatalogue([JUMELLE_A])
+        monkeypatch.setattr(
+            type(screen), "_added", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boum"))
+        )
+        monkeypatch.setattr(
+            _FauxCatalogue, "add", lambda self, d, v: (True, "ok"), raising=False
+        )
+        monkeypatch.setattr(
+            _FauxCatalogue, "configured", lambda self: [], raising=False
+        )
+
+        # Le worker tourne dans un fil : on appelle le corps directement, ce qui
+        # exerce exactement le chemin qui tuait l'application.
+        screen.submit.__wrapped__(screen, JUMELLE_A, {})
+
+        assert pilot.app._exception is None

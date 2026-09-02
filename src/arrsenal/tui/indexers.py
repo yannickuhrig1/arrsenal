@@ -195,7 +195,8 @@ class IndexersScreen(WizardScreen):
         `app_profile_id()`, qui interrogent Prowlarr eux aussi. Constate a
         l'usage : saisie d'un tracker, clic sur Ajouter, fenetre disparue.
         """
-        assert self._indexers is not None
+        if self._indexers is None:
+            return
         try:
             ok, message = self._indexers.add(definition, values)
             already = [i.get("name", "?") for i in self._indexers.configured()]
@@ -203,12 +204,26 @@ class IndexersScreen(WizardScreen):
             journal.LOGGER.exception("ajout de l'indexeur %s", definition.name)
             ok, message = False, f"{type(exc).__name__} : {exc}"
             already = []
-        self.app.call_from_thread(self._added, definition.name, ok, message, already)
+        try:
+            # `call_from_thread` RENVOIE au fil appelant ce que le rappel a leve.
+            # L'appel etait hors du `try`, donc une erreur d'affichage remontait
+            # dans le worker, hors de toute garde, et Textual arretait
+            # l'application. Le `assert` qui precedait avait le meme defaut.
+            self.app.call_from_thread(self._added, definition.name, ok, message, already)
+        except Exception:  # noqa: BLE001
+            journal.LOGGER.exception("affichage du resultat pour %s", definition.name)
 
     def _added(self, name: str, ok: bool, message: str, already: list[str]) -> None:
         colour = "green" if ok else "red"
-        configured = f"\n[dim]Configures : {', '.join(already) or 'aucun'}[/dim]"
-        self._set_status(f"[{colour}]{name} : {message}[/{colour}]{configured}")
+        # `escape` : ces trois textes viennent de Prowlarr et de l'indexeur, pas
+        # de nous, et ils atterrissent dans NOTRE balisage. Une balise fermante
+        # isolee dans un message d'erreur suffirait a lever `MarkupError` en
+        # plein rendu — donc a fermer l'assistant.
+        noms = ", ".join(escape(n) for n in already) or "aucun"
+        self._set_status(
+            f"[{colour}]{escape(name)} : {escape(message)}[/{colour}]\n"
+            f"[dim]Configures : {noms}[/dim]"
+        )
         self.query_one("#add", Button).disabled = False
         self.query_one("#skip", Button).label = "Continuer"
 

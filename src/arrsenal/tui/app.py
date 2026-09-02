@@ -10,7 +10,7 @@ from pathlib import Path
 
 from textual.app import App
 
-from .. import orchestrator
+from .. import journal, orchestrator
 from ..models import PlatformProfile, StackConfig, VpnConfig
 from ..wiring import StepResult
 from .screens import WelcomeScreen
@@ -42,6 +42,24 @@ class ArrsenalApp(App):
         #: captures et par les tests : lancer un navigateur pendant une CI
         #: n'aurait aucun sens.
         self.auto_open_page: bool = True
+
+    def _handle_exception(self, error: Exception) -> None:
+        """Dernier filet : consigner avant de mourir.
+
+        Textual arrete l'application sur TOUTE exception non rattrapee, y
+        compris celles levees dans un worker ou renvoyees par
+        `call_from_thread`. Signale a l'usage, deux fois : « le script s'est
+        ferme » — et le journal s'arretait a la derniere etape reussie, sans une
+        ligne sur la cause. Une panne qui ne laisse pas de trace n'est pas
+        diagnosticable ; celle-ci en laissera une.
+
+        On delegue ensuite a Textual, qui arrete l'application comme prevu :
+        ce point de passage sert a consigner, pas a survivre.
+        """
+        journal.LOGGER.error("assistant interrompu", exc_info=error)
+        for handler in journal.LOGGER.handlers:
+            handler.flush()
+        super()._handle_exception(error)
 
     def on_mount(self) -> None:
         self.push_screen(WelcomeScreen())
