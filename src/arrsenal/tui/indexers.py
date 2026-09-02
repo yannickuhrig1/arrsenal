@@ -8,6 +8,7 @@ passe d'un bouton.
 
 from __future__ import annotations
 
+from rich.markup import escape
 from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -101,34 +102,57 @@ class IndexersScreen(WizardScreen):
         self._matches = self._indexers.search(event.value, MAX_RESULTS)
         for definition in self._matches:
             marker = "prive" if definition.is_private else "public"
+            # Le nom vient de Prowlarr et se retrouve dans NOTRE balisage : il
+            # faut l'echapper, sinon une balise fermante isolee ferait lever
+            # `MarkupError` en plein rendu de la liste.
             results.append(
-                ListItem(Label(f"{definition.name}  [dim]{marker} - {definition.protocol}[/dim]"))
+                ListItem(
+                    Label(f"{escape(definition.name)}  [dim]{marker} - {definition.protocol}[/dim]")
+                )
             )
 
     @on(ListView.Selected, "#indexer-results")
-    def _select(self, event: ListView.Selected) -> None:
+    async def _select(self, event: ListView.Selected) -> None:
         index = event.list_view.index
         if index is None or index >= len(self._matches):
             return
         self._current = self._matches[index]
-        self._render_form(self._current)
+        await self._render_form(self._current)
 
-    def _render_form(self, definition: IndexerDefinition) -> None:
+    async def _render_form(self, definition: IndexerDefinition) -> None:
+        """Peuple le formulaire pour la definition choisie.
+
+        `remove_children()` et `mount()` sont ASYNCHRONES : ils rendent la main
+        avant que le DOM ait bouge. Sans les attendre, le second indexeur
+        selectionne montait un `Input` dont l'ancien existait encore, et Textual
+        levait `DuplicateIds` — depuis un gestionnaire d'evenement, donc
+        l'assistant se fermait net. Constate a l'usage : le premier choix
+        s'affichait, le suivant tuait l'application. Reproduit ensuite sur les
+        625 definitions d'un Prowlarr reel, ou 39 des 40 correspondances de
+        « tr » plantaient a la seconde selection.
+        """
         form = self.query_one("#indexer-form", VerticalScroll)
-        form.remove_children()
-        form.mount(
+        await form.remove_children()
+        # `markup=False` : ces textes viennent de Prowlarr, pas de nous. Verifie
+        # sur les 625 definitions du moment : aucune ne casse aujourd'hui, et
+        # `Torrent[CORE]` s'affiche tel quel. Mais une balise fermante isolee
+        # comme `[/dim]` leverait `MarkupError`, et un `[bold]` disparaitrait
+        # sans bruit. La liste bouge a chaque version de Prowlarr ; on ne parie
+        # pas dessus.
+        await form.mount(
             Static(
-                f"[b]{definition.name}[/b]  [dim]{definition.privacy} - "
-                f"{definition.protocol}[/dim]\n[dim]{definition.description[:160]}[/dim]",
+                f"{definition.name}  ({definition.privacy} - {definition.protocol})\n"
+                f"{definition.description[:160]}",
                 classes="indexer-title",
+                markup=False,
             )
         )
         fields = definition.editable_fields()
         if not fields:
-            form.mount(Static("[dim]Aucun identifiant requis.[/dim]"))
+            await form.mount(Static("[dim]Aucun identifiant requis.[/dim]"))
         for field in fields:
-            form.mount(Label(field.label, classes="group-title"))
-            form.mount(
+            await form.mount(Label(field.label, classes="group-title", markup=False))
+            await form.mount(
                 Input(
                     value=field.prefill,
                     password=field.secret,
@@ -137,9 +161,11 @@ class IndexersScreen(WizardScreen):
                 )
             )
         if len(definition.urls) > 1:
-            form.mount(
+            await form.mount(
                 Static(
-                    "[dim]Autres miroirs connus : " + ", ".join(definition.urls[1:4]) + "[/dim]"
+                    "Autres miroirs connus : " + ", ".join(definition.urls[1:4]),
+                    classes="indexer-mirrors",
+                    markup=False,
                 )
             )
         self.query_one("#add", Button).disabled = False

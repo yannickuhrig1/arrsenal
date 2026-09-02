@@ -266,7 +266,7 @@ async def capture() -> None:
         screen._matches = [FAKE_DEFINITION]
         results = screen.query_one("#indexer-results", ListView)
         results.append(ListItem(Label("Votre indexeur  [dim]prive - torrent[/dim]")))
-        screen._render_form(FAKE_DEFINITION)
+        await screen._render_form(FAKE_DEFINITION)
         # mount() est asynchrone : sans ces passes, la capture part avant que les
         # champs du formulaire soient rendus.
         for _ in range(4):

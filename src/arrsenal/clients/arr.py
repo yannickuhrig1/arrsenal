@@ -158,6 +158,13 @@ class ArrClient:
         Renvoie (gabarit_rempli, champs_appliques, champs_ignores). Les champs
         ignores sont ceux que nous voulions poser mais que cette version n'expose
         pas : ils sont journalises plutot que silencieusement perdus.
+
+        Un champ qu'on voulait VIDER et qui n'existe pas n'est pas une perte : le
+        resultat est identique avec ou sans lui. Le signaler n'apprenait rien et
+        polluait chaque installation. Cas reel : les profils posent
+        `tvDirectory: ""` pour interdire le couple categorie + repertoire, que
+        les *arr refusent ; or Transmission expose ce champ et qBittorrent non,
+        d'ou trois avertissements a chaque passage pour un effacement sans effet.
         """
         filled = dict(schema)
         fields = [dict(f) for f in schema.get("fields", [])]
@@ -169,7 +176,7 @@ class ArrClient:
                 field["value"] = values[name]
                 applied.append(name)
         filled["fields"] = fields
-        skipped = [k for k in values if k not in present]
+        skipped = [k for k, v in values.items() if k not in present and v not in ("", None)]
         return filled, applied, skipped
 
     # -- operations idempotentes --------------------------------------------

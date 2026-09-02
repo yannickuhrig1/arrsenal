@@ -141,8 +141,16 @@ async def test_path_check_actually_creates_a_hardlink(app, tmp_path):
         screen = pilot.app.screen
         screen.query_one("#data-root", Input).value = str(tmp_path / "data")
         screen.query_one("#check", Button).press()
-        await pilot.pause()
-        assert "hardlink" in str(screen.query_one("#paths-check", Static).content)
+        # `press()` poste un message : une seule passe d'evenements suffit d'
+        # ordinaire, mais pas sous charge — ce test echouait une fois sur
+        # plusieurs dizaines quand la suite tournait en entier. On attend le
+        # resultat plutot que de compter les passes.
+        cible = screen.query_one("#paths-check", Static)
+        for _ in range(60):
+            await pilot.pause()
+            if str(cible.content):
+                break
+        assert "hardlink" in str(cible.content)
 
 
 @pytest.mark.asyncio

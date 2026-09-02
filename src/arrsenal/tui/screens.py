@@ -231,7 +231,11 @@ class PathsScreen(WizardScreen):
         # chemins Linux, crees ensuite a la racine du disque courant.
         courant = default_profile()
         defaults = PROFILE_DEFAULTS[courant]
-        with Vertical(id="paths"):
+        # `VerticalScroll` et non `Vertical` : l'ecran a grossi (identifiant,
+        # adresse de la machine) et depassait la fenetre. Sans defilement, les
+        # derniers champs etaient simplement INACCESSIBLES — il fallait
+        # agrandir la fenetre a la main pour les voir. Signale a l'usage.
+        with VerticalScroll(id="paths"):
             yield Label("Profil de plateforme", classes="group-title")
             with RadioSet(id="platform"):
                 for profile in PlatformProfile:

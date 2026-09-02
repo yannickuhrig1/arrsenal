@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from textual.widgets import Button, Input, Static
+from textual.widgets import Button, Input, Label, Static
 
 from arrsenal.clients.prowlarr import IndexerDefinition
 from arrsenal.tui.app import ArrsenalApp
@@ -86,7 +86,7 @@ async def test_form_shows_credentials_and_hides_tuning_fields(screen_app):
         pilot.app.push_screen(IndexersScreen())
         await pilot.pause()
         screen = pilot.app.screen
-        screen._render_form(DEFINITION)
+        await screen._render_form(DEFINITION)
         await pilot.pause()
 
         names = {inp.id for inp in screen.query(".indexer-field").results(Input)}
@@ -100,7 +100,7 @@ async def test_secret_fields_are_masked_on_screen(screen_app):
         pilot.app.push_screen(IndexersScreen())
         await pilot.pause()
         screen = pilot.app.screen
-        screen._render_form(DEFINITION)
+        await screen._render_form(DEFINITION)
         await pilot.pause()
         masked = {inp.id: inp.password for inp in screen.query(".indexer-field").results(Input)}
         assert masked == {"fld-baseUrl": False, "fld-apiKey": True}
@@ -113,7 +113,7 @@ async def test_base_url_is_prefilled_from_the_definition(screen_app):
         pilot.app.push_screen(IndexersScreen())
         await pilot.pause()
         screen = pilot.app.screen
-        screen._render_form(DEFINITION)
+        await screen._render_form(DEFINITION)
         await pilot.pause()
         url = screen.query_one("#fld-baseUrl", Input)
         assert url.value == "https://un.invalid/"
@@ -135,9 +135,113 @@ async def test_rendering_a_second_indexer_replaces_the_first_form(screen_app):
         pilot.app.push_screen(IndexersScreen())
         await pilot.pause()
         screen = pilot.app.screen
-        screen._render_form(DEFINITION)
+        await screen._render_form(DEFINITION)
         await pilot.pause()
-        screen._render_form(other)
+        await screen._render_form(other)
         await pilot.pause()
         names = {inp.id for inp in screen.query(".indexer-field").results(Input)}
         assert names == {"fld-cookie"}
+
+
+# ------------------------------------------------- le plantage de la 0.1.5
+
+
+#: Deux definitions qui PARTAGENT un nom de champ. C'est le cas courant :
+#: `baseUrl` existe dans presque toutes les definitions de Prowlarr. Le test
+#: precedent en comparait deux aux champs disjoints, et passait donc au vert
+#: pendant que l'assistant se fermait chez l'utilisateur.
+JUMELLE_A = IndexerDefinition(
+    name="Tr4cker",
+    implementation="Torznab",
+    privacy="private",
+    protocol="torrent",
+    language="fr-FR",
+    description="",
+    raw={
+        "indexerUrls": ["https://a.invalid/"],
+        "fields": [
+            {"name": "baseUrl", "type": "select", "label": "Url", "value": None},
+            {"name": "apiKey", "type": "textbox", "label": "API Key", "privacy": "apiKey"},
+        ],
+    },
+)
+JUMELLE_B = IndexerDefinition(
+    name="Torrent[CORE]",
+    implementation="Torznab",
+    privacy="private",
+    protocol="torrent",
+    language="fr-FR",
+    description="",
+    raw={
+        "indexerUrls": ["https://b.invalid/"],
+        "fields": [
+            {"name": "baseUrl", "type": "select", "label": "Url", "value": None},
+            {"name": "apiKey", "type": "textbox", "label": "API Key", "privacy": "apiKey"},
+        ],
+    },
+)
+
+
+@pytest.mark.asyncio
+async def test_deux_indexeurs_aux_memes_champs_ne_tuent_pas_l_assistant(screen_app):
+    """Le plantage signale : chercher, cliquer un indexeur, puis un autre, et
+    l'application se fermait net.
+
+    `remove_children()` rend la main AVANT que le DOM ait bouge. Le second
+    formulaire montait donc un `#fld-baseUrl` alors que le premier existait
+    encore, et Textual levait `DuplicateIds` depuis un gestionnaire d'evenement
+    — ce qui arrete l'application. Reproduit sur un Prowlarr reel : 39 des 40
+    correspondances de « tr » plantaient a la seconde selection.
+    """
+    async with screen_app.run_test() as pilot:
+        pilot.app.push_screen(IndexersScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+
+        await screen._render_form(JUMELLE_A)
+        await screen._render_form(JUMELLE_B)
+        await pilot.pause()
+
+        assert screen.query_one("#fld-baseUrl", Input).value == "https://b.invalid/"
+        assert len(screen.query("#fld-baseUrl")) == 1
+
+
+@pytest.mark.asyncio
+async def test_dix_allers_retours_de_suite(screen_app):
+    """Un utilisateur compare plusieurs indexeurs avant de choisir."""
+    async with screen_app.run_test() as pilot:
+        pilot.app.push_screen(IndexersScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+
+        for i in range(10):
+            await screen._render_form(JUMELLE_A if i % 2 else JUMELLE_B)
+
+        assert len(screen.query(".indexer-field")) == 2
+
+
+@pytest.mark.asyncio
+async def test_un_nom_a_crochets_reste_lisible(screen_app):
+    """`Torrent[CORE]` existe vraiment dans Prowlarr. Le nom traverse notre
+    balisage : mal echappe, une balise fermante isolee ferait lever MarkupError
+    en plein rendu de la liste."""
+    async with screen_app.run_test() as pilot:
+        pilot.app.push_screen(IndexersScreen())
+        await pilot.pause()
+        screen = pilot.app.screen
+        screen._indexers = _FauxCatalogue([JUMELLE_B, JUMELLE_A])
+
+        screen.query_one("#indexer-search", Input).value = "to"
+        await pilot.pause()
+
+        libelles = [str(w.content) for w in screen.query_one("#indexer-results").query(Label)]
+        assert any("Torrent[CORE]" in libelle for libelle in libelles)
+
+
+class _FauxCatalogue:
+    def __init__(self, definitions):
+        self._definitions = definitions
+
+    def search(self, terme, limite):
+        besoin = terme.strip().lower()
+        return [d for d in self._definitions if besoin in d.name.lower()][:limite]

@@ -8,9 +8,19 @@ Header {
     background: $primary-darken-2;
 }
 
-#welcome, #paths, #services, #summary, #report {
+#welcome, #paths, #services, #summary, #report, #vpn {
     padding: 1 2;
     height: 1fr;
+}
+
+/* Un `Vertical` vaut `height: 1fr` par defaut : sa taille vient de la place
+   disponible, pas de son contenu. Sur une fenetre courte, ces trois blocs se
+   reduisaient a UNE ligne et leurs champs disparaissaient, superposes au bloc
+   suivant. Constate a l'usage : le message reclamait la cle privee WireGuard
+   alors que le champ pour la saisir etait ecrase hors de vue. `auto` fait
+   dependre la hauteur du contenu, et le defilement de `#vpn` fait le reste. */
+#vpn-details, #vpn-wireguard, #vpn-openvpn {
+    height: auto;
 }
 
 #pitch {
