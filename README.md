@@ -454,13 +454,13 @@ Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 | **Notifiarr** | Notifications centralisées pour toute la stack. Chaque *arr s'y déclare par une clé API. |
 | **Bazarr** | Sous-titres. Étudié, mais sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
 | **SABnzbd** | Client Usenet, à côté des deux clients torrent. |
+| **DroppedNeedle** | Musique. Anciennement *MusicSeerr*, renommé, et le nom de code compte : il **remplace Lidarr** plutôt que de le compléter — moteur de bibliothèque et de téléchargement intégré, catalogue MusicBrainz. Un seul conteneur, `PUID`/`PGID`/`UMASK` et un montage `/data` à parent commun : exactement les conventions d'arrsenal. Deux points à vérifier : il télécharge par **slskd** (Soulseek) ou SABnzbd, aucun des deux n'étant au catalogue, et son premier compte administrateur se crée par l'interface web, sans variable d'environnement pour le pré-semer. |
 | **Wizarr** | Invitations et gestion des comptes pour Jellyfin, Plex et Emby. Le service le plus autonome de cette liste : un conteneur, et le câblage se réduit au serveur média et à sa clé. |
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut donc pas précéder Plex, qui figure déjà plus haut : sans jeton Plex, il n'a rien à observer. |
 | **Jellystat** | Statistiques Jellyfin. Obstacle connu : le service exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue actuel tient en un seul. `JS_USER` / `JS_PASSWORD` laissent en revanche espérer un pré-semis des identifiants. |
 | **Tracearr** | Suivi des lectures et détection de partage de comptes, pour Plex, Jellyfin et Emby. L'image `latest` réclame une base et un Redis externes ; le tag `supervised` réunit le tout en un conteneur — c'est celui à vérifier. |
 | **Silo** | Serveur média compatible API Jellyfin. Deux obstacles connus : c'est une pile de quatre conteneurs, et aucune version n'est publiée — seulement des SHA de commit. |
 | Audiobookshelf, Shelfmark, Shelfarr | Livres et livres audio. |
-| *Musicseerr* | Demandes de médias pour la musique. **Aucun dépôt de référence** : la recherche ne rend que des projets homonymes de moins de cinq étoiles, sans version publiée ni image officielle. À reprendre si le projet se stabilise, ou si vous avez le bon lien. |
 
 Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié** contre une
 instance réelle. Voir [PROMPT.md](PROMPT.md) pour le détail.
