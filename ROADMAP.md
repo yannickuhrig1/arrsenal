@@ -3,7 +3,7 @@
 Où en est arrsenal, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.8**
+**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.9**
 
 ---
 
@@ -92,7 +92,7 @@ reste une commande à lancer.
 | Renouveler un mot de passe, avec recâblage | ✅ |
 | Renouveler une clé API, avec recâblage | ✅ |
 | Ajouter un service absent de l'installation | ✅ |
-| Démarrage automatique, sans lancer de commande | ✅ non publié |
+| Démarrage automatique, sans lancer de commande | ✅ 0.1.9 |
 
 **Pourquoi pas un conteneur.** La question a été tranchée en la mesurant. La
 console doit créer, démarrer et recréer des conteneurs — soit
@@ -129,6 +129,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.1.9** | La console démarre toute seule, sur l'hôte, et se protège par un mot de passe. Un cookie contenant un caractère accentué tuait la requête sans authentification. |
 | **0.1.8** | Rotation des clés API, ajout d'un service depuis la page d'administration, et filtre géographique du VPN en liste cliquable. Un même défaut trouvé trois fois : un service qui garde l'ancien secret sans que rien ne le dise — autobrr, puis l'entrée Application de Prowlarr. |
 | **0.1.7** | Recyclarr ne posait plus aucun profil, silencieusement, dès qu'un service se retrouvait avec deux fichiers de configuration. Renouvellement d'un mot de passe depuis la page d'administration. autobrr gardait l'ancien mot de passe d'un client de téléchargement. |
 | **0.1.6** | Trois plantages de l'assistant : deuxième indexeur sélectionné (`DuplicateIds`), message d'erreur d'un indexeur contenant un crochet ouvert, et champs devenus inaccessibles sur une fenêtre courte. La clé d'un indexeur ne fuit plus à l'écran ni au journal. |
