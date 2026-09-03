@@ -16,6 +16,11 @@ Deux cas rencontres pour de vrai :
 
 D'ou la regle : ce controle doit PARCOURIR l'assistant, pas seulement l'ouvrir.
 
+Les modules importes tardivement — `clients/silo.py` ne l'est qu'au fond d'une
+etape de cablage — ne se verifient PAS ici : cet executable est construit a
+part, et ce qu'il embarque ne dit rien de ce qu'embarque `arrsenal.exe`. Cette
+verification-la se fait sur le vrai binaire, dans le workflow.
+
 Sortie non nulle si l'assistant ne se rend pas correctement.
 """
 
@@ -30,7 +35,7 @@ MIN_REGLES = 50
 
 
 async def probe() -> int:
-    from textual.widgets import Button, RadioButton, SelectionList
+    from textual.widgets import Button, RadioButton, Select, SelectionList
 
     from arrsenal import catalog
     from arrsenal.tui.app import ArrsenalApp
@@ -51,6 +56,7 @@ async def probe() -> int:
         app.selection = ["sonarr", "qbittorrent"]
         app.push_screen(PathsScreen())
         await pilot.pause()
+        langues_proposees = len(app.screen.query_one("#langue", Select)._options)
         app.screen.query_one("#next", Button).press()
         await pilot.pause()
         atteint = type(app.screen).__name__
@@ -59,16 +65,22 @@ async def probe() -> int:
             await pilot.pause()
             lieux = len(app.screen.query_one("#vpn-lieux", SelectionList)._options)
 
+    choisissables = len(list(catalog.selectable()))
     print(f"  feuille de style : {regles} regles")
-    print(f"  services affiches : {cases} / {len(catalog.CATALOG)}")
+    print(f"  services affiches : {cases} / {choisissables}")
     print(f"  ecran apres les chemins : {atteint}")
+    print(f"  langues proposees : {langues_proposees}")
     print(f"  lieux VPN proposes : {lieux}")
 
     problemes = []
     if regles < MIN_REGLES:
         problemes.append(f"feuille de style absente ou vide ({regles} regles)")
-    if cases != len(catalog.CATALOG):
-        problemes.append(f"{cases} services affiches au lieu de {len(catalog.CATALOG)}")
+    if cases != choisissables:
+        # `CATALOG` contient aussi la base et le cache de Silo, tires comme
+        # prerequis et jamais coches : c'est `selectable()` qui fait foi.
+        problemes.append(f"{cases} services affiches au lieu de {choisissables}")
+    if langues_proposees <= 1:
+        problemes.append("le choix de la langue est vide ou absent")
     if atteint != "VpnScreen":
         problemes.append(f"l'ecran VPN n'est pas atteint ({atteint})")
     elif lieux <= 0:

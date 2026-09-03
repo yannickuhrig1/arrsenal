@@ -22,3 +22,8 @@ stack.local.yml
 dist-*/
 build-*/
 /arrsenal.spec
+
+# Journal produit par arrsenal lui-meme, dans le repertoire ou il tourne.
+# On le demande aux utilisateurs pour les rapports de bug : il ne doit jamais
+# entrer au depot, meme si les secrets y sont masques.
+arrsenal.log

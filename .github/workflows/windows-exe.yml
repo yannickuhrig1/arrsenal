@@ -52,6 +52,24 @@ jobs:
           dist-smoke\smoke.exe
         shell: pwsh
 
+      - name: Les modules charges tardivement sont dans l'archive
+        # `clients/silo.py` n'est importe qu'au fond d'une etape de cablage, et
+        # `arrsenal.exe` ne l'ouvre donc jamais avant qu'un utilisateur installe
+        # Silo pour de vrai. Un module qu'aucun import de premier niveau ne
+        # designe est exactement ce que l'empaquetage laisse au bord de la route
+        # sans rien dire. On lit la liste que PyInstaller a REELLEMENT ecrite,
+        # plutot que de faire confiance a son analyse.
+        run: |
+          $toc = Get-Content build\arrsenal\Analysis-00.toc -Raw
+          foreach ($m in @('arrsenal.clients.silo','arrsenal.langues',
+                           'arrsenal.clients.jellyfin','arrsenal.wiring')) {
+            if ($toc -notmatch [regex]::Escape("'$m'")) {
+              throw "$m absent de l'executable"
+            }
+            Write-Output "  $m"
+          }
+        shell: pwsh
+
       - name: Taille du binaire
         run: |
           $mo = [math]::Round((Get-Item dist\arrsenal.exe).Length / 1MB, 1)
