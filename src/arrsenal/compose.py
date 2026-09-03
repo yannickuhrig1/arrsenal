@@ -33,6 +33,20 @@ _HEADER = (
 )
 
 
+def flood_client(cfg: StackConfig) -> str | None:
+    """Le client de telechargement que Flood pilote, ou None.
+
+    Flood n'en pilote qu'un a la fois. Quand les deux sont installes,
+    qBittorrent gagne : son API est plus riche.
+    """
+    if not cfg.enabled("flood"):
+        return None
+    for client_id in ("qbittorrent", "transmission"):
+        if cfg.enabled(client_id):
+            return client_id
+    return None
+
+
 def _flood_block(cfg: StackConfig) -> dict:
     """Options de Flood, selon le client de telechargement present.
 
@@ -57,15 +71,25 @@ def _flood_block(cfg: StackConfig) -> dict:
         if not cfg.enabled(client_id):
             continue
         spec, inst = catalog.get(client_id), cfg.services[client_id]
-        base = f"http://{spec.id}:{spec.internal_port}"
+        # Flood n'est PAS dans le tunnel : sous VPN, le client de telechargement
+        # y est, et perd son alias DNS. `http://qbittorrent:8080` ne resout donc
+        # plus depuis Flood. Signale a l'usage : « Flood me dit impossible de se
+        # connecter au client ». Meme cause que la panne de Prowlarr le meme
+        # jour, et meme correction : on demande l'adresse a `internal_url`.
+        base = inst.internal_url(
+            spec, cfg.host, behind_vpn=cfg.vpn.enabled and spec.category is Category.DOWNLOAD
+        )
         url_option, user_option, pass_option = options
+        # Le mot de passe passe par le .env : le compose n'a pas a le porter en
+        # clair. C'etait le dernier secret a y rester apres la cle WireGuard.
+        variable = "FLOOD_CLIENT_PASS"
         block["command"] += [
             url_option,
             base if client_id == "qbittorrent" else f"{base}/transmission/rpc",
             user_option,
             inst.username or "",
             pass_option,
-            inst.password or "",
+            "${" + variable + "}",
         ]
         block["depends_on"] = [client_id]
         break
@@ -328,6 +352,11 @@ def render_env(cfg: StackConfig) -> str:
         "",
         "# Cles API pre-semees - utilisees par le cablage automatique.",
     ]
+    pilote = flood_client(cfg)
+    if pilote is not None:
+        # Flood recoit le mot de passe du client qu'il pilote. Il etait ecrit en
+        # clair dans le compose, dernier secret a y rester.
+        lines.append(f"FLOOD_CLIENT_PASS={_env_value(cfg.services[pilote].password or '')}")
     if cfg.vpn.enabled:
         # Le compose ne porte plus que le NOM de ces variables.
         if cfg.vpn.vpn_type == "wireguard":

@@ -24,6 +24,7 @@ from . import (
     journal,
     orchestrator,
     report,
+    vpncheck,
 )
 from . import adopt as adopt_mod
 from . import autostart as autostart_mod
@@ -654,6 +655,13 @@ def doctor(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack
     cfg = _load_config(project_dir)
     if not report.print_checks(orchestrator.preflight(cfg, project_dir)):
         console.print("[red]Des controles bloquants ont echoue.[/red]")
+
+    # La protection du trafic torrent AVANT l'etat des conteneurs : c'est la
+    # reponse la plus attendue de ce diagnostic.
+    fuites = vpncheck.verifier(cfg)
+    if fuites:
+        console.print("\nProtection VPN du trafic torrent :")
+        report.print_checks(fuites)
 
     console.print("\nEtat des conteneurs :")
     console.print(Compose(project_dir, cfg.project_name).ps())

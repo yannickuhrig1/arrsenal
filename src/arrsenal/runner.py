@@ -114,6 +114,31 @@ def running_project_dir(project_name: str) -> str | None:
     return None
 
 
+def network_mode(container: str) -> str | None:
+    """Mode reseau d'un conteneur, ou None s'il n'existe pas.
+
+    Un client torrent protege renvoie `container:<id de gluetun>` : il partage
+    la pile reseau du VPN et n'a aucune autre route. Un client expose renvoie
+    le nom d'un reseau, `arrsenal_arrsenal`.
+    """
+    proc = _run(
+        ["docker", "inspect", container, "--format", "{{.HostConfig.NetworkMode}}"],
+        timeout=PROBE_TIMEOUT,
+    )
+    return proc.stdout.strip() or None if proc.returncode == 0 else None
+
+
+def container_id(container: str) -> str | None:
+    proc = _run(["docker", "inspect", container, "--format", "{{.Id}}"], timeout=PROBE_TIMEOUT)
+    return proc.stdout.strip() or None if proc.returncode == 0 else None
+
+
+def exec_in(container: str, commande: list[str], timeout: int = PROBE_TIMEOUT) -> tuple[bool, str]:
+    """Execute une commande DANS un conteneur. Renvoie (succes, sortie)."""
+    proc = _run(["docker", "exec", container, *commande], timeout=timeout)
+    return proc.returncode == 0, (proc.stdout or proc.stderr).strip()
+
+
 def volume_name(project_name: str, volume: str) -> str:
     """Nom REEL d'un volume nomme, tel que Docker Compose le cree.
 

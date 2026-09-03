@@ -260,29 +260,24 @@ class Wirer:
     def adresse_client(self, dl_id: str) -> tuple[str, int]:
         """Ou joindre un client de telechargement DEPUIS un conteneur.
 
-        Trois cas, et il faut les trois. Cette resolution vivait en clair dans
-        `step_download_client` pendant que `step_prowlarr_download_client`
-        posait simplement le nom du service. Resultat, VPN active :
+        S'appuie sur `internal_url`, qui porte deja les trois cas — service
+        adopte, client sous VPN, cas ordinaire — et n'ajoute que la
+        decomposition en hote et port, parce que les *arr et Prowlarr veulent
+        deux champs la ou Flood ou qui veulent une URL.
 
-            Unknown exception: Name does not resolve (transmission:9091)
-            Unable to connect to qBittorrent — Name does not resolve
+        Cette resolution a ete recopiee en clair a plusieurs endroits, et chaque
+        copie a fini par diverger. Constate le 2026-09-03, VPN active :
 
-        Sonarr, Radarr et Lidarr se cablaient tres bien pendant que Prowlarr
-        echouait sur les MEMES clients, ce qui rendait la panne incomprehensible.
-        Les deux etapes lisent desormais la meme fonction, pour qu'elles ne
-        puissent plus diverger — c'est la troisieme fois qu'elles le font.
+            ECHEC prowlarr/downloadclient/transmission
+              Unknown exception: Name does not resolve (transmission:9091)
+
+        pendant que Sonarr, Radarr et Lidarr se cablaient tres bien sur les
+        MEMES clients, ce qui rendait la panne illisible. Une seule source.
         """
-        dl_spec = catalog.get(dl_id)
-        dl = self.cfg.services[dl_id]
-        if dl.adopted:
-            # Un client existant n'est pas sur le reseau compose : on le joint
-            # par l'hote, sur son port publie.
-            return self.cfg.host, dl.host_port
-        if self.cfg.vpn.enabled:
-            # Le client partage la pile reseau de Gluetun : il n'a plus de nom
-            # a lui sur le reseau, c'est `gluetun` qu'il faut viser.
-            return "gluetun", dl_spec.internal_port
-        return dl_spec.id, dl_spec.internal_port
+        url = self.internal_url(dl_id)
+        reste = url.split("://", 1)[1]
+        hote, _, port = reste.partition(":")
+        return hote, int(port.split("/", 1)[0])
 
     def step_download_client(self, arr_id: str, dl_id: str) -> StepResult:
         """Rattache un client de telechargement a un *arr.

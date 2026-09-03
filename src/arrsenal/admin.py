@@ -33,7 +33,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import adminauth, catalog, compose, dashboard, imageref, orchestrator, updates
+from . import (
+    adminauth,
+    catalog,
+    compose,
+    dashboard,
+    imageref,
+    orchestrator,
+    updates,
+    vpncheck,
+)
 from .clients.arr import ArrClient
 from .models import StackConfig
 from .runner import Compose
@@ -165,6 +174,12 @@ def doctor_payload(cfg: StackConfig, project_dir: Path) -> dict:
                     "blocking": False,
                 }
             )
+    # La fuite VPN en DERNIER, pour qu'elle se lise en bas du rapport, la ou
+    # l'oeil s'arrete. C'est le controle dont la reponse compte le plus.
+    controles += [
+        {"name": c.name, "ok": c.ok, "detail": c.detail, "blocking": c.blocking}
+        for c in vpncheck.verifier(cfg)
+    ]
     echecs = sum(1 for c in controles if not c["ok"])
     return {"checks": controles, "failed": echecs}
 
