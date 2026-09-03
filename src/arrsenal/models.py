@@ -52,6 +52,15 @@ class ServiceSpec(BaseModel):
     #: l'assistant a cote de Sonarr, et sur la page d'acces avec un lien mort.
     internal: bool = False
 
+    #: Ce service exige-t-il une cle de chiffrement au repos ?
+    needs_secret_key: bool = False
+
+    #: Avertissement a afficher quand le service n'est pas stable. Vide = stable.
+    #: Le texte est repris du projet amont, pas redige par nous : c'est lui qui
+    #: sait ou il en est. Un service instable qu'on presente comme les autres est
+    #: un mensonge par omission.
+    experimental: str = ""
+
     #: Services qui doivent etre SAINS avant celui-ci, pas seulement demarres.
     #: Silo refuse de demarrer si sa base n'a pas fini son initialisation.
     depends_on_healthy: tuple[str, ...] = ()
@@ -181,6 +190,13 @@ class ServiceInstance(BaseModel):
     #: `UrlBase` du service, quand il n'est pas servi a la racine.
     url_base: str = ""
 
+    #: Cle de chiffrement AU REPOS, distincte d'un mot de passe. Elle ne sert
+    #: pas a se connecter : elle chiffre les secrets que le service stocke.
+    #: La confondre avec un mot de passe serait grave — on peut reinitialiser un
+    #: mot de passe, pas celle-ci. Sa PERTE rend les donnees chiffrees
+    #: irrecuperables, ce que la page d'acces doit dire.
+    secret_key: str = ""
+
     #: Ports supplementaires REELLEMENT publies, {port interne: port hote}.
     #: Le catalogue donne les valeurs par defaut ; celles-ci peuvent etre
     #: decalees pour eviter un conflit. C'est ainsi que Silo peut exposer son
@@ -268,6 +284,12 @@ class StackConfig(BaseModel):
 
     #: Hote joignable depuis le navigateur de l'utilisateur, pour le rapport final.
     host: str = "localhost"
+
+    #: Langue des interfaces, code ISO 639-1. Appliquee partout ou le service
+    #: sait la recevoir. Avant, arrsenal imposait le francais a Jellyfin — en
+    #: dur, dans la signature du client — et laissait tout le reste en anglais :
+    #: une incoherence que personne n'avait choisie.
+    language: str = "en"
 
     #: Identifiant commun a tous les services. « arrsenal » n'est qu'un defaut :
     #: demande a l'usage, tout le monde ne veut pas ce nom-la.

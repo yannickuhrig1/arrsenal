@@ -56,6 +56,8 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 | qBittorrent | lui-même | catégories créées avec leur chemin de sauvegarde |
 | Sonarr, Radarr | Jellyfin | notification de rafraîchissement après import |
 | Jellyfin | système de fichiers | assistant de démarrage + bibliothèques Films, Séries, Musique |
+| Silo | système de fichiers | compte, **profil**, bibliothèques Films, Séries, Musique en **lecture seule**, analyse lancée |
+| Sonarr, Radarr, Lidarr, Prowlarr, Jellyfin, Silo | eux-mêmes | langue de l'interface, choisie une fois |
 | Sonarr, Radarr, Lidarr, Prowlarr | interface web | compte créé, **connexion réellement testée** |
 | Recyclarr | Sonarr, Radarr | profils de qualité et custom formats des TRaSH Guides, adresse et clé posées dans le template officiel, **première synchronisation lancée** |
 | qui | qBittorrent | compte créé, instance déclarée, connexion confirmée par qui |
@@ -477,7 +479,8 @@ Voir [DISCLAIMER.md](DISCLAIMER.md).
 ## Périmètre actuel
 
 Prowlarr · Sonarr · Radarr · **Lidarr** · Transmission · **qBittorrent** · Jellyfin
-· autobrr · Recyclarr · Gluetun *(VPN optionnel)* · Flood et qui *(UI optionnelles)*
+· **Silo** *(expérimental)* · autobrr · Recyclarr · Gluetun *(VPN optionnel)* ·
+Flood et qui *(UI optionnelles)*
 
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
@@ -519,7 +522,6 @@ Côté services, dans l'ordre où ils seront étudiés :
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut donc pas précéder Plex, qui figure déjà plus haut : sans jeton Plex, il n'a rien à observer. |
 | **Jellystat** | Statistiques Jellyfin. Obstacle connu : le service exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue actuel tient en un seul. `JS_USER` / `JS_PASSWORD` laissent en revanche espérer un pré-semis des identifiants. |
 | **Tracearr** | Suivi des lectures et détection de partage de comptes, pour Plex, Jellyfin et Emby. L'image `latest` réclame une base et un Redis externes ; le tag `supervised` réunit le tout en un conteneur — c'est celui à vérifier. |
-| **Silo** | Serveur média compatible API Jellyfin. Deux obstacles connus : c'est une pile de quatre conteneurs, et aucune version n'est publiée — seulement des SHA de commit. |
 | Audiobookshelf, Shelfmark, Shelfarr | Livres et livres audio. |
 
 Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié** contre une

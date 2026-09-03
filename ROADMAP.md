@@ -3,13 +3,13 @@
 Où en est arrsenal, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 2 septembre 2026** — version publiée : **0.1.10**
+**Dernière mise à jour : 3 septembre 2026** — version publiée : **0.1.10**
 
 ---
 
 ## Ce qui marche aujourd'hui
 
-Onze services installés et **câblés** en une passe, vérifiés contre des
+Douze services installés et **câblés** en une passe, vérifiés contre des
 instances réelles à chaque livraison.
 
 | | |
@@ -17,7 +17,7 @@ instances réelles à chaque livraison.
 | **Téléchargement** | Transmission, qBittorrent |
 | **Bibliothèque** | Sonarr, Radarr, Lidarr |
 | **Indexeurs** | Prowlarr |
-| **Média** | Jellyfin |
+| **Média** | Jellyfin, Silo *(expérimental)* |
 | **Automatisation** | autobrr, Recyclarr |
 | **Interfaces** | Flood, qui |
 | **Réseau** | Gluetun *(VPN optionnel)* |
@@ -25,6 +25,9 @@ instances réelles à chaque livraison.
 L'assistant couvre **toutes** les options de la ligne de commande : un test
 compare la signature d'`install` à ce que l'assistant sait poser, et échoue si
 un écart apparaît.
+
+La langue des interfaces se demande une fois et s'applique à toutes les
+applications qui en acceptent une.
 
 La page d'administration (`arrsenal serve`) donne l'état des services, les
 démarre, les arrête, les redémarre, signale les mises à jour et les applique,
@@ -36,30 +39,31 @@ l'installation initiale**.
 
 ## Prochaine étape
 
-**Silo.** Deux socles sur trois sont posés.
+**Mise à jour du pack.** Aujourd'hui arrsenal sait dire qu'une image a une
+version plus récente et l'appliquer. Il ne sait pas mettre à jour **sa propre
+installation** quand c'est arrsenal qui change.
 
-| | État |
+Le trou est concret et vérifiable : `stack.yml` porte un champ `version: 1`, et
+**rien ne le lit** — aucune occurrence dans le code. Cette semaine seule, quatre
+champs y sont apparus (`admin_password_hash`, `language`, `secret_key`,
+`extra_ports`). Les valeurs par défaut de pydantic absorbent l'écart en silence,
+ce qui marche tant qu'un champ ne fait qu'apparaître. Le jour où l'un change de
+sens, une installation faite en 0.1.7 se relira sans erreur et sera fausse.
+
+| | |
 |---|---|
-| Lire une référence d'image, digest compris | ✅ non publié |
-| Un service = plusieurs conteneurs et plusieurs ports | ✅ non publié |
-| Silo lui-même | à faire |
+| Migrations de `stack.yml`, indexées sur son numéro de version | à faire |
+| Appliquer les digests épinglés d'un nouveau catalogue à une installation ancienne | à faire |
+| Rejouer les étapes de câblage qui ont changé depuis la version installée | à faire |
 
-Ce que Silo demande réellement, mesuré et non supposé :
-
-- **quatre conteneurs** — `pgvector/pgvector:pg18`, `redis:alpine`,
-  `getmeili/meilisearch:latest` et `ghcr.io/silo-server/silo-server:latest` ;
-- **aucune version publiée** : 488 tags sur son registre, tous des SHA de
-  commit, plus `latest` et `nightly` ;
-- **trois des quatre images ont un tag flottant**. Épingler Silo ne suffira pas ;
-- **trois ports** : son interface, une API compatible Jellyfin sur 8096, une API
-  compatible Audiobookshelf sur 13378 ;
-- **`SECRET_KEY` obligatoire**, sans quoi il refuse de démarrer. Sa perte rend
-  les secrets chiffrés irrécupérables : arrsenal devra le dire, pas seulement le
-  générer.
-
-Le conflit de port avec Jellyfin **n'en est pas un** : son compose prévoit
-explicitement le décalage côté hôte (« PORT and JF_PORT in .env are host-side
-published-port overrides »). Le conteneur garde 8096 en interne.
+**Pas de fichier de secrets chiffré**, et la raison est mécanique plutôt que
+philosophique : c'est **Docker Compose** qui lit le `.env`, pas arrsenal.
+`POSTGRES_PASSWORD`, `SILO_SECRET_KEY` et les identifiants VPN doivent être en
+clair sur le disque au moment du `up`, sinon la stack ne démarre pas. Chiffrer
+`stack.yml` pendant que `.env` est en clair à côté serait décoratif. Un vrai
+chiffrement suppose une phrase de passe tapée à chaque démarrage, ce qui
+supprime le démarrage automatique livré en 0.1.9. Ce qui protège aujourd'hui :
+`chmod 600`, `.gitignore` généré, et masquage des secrets dans le journal.
 
 ---
 
@@ -70,6 +74,8 @@ published-port overrides »). Le conteneur garde 8096 en interne.
 | **Rotation des mots de passe** | ✅ livré en 0.1.7 | qBittorrent, Transmission et les *arr. Vérifié sur une stack de onze services : 25 liaisons sur 25 réalignées. |
 | **Rotation des clés API** | ✅ livré en 0.1.8 | Sur les *arr. Piège vérifié contre Sonarr 4.0.19 : `PUT config/host` répond **202 Accepted** et ne change rien — la clé relue vaut toujours l'ancienne une minute plus tard. Seule la réécriture de `config.xml` suivie d'un redémarrage fonctionne. |
 | **Ajouter un service après coup** | ✅ livré en 0.1.8 | Section « Ajouter un service » sur la page d'administration. Vérifié en vrai : stack Sonarr seul, puis ajout de Prowlarr — 4 liaisons câblées, clé et mot de passe de Sonarr intacts. |
+| **Silo** | ✅ câblé, non publié | Serveur média compatible API Jellyfin, **marqué expérimental**. Trois conteneurs — `pgvector/pgvector:pg18`, `redis:alpine` et `silo-server`, épinglés au digest ; Meilisearch est optionnel et n'est pas installé. Compte, **profil** et trois bibliothèques posés et relus. Deux pièges mesurés, pas supposés : sa base doit vivre dans un **volume Docker** (montage vers l'hôte : migrations en **2935 s** contre **5 s**), et son mot de passe de base doit être alphanumérique — un `?` dans une `postgres://` et le conteneur redémarre en boucle. |
+| **Langue des interfaces** | ✅ câblé, non publié | Demandée une fois dans l'assistant, appliquée partout. Chaque application exprime la même idée autrement : Sonarr et Radarr veulent un entier, **Prowlarr veut le code** (`fr`), Jellyfin une culture et un pays, Silo un code **par bibliothèque**. La table des 29 langues des *arr n'est publiée nulle part : relevée valeur par valeur contre un Sonarr 4.0.19. Au passage, une incohérence corrigée — arrsenal imposait le français à Jellyfin, en dur, et laissait tout le reste en anglais. |
 | **Liste des pays du VPN** | ✅ livré en 0.1.8 | Liste cliquable, extraite de l'image **épinglée**. Piège trouvé au passage : cinq fournisseurs n'exposent aucun pays — quatre classent par région, un par ville. `SERVER_COUNTRIES` ne filtrait rien chez eux. |
 
 ---
@@ -91,7 +97,6 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut pas précéder Plex. |
 | **Jellystat** | Statistiques Jellyfin. Exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue tient en un seul. |
 | **Tracearr** | Suivi des lectures et détection de partage de comptes. L'image `latest` réclame une base et un Redis externes ; le tag `supervised` réunit le tout en un conteneur. |
-| **Silo** | Serveur média compatible API Jellyfin. Pile de quatre conteneurs, et aucune version publiée — seulement des SHA de commit. |
 | Audiobookshelf, Shelfmark, Shelfarr | Livres et livres audio. |
 
 **Readarr n'est pas au programme** : le projet est archivé depuis le 27 juin 2025.
@@ -149,6 +154,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **à venir** | La base de Silo passait par un montage vers le disque Windows : ses migrations de premier démarrage prenaient **49 minutes** au lieu de 5 secondes, et l'installation abandonnait au bout de 300 s alors que PostgreSQL fonctionnait très bien. Un volume Docker règle les deux. Au passage, `config/silo-redis` restait vide à côté du `config/silo/redis` que Docker fabriquait lui-même. |
 | **0.1.10** | **0.1.8 et 0.1.9 etaient ininstallables** : le fichier des pays VPN n'entrait ni dans l'exécutable ni dans le paquet, et l'assistant mourait sur l'écran VPN. Un test compare désormais les fichiers non-Python réels aux deux déclarations d'empaquetage, et le contrôle de l'exe parcourt l'assistant au lieu de l'ouvrir. |
 | **0.1.9** | La console démarre toute seule, sur l'hôte, et se protège par un mot de passe. Un cookie contenant un caractère accentué tuait la requête sans authentification. |
 | **0.1.8** | Rotation des clés API, ajout d'un service depuis la page d'administration, et filtre géographique du VPN en liste cliquable. Un même défaut trouvé trois fois : un service qui garde l'ancien secret sans que rien ne le dise — autobrr, puis l'entrée Application de Prowlarr. |

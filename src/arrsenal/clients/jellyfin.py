@@ -92,9 +92,12 @@ class JellyfinClient:
         *,
         admin_user: str,
         admin_password: str,
-        ui_culture: str = "fr",
-        country: str = "FR",
-        metadata_language: str = "fr",
+        # Plus de defaut francais code en dur : la langue est un REGLAGE, et
+        # l'imposer etait un choix que personne n'avait fait. L'anglais reste
+        # le defaut de Jellyfin lui-meme.
+        ui_culture: str = "en",
+        country: str = "US",
+        metadata_language: str = "en",
     ) -> bool:
         """Termine l'assistant. Idempotent : ne fait rien s'il est deja termine.
 

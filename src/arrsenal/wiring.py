@@ -15,7 +15,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from . import catalog, journal
+from . import catalog, journal, langues
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
 from .clients.autobrr import AutobrrClient
@@ -33,6 +33,16 @@ SYNC_CATEGORIES = {
     "sonarr": [5000, 5010, 5020, 5030, 5040, 5045, 5050],
     "radarr": [2000, 2010, 2020, 2030, 2040, 2045, 2050],
     "lidarr": [3000, 3010, 3030, 3040, 3050, 3060],
+}
+
+#: Chemins des medias VUS PAR SILO. Il monte `${DATA_ROOT}/media` sur
+#: `/mnt/media`, et non `/data` comme les images LinuxServer : sa configuration
+#: amont l'appelle `MEDIA_CONTAINER_ROOT`. Reutiliser CONTAINER_PATHS ici
+#: donnerait des chemins que Silo ne trouverait pas.
+SILO_MEDIA = {
+    "movies": "/mnt/media/movies",
+    "tv": "/mnt/media/tv",
+    "music": "/mnt/media/music",
 }
 
 #: Dossier racine de bibliotheque de chaque application.
@@ -526,9 +536,13 @@ class Wirer:
         url = f"http://{self.cfg.host}:{inst.host_port}"
         with JellyfinClient(url) as jf:
             jf.wait_ready()
+            choisie = langues.resoudre(self.cfg.language)
             ran = jf.run_startup_wizard(
                 admin_user=inst.username or "arrsenal",
                 admin_password=inst.password or "",
+                ui_culture=choisie.code,
+                country=choisie.pays,
+                metadata_language=choisie.code,
             )
             jf.authenticate(inst.username or "arrsenal", inst.password or "")
             # La cle API alimente les notifications Sonarr/Radarr -> Jellyfin,
@@ -564,6 +578,96 @@ class Wirer:
             detail=detail,
             created=ran,
             warnings=[] if analyse else ["l'analyse des bibliotheques n'a pas pu etre lancee"],
+        )
+
+    def step_langue(self, arr_id: str) -> StepResult:
+        """Pose la langue de l'interface d'un *arr.
+
+        Sans elle, arrsenal livrait une stack dont Jellyfin parlait francais —
+        impose en dur — et dont Sonarr, Radarr et Prowlarr parlaient anglais.
+        Une incoherence que personne n'avait choisie.
+        """
+        valeur = langues.arr_ui_language(self.cfg.language)
+        if valeur is None:
+            return StepResult(
+                f"{arr_id}: langue de l'interface",
+                ok=True,
+                detail=f"{self.cfg.language} inconnue de {arr_id}, interface laissee telle quelle",
+            )
+        change = self.arr(arr_id).set_ui_language(self.cfg.language, valeur)
+        relu = self.arr(arr_id).get("config/ui").get("uiLanguage")
+        return StepResult(
+            f"{arr_id}: langue de l'interface",
+            # Relu depuis l'application : « le PUT est passe » ne prouve rien.
+            # La valeur attendue depend du type expose — entier ou code.
+            ok=relu in (valeur, self.cfg.language),
+            detail=f"{self.cfg.language}" + ("" if change else " (deja posee)"),
+            created=change,
+        )
+
+    def step_silo_setup(self) -> StepResult:
+        """Accueil de Silo et creation de ses bibliotheques.
+
+        Meme forme que Jellyfin, et pour la meme raison : creer un compte, s'y
+        connecter avec les identifiants ANNONCES, puis poser les bibliotheques.
+
+        Silo monte les medias en LECTURE SEULE. Il lit ce que les *arr
+        organisent, il n'y touche pas : les deux cohabitent sans se marcher
+        dessus, et c'est verifie par le montage lui-meme, pas espere.
+        """
+        from .clients.silo import SiloClient
+
+        inst = self.cfg.services["silo"]
+        identifiant = inst.username or self.cfg.username
+        with SiloClient(inst.url(self.cfg.host)) as silo:
+            # Silo redemarre en boucle tant que sa base n'est pas prete :
+            # trente secondes observees au premier demarrage. Attendre son API
+            # plutot que son conteneur evite de cabler dans le vide.
+            silo.wait_ready()
+            cree = silo.setup(username=identifiant, password=inst.password or "")
+            if not cree:
+                # Accueil deja fait : on se connecte, ce qui VERIFIE au passage
+                # que les identifiants annonces ouvrent bien la porte.
+                silo.login(identifiant, inst.password or "")
+
+            # Le compte ne suffit pas : sans PROFIL, Silo affiche « You need a
+            # profile before you can enter the app » et bloque l'entree.
+            profil = silo.ensure_profile(identifiant)
+
+            voulues = [
+                (nom, genre, chemin)
+                for nom, genre, chemin in (
+                    ("Films", "movie", SILO_MEDIA["movies"]),
+                    ("Series", "show", SILO_MEDIA["tv"]),
+                    ("Musique", "music", SILO_MEDIA["music"]),
+                )
+            ]
+            faites = [
+                nom
+                for nom, genre, chemin in voulues
+                if silo.ensure_library(nom, genre, chemin, language=self.cfg.language)
+            ]
+            existantes = silo.libraries()
+            noms = {lib.get("name") for lib in existantes}
+            # Comme Jellyfin : une bibliotheque creee ne s'analyse pas toute
+            # seule, et une mediatheque vide donne l'impression que rien n'a
+            # marche.
+            analysees = sum(1 for lib in existantes if silo.refresh_metadata(lib["id"]))
+
+        ok = {nom for nom, _g, _c in voulues} <= noms
+        detail = "accueil execute" if cree else "accueil deja termine"
+        detail += ", profil cree" if profil else ""
+        detail += f", bibliotheques creees: {', '.join(faites) or 'aucune (deja presentes)'}"
+        detail += f", {analysees} analyse(s) lancee(s)" if analysees else ""
+        return StepResult(
+            "silo: accueil + bibliotheques",
+            ok=ok,
+            detail=detail,
+            created=cree,
+            # L'avertissement du projet est repris a CHAQUE installation, pas
+            # seulement dans le catalogue : celui qui lit le rapport doit le
+            # voir, meme s'il n'a pas lu la page d'acces.
+            warnings=[catalog.get("silo").experimental],
         )
 
     def step_autobrr(self) -> StepResult:
@@ -864,6 +968,14 @@ class Wirer:
                 WiringStep(f"{arr_id}/acces-web", lambda a=arr_id: self.step_web_login(a))
             )
 
+        # La langue APRES l'acces web : les deux ecrivent dans la configuration
+        # de l'application, et `config/host` d'abord evite une relecture perimee.
+        if langues.arr_ui_language(cfg.language) is not None:
+            for arr_id in (a for a in catalog.STARTUP_ORDER if cfg.enabled(a) and _is_arr(a)):
+                steps.append(
+                    WiringStep(f"{arr_id}/langue", lambda a=arr_id: self.step_langue(a))
+                )
+
         for arr_id in arrs:
             steps.append(
                 WiringStep(
@@ -927,6 +1039,9 @@ class Wirer:
                         lambda a=arr_id: self.step_jellyfin_notification(a),
                     )
                 )
+
+        if cfg.enabled("silo"):
+            steps.append(WiringStep("silo/setup", self.step_silo_setup))
         return steps
 
     def execute(self, *, on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:

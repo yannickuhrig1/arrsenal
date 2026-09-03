@@ -182,6 +182,11 @@ def install(
     username: str = typer.Option(
         "arrsenal", help="Identifiant commun a tous les services installes."
     ),
+    language: str = typer.Option(
+        "en",
+        "--langue",
+        help="Langue des interfaces (code ISO : fr, en, es...). Voir `arrsenal langues`.",
+    ),
     timezone: str = typer.Option("Etc/UTC", "--tz"),
     project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
     dry_run: bool = typer.Option(False, "--dry-run", help="N'ecrit rien, montre tout."),
@@ -228,6 +233,7 @@ def install(
         host=host,
         timezone=timezone,
         username=username,
+        language=language,
     )
 
     chosen = {"sonarr": recyclarr_sonarr.strip(), "radarr": recyclarr_radarr.strip()}
@@ -661,10 +667,10 @@ def uninstall(
 ) -> None:
     """Arrete la stack. Ne touche JAMAIS a DATA_ROOT."""
     cfg = _load_config(project_dir)
-    ok, message = Compose(project_dir, cfg.project_name).down()
-    console.print(message if not ok else "Conteneurs arretes et supprimes.")
-
-    if remove_config:
+    if not remove_config:
+        ok, message = Compose(project_dir, cfg.project_name).down()
+        console.print(message if not ok else "Conteneurs arretes et supprimes.")
+    else:
         if not typer.confirm(
             f"Supprimer definitivement {cfg.config_root} (bases, historiques, reglages) ?",
             default=False,
@@ -674,11 +680,41 @@ def uninstall(
             "Confirmez une seconde fois : cette action est irreversible.", default=False
         ):
             raise typer.Exit(0)
+        # `-v` emporte AUSSI les volumes Docker. Sans lui, la base de Silo
+        # survivrait a une desinstallation demandee comme totale : elle ne vit
+        # pas sous CONFIG_ROOT mais dans un volume, pour des raisons de vitesse
+        # (voir compose.PG_VOLUME). L'utilisateur qui demande tout doit tout
+        # obtenir, pas presque tout.
+        ok, message = Compose(project_dir, cfg.project_name).down(volumes=True)
+        console.print(message if not ok else "Conteneurs et volumes supprimes.")
+
         import shutil
 
         shutil.rmtree(cfg.config_root, ignore_errors=True)
         console.print(f"{cfg.config_root} supprime.")
     console.print(f"[dim]Vos medias dans {cfg.data_root} n'ont pas ete touches.[/dim]")
+
+
+@app.command("langues")
+def langues_cmd() -> None:
+    """Langues d'interface acceptees.
+
+    Les *arr en connaissent 28 ; l'assistant n'en propose que sept, les plus
+    courantes. Les autres restent accessibles par `--langue`.
+    """
+    from . import langues as langues_mod
+
+    proposees = {lang.code for lang in langues_mod.PROPOSEES}
+    console.print("[bold]Proposees dans l'assistant[/bold]")
+    for lang in langues_mod.PROPOSEES:
+        console.print(f"  {lang.code:4} {lang.nom}")
+    autres = sorted(set(langues_mod.ARR_UI_LANGUAGE) - proposees)
+    console.print("")
+    console.print(f"[dim]Aussi acceptees par --langue : {', '.join(autres)}[/dim]")
+    console.print(
+        "[dim]Jellyfin et Silo acceptent tout code ISO ; la liste ci-dessus est "
+        "celle que les *arr savent afficher.[/dim]"
+    )
 
 
 @app.command("vpn-providers")

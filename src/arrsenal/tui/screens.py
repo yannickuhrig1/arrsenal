@@ -30,7 +30,7 @@ from textual.widgets import (
     Static,
 )
 
-from .. import catalog, journal, orchestrator, vpnservers
+from .. import catalog, journal, langues, orchestrator, vpnservers
 from ..clients import recyclarr as recyclarr_cfg
 from ..layout import (
     PROFILE_DEFAULTS,
@@ -262,6 +262,18 @@ class PathsScreen(WizardScreen):
             )
             yield Input(value="arrsenal", id="username")
 
+            yield Label(
+                "Langue des interfaces "
+                "[dim](appliquee a chaque service qui sait la recevoir)[/dim]",
+                classes="group-title",
+            )
+            yield Select(
+                [(lang.nom, lang.code) for lang in langues.PROPOSEES],
+                value="fr",
+                allow_blank=False,
+                id="langue",
+            )
+
             yield Label("Fuseau horaire", classes="group-title")
             yield Input(value="Europe/Paris", id="tz")
 
@@ -355,6 +367,8 @@ class PathsScreen(WizardScreen):
         self.app.data_root = self.query_one("#data-root", Input).value.strip()
         self.app.timezone = self.query_one("#tz", Input).value.strip() or "Etc/UTC"
         self.app.username = self.query_one("#username", Input).value.strip() or "arrsenal"
+        choisie = self.query_one("#langue", Select).value
+        self.app.language = choisie if isinstance(choisie, str) else "en"
         self.app.host = self.query_one("#host", Input).value.strip() or "localhost"
         self.app.platform = self.platform()
         # Le VPN d'abord, s'il y a un trafic a proteger. Puis les profils de

@@ -24,6 +24,40 @@ _TAGS = {
     "recyclarr": "8.7.1",
 }
 
+#: Silo s'epingle autrement : il ne publie pas de version au sens habituel, mais
+#: un numero de construction monotone. `build-522` porte l'etiquette
+#: `org.opencontainers.image.version` de l'image, relevee dans l'image elle-meme.
+#:
+#: Le DIGEST accompagne le tag. Docker retient le digest, donc le contenu est
+#: fige ; le tag reste lisible et comparable pour la detection de mises a jour.
+#: C'est la seule forme qui donne les deux a la fois.
+#:
+#: Ses deux appoints sont epingles de la meme facon : `redis:alpine` et
+#: `pgvector:pg18` sont des tags FLOTTANTS, qui designent un nom et non un
+#: contenu. Sans digest, deux installations du meme jour peuvent differer.
+_SILO = {
+    "silo": (
+        "ghcr.io/silo-server/silo-server:build-522"
+        "@sha256:d3cb4ad9df66c727506c562ea3a9263b8938352d66ac5c247425d654b585b5df"
+    ),
+    "postgres": (
+        "pgvector/pgvector:pg18"
+        "@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a"
+    ),
+    "redis": (
+        "redis:alpine"
+        "@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576"
+    ),
+}
+
+#: Repris tel quel du README de Silo. Ce n'est pas notre jugement sur le projet,
+#: c'est ce que le projet dit de lui-meme.
+_SILO_AVERTISSEMENT = (
+    "Silo est en pre-version : son API, sa configuration et ses migrations de "
+    "base peuvent changer avant sa premiere version stable. Sauvegardez avant "
+    "toute mise a jour."
+)
+
 CATALOG: dict[str, ServiceSpec] = {
     "prowlarr": ServiceSpec(
         id="prowlarr",
@@ -106,6 +140,54 @@ CATALOG: dict[str, ServiceSpec] = {
         api_family="jellyfin",
         notes="Serveur media. Bibliotheques creees pour vous.",
     ),
+    "silo-postgres": ServiceSpec(
+        id="silo-postgres",
+        display_name="PostgreSQL (Silo)",
+        category=Category.MEDIA,
+        image=_SILO["postgres"],
+        # Aucun port publie : la base ne sert qu'a Silo, sur le reseau interne.
+        # L'exposer sur l'hote serait une surface d'attaque pour rien.
+        internal_port=0,
+        default_host_port=0,
+        # Aucun dossier sur l'hote : ses donnees vivent dans un VOLUME Docker.
+        # Un montage vers le disque Windows rendait ses migrations 590 fois plus
+        # lentes — 2935 s contre 5 s, mesure. Voir compose.PG_VOLUME.
+        config_dir=None,
+        internal=True,
+        notes="Base de donnees de Silo. Installee avec lui, jamais seule.",
+    ),
+    "silo-redis": ServiceSpec(
+        id="silo-redis",
+        display_name="Redis (Silo)",
+        category=Category.MEDIA,
+        image=_SILO["redis"],
+        internal_port=0,
+        default_host_port=0,
+        config_dir="silo/redis",
+        internal=True,
+        notes="Cache de Silo. Installe avec lui, jamais seul.",
+    ),
+    "silo": ServiceSpec(
+        id="silo",
+        display_name="Silo",
+        category=Category.MEDIA,
+        image=_SILO["silo"],
+        internal_port=8080,
+        default_host_port=8090,
+        config_dir="silo",
+        # Trois portes sur le meme conteneur. Le libelle compte : « API
+        # Jellyfin » dit a quoi ca sert, « port 8096 » non.
+        extra_ports=(("API Jellyfin", 8096), ("API Audiobookshelf", 13378)),
+        requires=("silo-postgres", "silo-redis"),
+        # SAINS, pas seulement demarres : Silo refuse de demarrer si sa base n'a
+        # pas fini son initialisation.
+        depends_on_healthy=("silo-postgres", "silo-redis"),
+        api_family="silo",
+        needs_secret_key=True,
+        experimental=_SILO_AVERTISSEMENT,
+        notes="Serveur media, API compatible Jellyfin. Meilisearch est optionnel "
+        "et n'est pas installe.",
+    ),
     "autobrr": ServiceSpec(
         id="autobrr",
         display_name="autobrr",
@@ -176,6 +258,11 @@ STARTUP_ORDER = (
     # au meme endpoint, et son test de connexion les contacte reellement.
     "autobrr",
     "jellyfin",
+    # Les appoints de Silo AVANT lui : `depends_on` exige qu'ils soient sains,
+    # et l'ordre de cette liste decide aussi de l'ordre d'affichage.
+    "silo-postgres",
+    "silo-redis",
+    "silo",
     "flood",
     "qui",
 )

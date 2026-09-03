@@ -78,6 +78,44 @@ def generate_password(length: int = PASSWORD_LENGTH) -> str:
 # --------------------------------------------------------------------------- *arr
 
 
+#: Longueur d'un mot de passe sans ponctuation. Plus long pour compenser :
+#: 62 caracteres possibles sur 32 tirages donnent environ 190 bits, bien
+#: au-dela des 125 bits du mot de passe ordinaire.
+URL_PASSWORD_LENGTH = 32
+
+
+def generate_url_password(length: int = URL_PASSWORD_LENGTH) -> str:
+    """Mot de passe destine a vivre DANS une URL. Lettres et chiffres seulement.
+
+    Un mot de passe ordinaire contient `?`, `^`, `@` ou `:`. Tous sont valides
+    dans un fichier `.env` et tous cassent une URL : le `?` y ouvre la chaine de
+    requete, le `@` separe l'identite de l'hote.
+
+    Constate au premier demarrage reel de Silo, dont la connexion a sa base
+    passe par `postgres://utilisateur:motdepasse@hote/base` :
+
+        cannot parse `postgres://silo:xxxxxx@silo-postgres:5432/silo`:
+        failed to parse as URL (net/url: invalid userinfo)
+
+    Le conteneur redemarrait en boucle. Encoder le mot de passe serait l'autre
+    voie, mais la substitution a lieu dans Docker, hors de notre portee : mieux
+    vaut un mot de passe qui n'a jamais besoin d'etre encode. L'entropie vient
+    alors de la longueur, ce qui ne coute rien — personne ne le tape.
+    """
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def generate_secret_key() -> str:
+    """Cle de chiffrement au repos, 48 octets en base64.
+
+    C'est la forme que Silo demande explicitement : « generate one with
+    openssl rand -base64 48 ». Elle ne sert pas a se connecter, elle chiffre ce
+    que le service stocke — on ne la reinitialise donc pas, on la perd.
+    """
+    return base64.b64encode(secrets.token_bytes(48)).decode()
+
+
 def render_arr_config(
     *,
     api_key: str,

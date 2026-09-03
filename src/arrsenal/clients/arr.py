@@ -111,6 +111,32 @@ class ArrClient:
         host["passwordConfirmation"] = password
         self.put(f"config/host/{host['id']}", host)
 
+    def set_ui_language(self, code: str, valeur: int) -> bool:
+        """Pose la langue de l'INTERFACE. Renvoie True si elle a change.
+
+        Le type de `uiLanguage` DEPEND DE L'APPLICATION, ce qui ne se devine
+        pas : Sonarr et Radarr veulent un entier (2 pour le francais), Prowlarr
+        veut le code lui-meme (`fr`). Poser l'entier a Prowlarr donne :
+
+            "$.uiLanguage": ["The JSON value could not be converted to
+             System.String"]
+
+        On regarde donc ce que l'application expose DEJA et on lui rend la
+        meme forme, plutot que de tenir une liste de qui veut quoi — une liste
+        qui aurait vieilli a la premiere version suivante.
+
+        On relit la configuration complete avant de la renvoyer : n'ecrire que
+        ce champ effacerait le format de date, le theme et le reste.
+        """
+        ui = self.get("config/ui")
+        actuel = ui.get("uiLanguage")
+        attendu = code if isinstance(actuel, str) else valeur
+        if actuel == attendu:
+            return False
+        ui["uiLanguage"] = attendu
+        self.put(f"config/ui/{ui['id']}", ui)
+        return True
+
     # -- disponibilite -------------------------------------------------------
 
     def status(self) -> dict:

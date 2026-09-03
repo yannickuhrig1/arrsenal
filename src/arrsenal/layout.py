@@ -14,6 +14,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import catalog
 from .models import PlatformProfile
 
 #: Sous-dossiers crees sous DATA_ROOT. Meme structure cote hote et cote conteneur.
@@ -160,7 +161,16 @@ def create_tree(data_root: str | Path, config_root: str | Path, service_ids: lis
             p.mkdir(parents=True, exist_ok=True)
             created.append(p)
     for sid in service_ids:
-        p = config_root / sid
+        spec = catalog.CATALOG.get(sid)
+        # On cree le dossier que le compose MONTE, pas un dossier portant le nom
+        # du service. Les deux coincidaient partout jusqu'a Silo, dont les
+        # conteneurs d'appoint vivent sous `silo/`. Sans cela, `config/silo-redis`
+        # restait vide a cote du `config/silo/redis` que Docker creait lui-meme.
+        # Un service sans dossier de configuration — la base de Silo, qui tient
+        # dans un volume Docker — n'en cree aucun.
+        if spec is not None and not spec.needs_config_volume:
+            continue
+        p = config_root / (spec.config_dir if spec is not None else sid)
         if not p.exists():
             p.mkdir(parents=True, exist_ok=True)
             created.append(p)

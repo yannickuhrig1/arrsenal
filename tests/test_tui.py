@@ -36,10 +36,17 @@ async def test_welcome_blocks_until_docker_answers(app):
 
 @pytest.mark.asyncio
 async def test_every_catalog_service_has_a_checkbox(app):
+    """Tout service CHOISISSABLE a sa case.
+
+    Le catalogue contient aussi des conteneurs d'appoint — la base de donnees
+    et le cache de Silo. Ceux-la sont tires comme prerequis et ne se cochent
+    pas : une base de donnees a cote de Sonarr n'aurait aucun sens.
+    """
     async with app.run_test() as pilot:
         screen = await _goto_services(pilot)
         ids = {box.id for box in screen.query(Checkbox)}
-        assert ids == {f"svc-{sid}" for sid in catalog.CATALOG}
+        assert ids == {f"svc-{spec.id}" for spec in catalog.selectable()}
+        assert "svc-silo-postgres" not in ids
 
 
 @pytest.mark.asyncio

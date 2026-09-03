@@ -60,6 +60,7 @@ def build_config(
     host: str = "localhost",
     timezone: str = "Etc/UTC",
     username: str = "arrsenal",
+    language: str = "en",
 ) -> StackConfig:
     """Construit une StackConfig complete, secrets generes.
 
@@ -80,14 +81,16 @@ def build_config(
         ids_source=source,
         ids_certain=certain,
         username=username,
+        language=language,
     )
     for sid in catalog.resolve_dependencies(services):
         cfg.services[sid] = new_instance(cfg, sid)
+    resolve_port_conflicts(cfg)
     return cfg
 
 
 #: Familles qui recoivent un identifiant et un mot de passe.
-_AVEC_COMPTE = ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr", "qui")
+_AVEC_COMPTE = ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr", "qui", "silo")
 
 
 def new_instance(cfg: StackConfig, service_id: str) -> ServiceInstance:
@@ -112,7 +115,50 @@ def new_instance(cfg: StackConfig, service_id: str) -> ServiceInstance:
     if spec.api_family in _AVEC_COMPTE:
         inst.username = cfg.username
         inst.password = seed.generate_password()
+    if spec.needs_secret_key:
+        # 48 octets en base64, comme le demande Silo : « openssl rand -base64 48 ».
+        inst.secret_key = seed.generate_secret_key()
+    if service_id == "silo-postgres":
+        # Pas de compte a proposer a l'utilisateur — c'est une base interne —
+        # mais un mot de passe reste necessaire entre les deux conteneurs. Il
+        # vit DANS une URL de connexion : sans ponctuation, donc.
+        inst.password = seed.generate_url_password()
     return inst
+
+
+def resolve_port_conflicts(cfg: StackConfig) -> list[tuple[str, int, int]]:
+    """Decale les ports SUPPLEMENTAIRES qui en heurtent un autre.
+
+    Renvoie les decalages effectues, sous la forme (service, voulu, retenu).
+
+    Le cas concret : Silo expose une API compatible Jellyfin sur 8096, le port
+    de Jellyfin. Les deux ensemble, `docker compose up` echoue pour la pile
+    ENTIERE — pas seulement pour le dernier arrive.
+
+    Seuls les ports supplementaires bougent. Le port principal d'un service est
+    celui que l'utilisateur connait et tape ; le decaler en silence serait une
+    surprise. Un port supplementaire, lui, est deja une porte secondaire, et le
+    projet amont prevoit explicitement de le deplacer : « PORT and JF_PORT in
+    .env are host-side published-port overrides ». Le conteneur garde son port
+    interne, seul le cote hote change.
+    """
+    decalages: list[tuple[str, int, int]] = []
+    pris = {inst.host_port for inst in cfg.services.values() if inst.host_port}
+
+    for sid in catalog.STARTUP_ORDER:
+        inst = cfg.services.get(sid)
+        if inst is None:
+            continue
+        for interne in sorted(inst.extra_ports):
+            voulu = inst.extra_ports[interne]
+            retenu = voulu
+            while retenu in pris:
+                retenu += 1
+            if retenu != voulu:
+                inst.extra_ports[interne] = retenu
+                decalages.append((sid, voulu, retenu))
+            pris.add(retenu)
+    return decalages
 
 
 def our_published_ports(cfg: StackConfig, project_dir: Path | None) -> set[int]:

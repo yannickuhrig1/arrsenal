@@ -11,6 +11,7 @@ etre une rustine plus tard, meme si la Phase 1 n'expose que la forme sans VPN.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -18,6 +19,10 @@ from . import catalog
 from .models import Category, StackConfig
 
 NETWORK_NAME = "arrsenal"
+
+#: Volume Docker de la base de Silo. Voir `_service_block` : un montage vers le
+#: disque de l'hote rend ses migrations 590 fois plus lentes sous Windows.
+PG_VOLUME = "silo-pgdata"
 
 #: Tag epingle de Gluetun. Le depot a ete transfere de qdm12/gluetun vers
 #: passteque/gluetun ; l'image, elle, reste qmcgaw/gluetun.
@@ -149,6 +154,89 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # des *arr. `CRON_SCHEDULE` est sa planification, pas un reglage d'arrsenal.
         block["environment"] = {"TZ": cfg.timezone, "CRON_SCHEDULE": "@daily"}
         block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
+    elif service_id == "silo-postgres":
+        # `POSTGRES_PASSWORD` vient du .env comme tout secret genere. Le
+        # healthcheck n'est pas decoratif : Silo refuse de demarrer si sa base
+        # n'a pas fini son initialisation, et `depends_on` s'appuie dessus.
+        block["environment"] = {
+            "POSTGRES_USER": "silo",
+            "POSTGRES_PASSWORD": "${SILO_POSTGRES_PASS}",
+            "POSTGRES_DB": "silo",
+            "TZ": cfg.timezone,
+        }
+        # VOLUME DOCKER NOMME, pas un montage vers le disque de l'hote. C'est
+        # le seul point du catalogue ou nous nous ecartons de la convention
+        # « tout sous CONFIG_ROOT », et la mesure ne laisse pas le choix :
+        #
+        #   base vide, meme image, meme machine, Docker Desktop / Windows
+        #   montage vers un dossier de l'hote -> migrations appliquees en 2935 s
+        #   volume Docker nomme              -> les memes migrations en 5 s
+        #
+        # Silo enchaine des milliers de petites ecritures synchrones pendant ses
+        # migrations ; chacune traverse la couche de partage de fichiers de
+        # Docker Desktop. Le premier essai reel a expire au bout de 300 s alors
+        # que PostgreSQL fonctionnait parfaitement : il etait simplement 590
+        # fois plus lent. Une base de donnees n'a de toute facon rien a faire
+        # dans un dossier que l'utilisateur ouvre et sauvegarde a la main.
+        block["volumes"] = [f"{PG_VOLUME}:/var/lib/postgresql"]
+        block["healthcheck"] = {
+            "test": ["CMD-SHELL", "pg_isready -U silo"],
+            "interval": "5s",
+            "timeout": "3s",
+            "retries": 5,
+            # `start_period` est ABSENT du compose amont, et c'est un piege.
+            # Au tout premier demarrage `initdb` cree la base, ce qui depassait
+            # les 25 s que 5 essais de 5 s accordent. Compose declarait alors le
+            # conteneur malade et REFUSAIT de demarrer Silo, pendant que le
+            # journal disait « database system is ready to accept connections ».
+            # Le volume nomme a rendu ce cas rare, il ne l'a pas rendu
+            # impossible : une machine chargee reste plus lente qu'une machine
+            # au repos. On garde la marge, elle ne coute rien quand tout va
+            # bien — la sonde repond des que la base repond.
+            "start_period": "90s",
+        }
+        # pgvector construit ses index en memoire partagee. 8 Go est le defaut
+        # du projet ; nous restons modestes, une stack media n'est pas un
+        # entrepot de donnees et la valeur se releve dans le compose.
+        block["shm_size"] = "1gb"
+        block["command"] = ["postgres", "-c", "listen_addresses=*"]
+    elif service_id == "silo-redis":
+        block["environment"] = {"TZ": cfg.timezone}
+        block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/data"]
+        block["healthcheck"] = {
+            "test": ["CMD", "redis-cli", "ping"],
+            "interval": "5s",
+            "timeout": "3s",
+            "retries": 5,
+            "start_period": "30s",
+        }
+    elif service_id == "silo":
+        block["environment"] = {
+            "MODE": "integrated",
+            # Les ports INTERNES ne bougent jamais. Le decalage se fait cote
+            # hote, ce que le projet prevoit explicitement.
+            "PORT": "8080",
+            "JF_PORT": "8096",
+            # Sans elle, le serveur refuse de demarrer. Sa PERTE rend les
+            # secrets chiffres irrecuperables : elle est donc generee une fois,
+            # conservee dans le .env, et signalee a l'utilisateur.
+            "SECRET_KEY": "${SILO_SECRET_KEY}",
+            "DATABASE_URL": (
+                "postgres://silo:${SILO_POSTGRES_PASS}@silo-postgres:5432/silo?sslmode=disable"
+            ),
+            "REDIS_URL": "redis://silo-redis:6379",
+            "SILO_PLUGIN_CACHE_DIR": "/var/lib/silo/plugins",
+            "TZ": cfg.timezone,
+        }
+        block["volumes"] = [
+            f"${{CONFIG_ROOT}}/{spec.config_dir}/plugins:/var/lib/silo/plugins",
+            f"${{CONFIG_ROOT}}/{spec.config_dir}/compat:/var/lib/silo/compat",
+            f"${{CONFIG_ROOT}}/{spec.config_dir}/transcode:/tmp/silo-transcode",
+            # LECTURE SEULE. Silo lit les medias, il ne les organise pas : ce
+            # sont les *arr qui ecrivent. Le montage en lecture seule rend la
+            # cohabitation sure plutot que simplement probable.
+            "${DATA_ROOT}/media:/mnt/media:ro",
+        ]
     elif service_id == "autobrr":
         # autobrr n'a pas besoin de /data : il ne touche pas aux fichiers, il
         # pousse des sorties vers les applications.
@@ -182,11 +270,7 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
 
 
 def build_compose(cfg: StackConfig) -> dict:
-    services = {
-        sid: _service_block(cfg, sid)
-        for sid in catalog.STARTUP_ORDER
-        if cfg.enabled(sid)
-    }
+    services = {sid: _service_block(cfg, sid) for sid in catalog.STARTUP_ORDER if cfg.enabled(sid)}
     if not services:
         raise ValueError("aucun service selectionne")
     if cfg.vpn.enabled:
@@ -194,11 +278,18 @@ def build_compose(cfg: StackConfig) -> dict:
         if gaps:
             raise ValueError("VPN active mais incomplet : il manque " + ", ".join(gaps))
         services = {"gluetun": _gluetun_block(cfg), **services}
-    return {
+    doc: dict[str, Any] = {
         "name": cfg.project_name,
         "services": services,
         "networks": {NETWORK_NAME: {"driver": "bridge"}},
     }
+    if "silo-postgres" in services:
+        # Compose prefixe le nom par celui du projet : deux installations ne se
+        # marchent pas dessus. `arrsenal uninstall --volumes` l'emporte avec le
+        # reste, et sans l'option la base survit a un `down` — ce qui est le
+        # comportement voulu pour une base de donnees.
+        doc["volumes"] = {PG_VOLUME: {}}
+    return doc
 
 
 def render_compose(cfg: StackConfig) -> str:
@@ -241,7 +332,11 @@ def render_env(cfg: StackConfig) -> str:
         inst = cfg.services.get(sid)
         if inst is None:
             continue
-        up = sid.upper()
+        # Un identifiant de service peut contenir un tiret (`silo-postgres`) ;
+        # un nom de variable d'environnement, non.
+        up = sid.upper().replace("-", "_")
+        if inst.secret_key:
+            lines.append(f"{up}_SECRET_KEY={_env_value(inst.secret_key)}")
         if inst.api_key:
             lines.append(f"{up}_API_KEY={_env_value(inst.api_key)}")
         if inst.username:
