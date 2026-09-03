@@ -23,8 +23,8 @@ from .clients.base import WiringError
 from .clients.jellyfin import JellyfinClient
 from .clients.qbittorrent import QBittorrentClient
 from .clients.qui import QuiClient
-from .downloadclients import ARR_ROUTING, profile_for
-from .layout import CONTAINER_PATHS
+from .downloadclients import profile_for
+from .layout import BIBLIOTHEQUES, CONTAINER_PATHS
 from .models import Category, StackConfig
 
 #: Categories d'indexeurs Prowlarr poussees vers chaque application (conventions Newznab).
@@ -45,11 +45,17 @@ SILO_MEDIA = {
     "music": "/mnt/media/music",
 }
 
-#: Dossier racine de bibliotheque de chaque application.
+#: Dossiers racine de chaque application, dans l'ordre ou ils sont poses.
+#:
+#: Sonarr en recoit DEUX : les series et l'anime. Ce n'est pas un detail de
+#: rangement — Sonarr traite l'anime comme un type de serie a part, avec ses
+#: propres conventions de nommage et de numerotation. Melanger les deux dans un
+#: seul dossier racine fait renommer les series normales selon des regles anime.
+#: C'est la disposition que recommandent les TRaSH Guides.
 ROOT_FOLDERS = {
-    "sonarr": CONTAINER_PATHS["media_tv"],
-    "radarr": CONTAINER_PATHS["media_movies"],
-    "lidarr": CONTAINER_PATHS["media_music"],
+    b.arr: [x.mediatheque for x in BIBLIOTHEQUES if x.arr == b.arr and x.media]
+    for b in BIBLIOTHEQUES
+    if b.arr
 }
 
 
@@ -382,10 +388,15 @@ class Wirer:
         url = f"http://{self.cfg.host}:{inst.host_port}"
         with QBittorrentClient(url, inst.username or "", inst.password or "") as qb:
             qb.wait_ready()
+            # TOUTES les bibliotheques, pas seulement celles qu'une application
+            # pilote. Une categorie « livres » qui range dans /data/torrents/books
+            # sert des le premier telechargement manuel, et elle sera deja la le
+            # jour ou Shelfarr ou Audiobookshelf entrent au catalogue. Sans elle,
+            # tout finit en vrac a la racine des torrents.
             wanted = {
-                category: path
-                for arr_id, (category, path) in ARR_ROUTING.items()
-                if self.cfg.enabled(arr_id)
+                b.id: b.torrents
+                for b in BIBLIOTHEQUES
+                if b.arr is None or self.cfg.enabled(b.arr)
             }
             if self.cfg.enabled("prowlarr"):
                 # Prowlarr cree sinon lui-meme une categorie "prowlarr" SANS chemin
@@ -400,6 +411,50 @@ class Wirer:
             ok=expected <= present,
             detail=f"creees: {', '.join(made) or 'aucune (deja presentes)'}",
             created=bool(made),
+        )
+
+    def step_qbittorrent_rss(self) -> StepResult:
+        """Allume le lecteur RSS de qBittorrent et son telechargement auto.
+
+        Demande a l'usage. qBittorrent livre le moteur RSS actif mais le
+        telechargement automatique ETEINT : une regle ecrite ne se declenche
+        jamais, et rien ne l'explique. Constate sur une instance 5.2.3 installee
+        par arrsenal.
+
+        arrsenal n'ajoute aucun flux ni aucune regle : ils dependent de vos
+        traqueurs, comme les indexeurs de Prowlarr. Il pose l'interrupteur.
+        """
+        inst = self.cfg.services["qbittorrent"]
+        if inst.adopted:
+            return StepResult(
+                "qbittorrent: lecteur RSS",
+                ok=True,
+                detail="client existant, reglages laisses tels quels",
+            )
+        url = f"http://{self.cfg.host}:{inst.host_port}"
+        with QBittorrentClient(url, inst.username or "", inst.password or "") as qb:
+            # `wait_ready` ouvre la session au passage. Sans elle, la premiere
+            # lecture des preferences repond 403 et l'etape echoue en annoncant
+            # « preferences illisibles » — constate au premier essai reel.
+            qb.wait_ready()
+            changes = qb.ensure_rss()
+            relu = qb.preferences()
+        actif = relu.get("rss_auto_downloading_enabled") is True
+        return StepResult(
+            "qbittorrent: lecteur RSS",
+            # Relu depuis l'application : `setPreferences` repond 200 meme pour
+            # un reglage qu'il ignore ensuite.
+            ok=actif,
+            detail=(
+                f"actif, rafraichi toutes les {relu.get('rss_refresh_interval')} min"
+                + (f" (change: {', '.join(changes)})" if changes else " (deja actif)")
+            ),
+            created=bool(changes),
+            warnings=(
+                []
+                if actif
+                else ["le telechargement automatique RSS n'a pas pu etre active"]
+            ),
         )
 
     def step_prowlarr_application(self, arr_id: str) -> StepResult:
@@ -986,14 +1041,16 @@ class Wirer:
                 steps.append(WiringStep(f"{arr_id}/langue", lambda a=arr_id: self.step_langue(a)))
 
         for arr_id in arrs:
-            steps.append(
-                WiringStep(
-                    f"{arr_id}/rootfolder",
-                    lambda a=arr_id: self.step_root_folder(a, ROOT_FOLDERS[a]),
+            for chemin in ROOT_FOLDERS.get(arr_id, []):
+                steps.append(
+                    WiringStep(
+                        f"{arr_id}/rootfolder/{chemin.rsplit('/', 1)[1]}",
+                        lambda a=arr_id, c=chemin: self.step_root_folder(a, c),
+                    )
                 )
-            )
 
         if cfg.enabled("qbittorrent"):
+            steps.append(WiringStep("qbittorrent/rss", self.step_qbittorrent_rss))
             # Les categories doivent exister avant que les *arr n'y envoient quoi
             # que ce soit : sinon qBittorrent les cree sans chemin de sauvegarde.
             steps.append(WiringStep("qbittorrent/categories", self.step_qbittorrent_categories))

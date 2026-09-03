@@ -17,29 +17,75 @@ from pathlib import Path
 from . import catalog
 from .models import PlatformProfile
 
+
 #: Sous-dossiers crees sous DATA_ROOT. Meme structure cote hote et cote conteneur.
-DATA_SUBDIRS = (
-    "torrents",
-    "torrents/movies",
-    "torrents/tv",
-    "torrents/music",
-    "torrents/.incomplete",
-    "media",
-    "media/movies",
-    "media/tv",
-    "media/music",
+@dataclass(frozen=True)
+class Bibliotheque:
+    """Un genre de contenu, de son telechargement a son rangement."""
+
+    id: str
+    nom: str
+    #: Application qui la remplit, ou None si personne ne la pilote encore.
+    arr: str | None
+    #: False pour ce qui ne se range pas dans une mediatheque : un logiciel
+    #: telecharge n'a pas sa place a cote des films.
+    media: bool = True
+
+    @property
+    def torrents(self) -> str:
+        return f"/data/torrents/{self.id}"
+
+    @property
+    def mediatheque(self) -> str:
+        return f"/data/media/{self.id}"
+
+
+#: Les BIBLIOTHEQUES d'une stack media, et tout ce qui en decoule.
+#:
+#: Une seule table, parce que chaque bibliotheque implique trois choses qui
+#: doivent rester d'accord : un dossier de telechargement, un dossier de
+#: rangement, et une categorie chez le client torrent qui envoie l'un vers
+#: l'autre. Les tenir dans trois listes separees revenait a les desynchroniser
+#: a la premiere addition.
+#:
+#: `arr` designe l'application qui la remplit, ou None : un rangement sans
+#: automatisation reste utile pour ce qu'on telecharge a la main, mais arrsenal
+#: ne doit pas laisser croire qu'il le pilote.
+#:
+#: Les deux racines vivent sous le MEME point de montage `/data`, condition des
+#: liens physiques : sans cela chaque import recopie le fichier.
+BIBLIOTHEQUES: tuple[Bibliotheque, ...] = (
+    Bibliotheque("movies", "Films", arr="radarr"),
+    Bibliotheque("tv", "Series", arr="sonarr"),
+    # Sonarr gere l'anime comme un TYPE de serie, avec son propre dossier
+    # racine : c'est la disposition recommandee par les TRaSH Guides, et elle
+    # evite que les conventions de nommage anime polluent les series.
+    Bibliotheque("anime", "Anime", arr="sonarr"),
+    Bibliotheque("music", "Musique", arr="lidarr"),
+    # Les suivantes n'ont pas encore d'application au catalogue. Elles rangent
+    # ce qu'on telecharge a la main, et attendent Audiobookshelf, Shelfarr et
+    # les autres.
+    Bibliotheque("shows", "Spectacles", arr=None),
+    Bibliotheque("books", "Livres", arr=None),
+    Bibliotheque("audiobooks", "Livres audio", arr=None),
+    Bibliotheque("apps", "Logiciels", arr=None, media=False),
 )
 
-#: Correspondance categorie *arr -> chemin conteneur.
+#: Sous-dossiers a creer sous DATA_ROOT. Deduit de la table ci-dessus.
+DATA_SUBDIRS = (
+    "torrents",
+    "torrents/.incomplete",
+    *(f"torrents/{b.id}" for b in BIBLIOTHEQUES),
+    "media",
+    *(f"media/{b.id}" for b in BIBLIOTHEQUES if b.media),
+)
+
+#: Chemins tels que les conteneurs les voient.
 CONTAINER_PATHS = {
     "torrents_root": "/data/torrents",
     "torrents_incomplete": "/data/torrents/.incomplete",
-    "torrents_tv": "/data/torrents/tv",
-    "torrents_movies": "/data/torrents/movies",
-    "torrents_music": "/data/torrents/music",
-    "media_tv": "/data/media/tv",
-    "media_movies": "/data/media/movies",
-    "media_music": "/data/media/music",
+    **{f"torrents_{b.id}": f"/data/torrents/{b.id}" for b in BIBLIOTHEQUES},
+    **{f"media_{b.id}": f"/data/media/{b.id}" for b in BIBLIOTHEQUES if b.media},
 }
 
 

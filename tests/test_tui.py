@@ -62,7 +62,14 @@ async def test_summary_counts_the_links_that_will_be_wired(app):
         screen = await _goto_services(pilot)
         text = str(screen.query_one("#selection-summary", Static).content)
         assert "liens" in text
-        assert "18 liens" not in text  # selection par defaut, pas le catalogue entier
+        # Le nombre exact bouge a chaque etape ajoutee au plan ; ce qui compte
+        # est qu'il reflete la SELECTION et non le catalogue entier.
+        from arrsenal import catalog, orchestrator
+
+        tout = orchestrator.build_config(
+            services=[s.id for s in catalog.selectable()], config_root="/c", data_root="/d"
+        )
+        assert f"{orchestrator.planned_links(tout)} liens" not in text
 
 
 @pytest.mark.asyncio

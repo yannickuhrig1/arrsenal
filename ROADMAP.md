@@ -29,6 +29,18 @@ un écart apparaît.
 La langue des interfaces se demande une fois et s'applique à toutes les
 applications qui en acceptent une.
 
+**Huit bibliothèques** sont créées et rangées : films, séries, **anime**,
+musique, spectacles, livres, livres audio et logiciels. Chacune a son dossier de
+téléchargement, son dossier de rangement et sa catégorie qBittorrent qui envoie
+l'un vers l'autre. Sonarr reçoit un dossier racine séparé pour l'anime, comme le
+recommandent les TRaSH Guides. Les quatre dernières n'ont pas encore
+d'application qui les pilote : elles rangent les téléchargements manuels, et
+attendent Audiobookshelf, Shelfarr et les autres.
+
+Le **lecteur RSS de qBittorrent** est activé, téléchargement automatique
+compris. arrsenal n'ajoute ni flux ni règle : ils dépendent de vos traqueurs,
+exactement comme les indexeurs.
+
 La page d'administration (`arrsenal serve`) donne l'état des services, les
 démarre, les arrête, les redémarre, signale les mises à jour et les applique,
 affiche les identifiants, **renouvelle un mot de passe ou une clé API en
@@ -88,16 +100,18 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 | | Ce qu'il reste à faire |
 |---|---|
 | **Plex** | Second serveur média. Son jeton s'obtient par `plex.tv`, pas par l'API locale : c'est le point à vérifier avant de l'inscrire. |
-| **Seerr** | Demandes de médias. Jellyseerr et Overseerr ont fusionné sous ce nom ; le câblage vise Sonarr, Radarr et le serveur média. |
+| **Seerr** | Demandes de médias. Jellyseerr et Overseerr ont fusionné sous ce nom, confirmé par le projet lui-même. Image `ghcr.io/seerr-team/seerr`, **v3.4.1**, 11 versions publiées — épinglable. Le câblage vise Sonarr, Radarr et le serveur média. |
 | **Notifiarr** | Notifications centralisées. Chaque *arr s'y déclare par une clé API. |
 | **Bazarr** | Sous-titres. Sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
 | **SABnzbd** | Client Usenet, à côté des deux clients torrent. |
-| **DroppedNeedle** | Musique, anciennement *MusicSeerr*. **Remplace Lidarr** plutôt que de le compléter. Un conteneur, `PUID`/`PGID` et un montage `/data` à parent commun : nos conventions exactes. Deux obstacles : il télécharge par slskd ou SABnzbd, aucun des deux au catalogue, et son premier compte administrateur se crée par l'interface web. |
+| **DroppedNeedle** | `ghcr.io/droppedneedle/droppedneedle`, **v2.9.0**. Musique, anciennement *MusicSeerr*. **Remplace Lidarr** plutôt que de le compléter. Un conteneur, `PUID`/`PGID` et un montage `/data` à parent commun : nos conventions exactes. Deux obstacles : il télécharge par slskd ou SABnzbd, aucun des deux au catalogue, et son premier compte administrateur se crée par l'interface web. |
 | **Wizarr** | Invitations et gestion des comptes pour Jellyfin, Plex et Emby. Le plus autonome de la liste : un conteneur, et le câblage se réduit au serveur média et à sa clé. |
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut pas précéder Plex. |
 | **Jellystat** | Statistiques Jellyfin. Exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue tient en un seul. |
 | **Tracearr** | Suivi des lectures et détection de partage de comptes. L'image `latest` réclame une base et un Redis externes ; le tag `supervised` réunit le tout en un conteneur. |
-| Audiobookshelf, Shelfmark, Shelfarr | Livres et livres audio. |
+| **Audiobookshelf** | `ghcr.io/advplyr/audiobookshelf`, **2.36.0**, 128 versions. Serveur de livres audio et d'ebooks. Les répertoires `books` et `audiobooks` l'attendent déjà. |
+| **Shelfarr** | `ghcr.io/pedro-revez-silva/shelfarr`, **2026.08.31.1**. Demandes de livres pour l'écosystème *arr — un Seerr des livres. Cherche dans Prowlarr, télécharge par qBittorrent, livre à Audiobookshelf. Comble le trou laissé par Readarr, archivé depuis le 27 juin 2025. |
+| **Shelfmark** | `ghcr.io/calibrain/shelfmark`, **v1.3.15**, 60 versions. Interface de recherche et de demande de livres, sources et clients apportés par vous. |
 
 **Readarr n'est pas au programme** : le projet est archivé depuis le 27 juin 2025.
 

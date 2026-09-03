@@ -118,6 +118,56 @@ class QBittorrentClient:
             )
         return True
 
+    def preferences(self) -> dict:
+        resp = self._http.get("/api/v2/app/preferences")
+        if resp.status_code >= 400:
+            raise WiringError(
+                f"{self.name}: preferences illisibles",
+                f"HTTP {resp.status_code}",
+                "la session est-elle bien authentifiee ?",
+            )
+        return resp.json()
+
+    def ensure_rss(self, *, refresh_minutes: int = 15) -> list[str]:
+        """Allume le lecteur RSS et le telechargement automatique.
+
+        Renvoie la liste des reglages REELLEMENT changes, vide si tout etait
+        deja en place.
+
+        qBittorrent livre le moteur RSS actif mais le telechargement
+        automatique ETEINT : les regles qu'on ecrit ne se declenchent jamais, et
+        rien ne le dit. Verifie contre 5.2.3, sur une instance installee par
+        arrsenal — `rss_processing_enabled: True`,
+        `rss_auto_downloading_enabled: False`.
+
+        `setPreferences` attend un JSON dans un champ de formulaire nomme
+        `json` : ce n'est pas un corps JSON.
+
+        arrsenal n'ajoute AUCUN flux ni AUCUNE regle : ils dependent de vos
+        traqueurs, exactement comme les indexeurs de Prowlarr. Il pose
+        l'interrupteur, vous posez le contenu.
+        """
+        voulu = {
+            "rss_processing_enabled": True,
+            "rss_auto_downloading_enabled": True,
+            "rss_refresh_interval": refresh_minutes,
+        }
+        actuel = self.preferences()
+        change = {k: v for k, v in voulu.items() if actuel.get(k) != v}
+        if not change:
+            return []
+        resp = self._http.post("/api/v2/app/setPreferences", data={"json": json.dumps(change)})
+        if resp.status_code >= 400:
+            raise WiringError(
+                f"{self.name}: activation du RSS refusee",
+                f"HTTP {resp.status_code} - {resp.text[:200]}",
+                "la version de qBittorrent expose-t-elle bien ces reglages ?",
+            )
+        # On RELIT : `setPreferences` repond 200 meme pour un reglage inconnu,
+        # qu'il ignore ensuite en silence.
+        relu = self.preferences()
+        return [k for k, v in change.items() if relu.get(k) == v]
+
     def set_password(self, password: str) -> None:
         """Change le mot de passe de la WebUI par l'API de qBittorrent.
 

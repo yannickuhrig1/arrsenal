@@ -198,4 +198,7 @@ def test_la_verification_precede_le_reste_du_cablage(tmp_path):
     )
     names = [s.name for s in Wirer(cfg).build_plan()]
 
-    assert names.index("sonarr/acces-web") < names.index("sonarr/rootfolder")
+    # Sonarr recoit desormais DEUX dossiers racine, series et anime : on vise
+    # le premier posé, quel qu'il soit.
+    premier = next(i for i, n in enumerate(names) if n.startswith("sonarr/rootfolder"))
+    assert names.index("sonarr/acces-web") < premier
