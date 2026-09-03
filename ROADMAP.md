@@ -3,7 +3,7 @@
 Où en est arrsenal, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 3 septembre 2026** — version publiée : **0.1.11**
+**Dernière mise à jour : 3 septembre 2026** — version publiée : **0.1.12**
 
 ---
 
@@ -156,6 +156,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.1.12** | **Prowlarr ne pouvait pas joindre les clients de téléchargement quand le VPN était actif.** Un client torrent sous VPN passe en `network_mode: service:gluetun` et perd son nom sur le réseau : c'est `gluetun` qu'il faut viser. `step_download_client` le savait, `step_prowlarr_download_client` posait le nom du service en dur. Sonarr, Radarr et Lidarr se câblaient très bien sur les mêmes clients au même instant, ce qui rendait la panne illisible. **Troisième divergence** entre ces deux étapes après le mot de passe et la clé : elles lisent désormais la même fonction. |
 | **0.1.11** | **La console d'administration n'avait plus aucun JavaScript depuis la 0.1.8.** Le message de confirmation de « ajouter un service » contenait une chaine ouverte sur deux lignes et trois apostrophes francaises non echappees — du JavaScript invalide, qui emportait le script entier. Demarrer, arreter, redemarrer, faire tourner une cle, appliquer une mise a jour : rien ne repondait. Le HTML etait pourtant parfaitement bien forme, et tous les tests Python passaient. Trouve en ouvrant la page dans un vrai navigateur ; un test verifie desormais que chaque bloc `<script>` a ses apostrophes appariees. |
 | **0.1.11** | **Diagnostic et recherche de mises a jour depuis la console.** Deux boutons, demandes a l'usage. La verification des mises a jour tournait deja toutes les quinze minutes, mais en silence : impossible de la declencher ni de savoir quand elle avait eu lieu. Le diagnostic, lui, n'existait qu'en ligne de commande. |
 | **0.1.11** | **Une seconde installation ecrasait la premiere.** Docker identifie une pile par son nom, jamais par son repertoire, et ce nom etait fige a `arrsenal` : installer une pile d'essai a cote d'une pile en service recreait les six conteneurs de celle-ci en les pointant ailleurs. Le preflight rassurait meme — « port occupe par votre propre pile arrsenal » — ce qui etait vrai du nom et faux de l'installation. `--project-name` existe maintenant, l'assistant le demande, et le preflight avertit. |

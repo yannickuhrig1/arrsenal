@@ -257,6 +257,33 @@ class Wirer:
             client.wait_ready(timeout=120.0)
         return True
 
+    def adresse_client(self, dl_id: str) -> tuple[str, int]:
+        """Ou joindre un client de telechargement DEPUIS un conteneur.
+
+        Trois cas, et il faut les trois. Cette resolution vivait en clair dans
+        `step_download_client` pendant que `step_prowlarr_download_client`
+        posait simplement le nom du service. Resultat, VPN active :
+
+            Unknown exception: Name does not resolve (transmission:9091)
+            Unable to connect to qBittorrent — Name does not resolve
+
+        Sonarr, Radarr et Lidarr se cablaient tres bien pendant que Prowlarr
+        echouait sur les MEMES clients, ce qui rendait la panne incomprehensible.
+        Les deux etapes lisent desormais la meme fonction, pour qu'elles ne
+        puissent plus diverger — c'est la troisieme fois qu'elles le font.
+        """
+        dl_spec = catalog.get(dl_id)
+        dl = self.cfg.services[dl_id]
+        if dl.adopted:
+            # Un client existant n'est pas sur le reseau compose : on le joint
+            # par l'hote, sur son port publie.
+            return self.cfg.host, dl.host_port
+        if self.cfg.vpn.enabled:
+            # Le client partage la pile reseau de Gluetun : il n'a plus de nom
+            # a lui sur le reseau, c'est `gluetun` qu'il faut viser.
+            return "gluetun", dl_spec.internal_port
+        return dl_spec.id, dl_spec.internal_port
+
     def step_download_client(self, arr_id: str, dl_id: str) -> StepResult:
         """Rattache un client de telechargement a un *arr.
 
@@ -269,30 +296,22 @@ class Wirer:
         dl_spec = catalog.get(dl_id)
         dl = self.cfg.services[dl_id]
 
-        if dl.adopted:
-            # Le client existant n'est pas sur le reseau compose : on le joint par
-            # l'hote. Et son mot de passe est hache dans sa configuration, donc
-            # illisible : il doit venir de l'utilisateur.
-            if not dl.password:
-                return StepResult(
-                    f"{arr_id}: client de telechargement {dl_spec.display_name}",
-                    ok=False,
-                    detail="identifiants inconnus",
-                    warnings=[
-                        (
-                            f"Le mot de passe de {dl_spec.display_name} est hache dans "
-                            f"sa configuration : arrsenal ne peut pas le lire. Passez "
-                            f"--dl-user et --dl-pass."
-                        )
-                    ],
-                )
-            host, port = self.cfg.host, dl.host_port
-        elif self.cfg.vpn.enabled:
-            # Le client partage la pile reseau de Gluetun : c'est gluetun qu'il
-            # faut viser, pas son propre nom de service qui ne resout plus.
-            host, port = "gluetun", dl_spec.internal_port
-        else:
-            host, port = dl_spec.id, dl_spec.internal_port
+        # Le mot de passe d'un client ADOPTE est hache dans sa configuration,
+        # donc illisible : il doit venir de l'utilisateur.
+        if dl.adopted and not dl.password:
+            return StepResult(
+                f"{arr_id}: client de telechargement {dl_spec.display_name}",
+                ok=False,
+                detail="identifiants inconnus",
+                warnings=[
+                    (
+                        f"Le mot de passe de {dl_spec.display_name} est hache dans "
+                        f"sa configuration : arrsenal ne peut pas le lire. Passez "
+                        f"--dl-user et --dl-pass."
+                    )
+                ],
+            )
+        host, port = self.adresse_client(dl_id)
 
         values = profile.arr_values(
             host=host,
@@ -325,9 +344,7 @@ class Wirer:
             # passe du client a change depuis — une reinstallation suffit — elle
             # reste en place et son test echoue, sans que rien ne l'explique. On
             # realigne les seuls champs d'identification.
-            identifiants = {
-                nom: values[nom] for nom in ("username", "password") if nom in values
-            }
+            identifiants = {nom: values[nom] for nom in ("username", "password") if nom in values}
             try:
                 modifies = client.sync_fields("downloadclient", obj, identifiants)
             except WiringError:
@@ -443,14 +460,17 @@ class Wirer:
         profile = profile_for(dl_id)
         dl_spec = catalog.get(dl_id)
         dl = self.cfg.services[dl_id]
+        hote, port = self.adresse_client(dl_id)
 
         obj, created, skipped = prowlarr.ensure_resource(
             "downloadclient",
             name=dl_spec.display_name,
             implementation=profile.implementation,
             values=profile.prowlarr_values(
-                host=dl_spec.id,
-                port=dl_spec.internal_port,
+                # La MEME adresse que pour les *arr. La poser en dur ici
+                # cassait tout cablage sous VPN.
+                host=hote,
+                port=port,
                 username=dl.username or "",
                 password=dl.password or "",
             ),
@@ -569,7 +589,7 @@ class Wirer:
             # reelle, deux episodes sur le disque et zero dans Jellyfin.
             analyse = jf.refresh_libraries()
         ok = {name for _a, name, _c, _p in wanted} <= names
-        detail = ("assistant execute" if ran else "assistant deja termine")
+        detail = "assistant execute" if ran else "assistant deja termine"
         detail += f", bibliotheques creees: {', '.join(made) or 'aucune (deja presentes)'}"
         detail += ", analyse lancee" if analyse else ""
         return StepResult(
@@ -735,9 +755,7 @@ class Wirer:
         runner = Compose(self.cfg.project_dir or Path("."), self.cfg.project_name)
 
         wanted = {
-            sid: self.cfg.recyclarr_templates.get(
-                sid, recyclarr_cfg.DEFAULT_TEMPLATES.get(sid, "")
-            )
+            sid: self.cfg.recyclarr_templates.get(sid, recyclarr_cfg.DEFAULT_TEMPLATES.get(sid, ""))
             for sid in ("sonarr", "radarr")
             if self.cfg.enabled(sid)
         }
@@ -964,17 +982,13 @@ class Wirer:
         # Prowlarr compris : c'est LUI qui n'ouvrait pas. La verification passe par
         # la page de connexion, donc elle vaut pour toute la famille.
         for arr_id in (a for a in catalog.STARTUP_ORDER if cfg.enabled(a) and _is_arr(a)):
-            steps.append(
-                WiringStep(f"{arr_id}/acces-web", lambda a=arr_id: self.step_web_login(a))
-            )
+            steps.append(WiringStep(f"{arr_id}/acces-web", lambda a=arr_id: self.step_web_login(a)))
 
         # La langue APRES l'acces web : les deux ecrivent dans la configuration
         # de l'application, et `config/host` d'abord evite une relecture perimee.
         if langues.arr_ui_language(cfg.language) is not None:
             for arr_id in (a for a in catalog.STARTUP_ORDER if cfg.enabled(a) and _is_arr(a)):
-                steps.append(
-                    WiringStep(f"{arr_id}/langue", lambda a=arr_id: self.step_langue(a))
-                )
+                steps.append(WiringStep(f"{arr_id}/langue", lambda a=arr_id: self.step_langue(a)))
 
         for arr_id in arrs:
             steps.append(
@@ -987,9 +1001,7 @@ class Wirer:
         if cfg.enabled("qbittorrent"):
             # Les categories doivent exister avant que les *arr n'y envoient quoi
             # que ce soit : sinon qBittorrent les cree sans chemin de sauvegarde.
-            steps.append(
-                WiringStep("qbittorrent/categories", self.step_qbittorrent_categories)
-            )
+            steps.append(WiringStep("qbittorrent/categories", self.step_qbittorrent_categories))
 
         for dl_id in clients:
             for arr_id in arrs:
