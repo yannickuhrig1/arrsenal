@@ -506,9 +506,38 @@ def wire(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.y
     """Rejoue uniquement le cablage sur une stack deja demarree. Idempotent."""
     cfg = _load_config(project_dir)
     cfg.project_dir = project_dir
+
+    # DEMARREE n'est pas PRETE, et la nuance coute cher. Un Sonarr neuf passe
+    # une minute ou plus dans ses migrations de base ; pendant ce temps son port
+    # est publie mais rien n'ecoute derriere. Le cablage tombait alors sur
+    # « Server disconnected without sending a response », un message qui envoie
+    # chercher une panne reseau la ou il n'y a qu'une attente. `install`
+    # attendait deja ; `wire` non, alors que c'est LA commande qu'on lance pour
+    # reparer un cablage incomplet.
+    def _attente(etape: orchestrator.Progress) -> None:
+        console.print(f"  [dim]{etape.phase}[/dim] {etape.message}")
+
+    # Une attente qui expire, une cle refusee : ces echecs se RACONTENT, ils ne
+    # se jettent pas. `wire` rendait une trace Python et « Failed to execute
+    # script 'launcher' », ce qui n'apprend rien a qui vient reparer sa stack.
+    # `install` traitait deja le cas ; `wire` non.
+    try:
+        orchestrator.wait_for_arrs(cfg, _attente)
+        orchestrator.wait_for_download_clients(cfg, _attente)
+    except Exception as exc:
+        journal.LOGGER.exception("attente des services")
+        console.print(f"[red]{exc}[/red]")
+        console.print("[dim]Diagnostic : `arrsenal doctor`[/dim]")
+        raise typer.Exit(1) from exc
+
     wirer = Wirer(cfg)
     try:
         results = wirer.execute(on_step=report.print_step)
+    except Exception as exc:
+        journal.LOGGER.exception("cablage")
+        console.print(f"[red]{type(exc).__name__} : {exc}[/red]")
+        console.print("[dim]Diagnostic : `arrsenal doctor`[/dim]")
+        raise typer.Exit(1) from exc
     finally:
         wirer.close()
     compose.write_artifacts(cfg, project_dir)

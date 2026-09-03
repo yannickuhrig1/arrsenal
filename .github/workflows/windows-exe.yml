@@ -62,7 +62,7 @@ jobs:
         run: |
           $toc = Get-Content build\arrsenal\Analysis-00.toc -Raw
           foreach ($m in @('arrsenal.clients.silo','arrsenal.langues',
-                           'arrsenal.clients.jellyfin','arrsenal.wiring')) {
+                           'arrsenal.clients.jellyfin','arrsenal.wiring','arrsenal.vpncheck')) {
             if ($toc -notmatch [regex]::Escape("'$m'")) {
               throw "$m absent de l'executable"
             }
