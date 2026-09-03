@@ -91,3 +91,23 @@ def test_une_bibliotheque_sans_application_a_quand_meme_sa_categorie():
     assert {b.id for b in sans_arr} >= {"books", "audiobooks", "apps"}
     for b in sans_arr:
         assert b.torrents == f"/data/torrents/{b.id}"
+
+
+def test_wire_cree_l_arborescence_avant_de_cabler():
+    """Une bibliotheque ajoutee au catalogue n'avait AUCUN effet sur une
+    installation existante.
+
+    `install` cree les dossiers, `wire` non. Sonarr refuse net un dossier racine
+    absent — « Path '/data/media/anime' does not exist » — et la reparation
+    d'une pile reelle echouait donc sur la seule etape nouvelle. `create_tree`
+    est idempotent : sur une installation a jour il ne cree rien.
+    """
+    import inspect
+
+    from arrsenal import cli
+
+    source = inspect.getsource(cli.wire)
+    assert "create_tree" in source, "wire cable sans garantir les dossiers"
+    assert source.index("create_tree") < source.index("Wirer(cfg)"), (
+        "les dossiers doivent exister AVANT le cablage"
+    )

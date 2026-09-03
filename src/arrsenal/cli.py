@@ -30,7 +30,7 @@ from . import adopt as adopt_mod
 from . import autostart as autostart_mod
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
-from .layout import default_profile, path_warning
+from .layout import create_tree, default_profile, path_warning
 from .models import VPN_PROVIDERS, PlatformProfile, StackConfig, VpnConfig
 from .orchestrator import InstallAborted, Progress
 from .runner import Compose
@@ -514,6 +514,16 @@ def wire(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.y
     # chercher une panne reseau la ou il n'y a qu'une attente. `install`
     # attendait deja ; `wire` non, alors que c'est LA commande qu'on lance pour
     # reparer un cablage incomplet.
+    # L'arborescence AVANT le cablage. Une bibliotheque ajoutee au catalogue
+    # n'avait aucun effet sur une installation existante : `install` cree les
+    # dossiers, `wire` non, et Sonarr refuse net un dossier racine absent —
+    # « Path '/data/media/anime' does not exist ». Constate en reparant une pile
+    # reelle apres l'ajout de l'anime. `create_tree` est idempotent : sur une
+    # installation a jour il ne cree rien et ne dit rien.
+    nouveaux = create_tree(cfg.data_root, cfg.config_root, list(cfg.services))
+    if nouveaux:
+        console.print(f"  [dim]arborescence[/dim] {len(nouveaux)} dossier(s) cree(s)")
+
     def _attente(etape: orchestrator.Progress) -> None:
         console.print(f"  [dim]{etape.phase}[/dim] {etape.message}")
 
