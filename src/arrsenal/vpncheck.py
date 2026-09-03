@@ -25,16 +25,29 @@ Gluetun voit ce `127.0.0.1`. Verifie dans les deux sens contre une pile reelle :
     depuis qbittorrent -> {"public_ip": ..., "country": "Netherlands", ...}
     depuis sonarr      -> can't connect to remote host (127.0.0.1): refused
 
-Et il ne demande AUCUN service exterieur : l'adresse vient de Gluetun lui-meme.
+L'adresse vient de Gluetun lui-meme, sans service exterieur.
 
-L'adresse IP n'est jamais journalisee. On ne garde que le pays et l'operateur,
-qui suffisent a reconnaitre un tunnel d'un fournisseur d'acces — et le journal
-est le fichier qu'on demande aux utilisateurs de joindre a un rapport de bug.
+**3. Le tunnel ressort-il ailleurs que chez vous ?** Un tunnel qui reboucle sur
+la connexion du domicile ne protege de rien, et les deux controles precedents le
+declarent pourtant bon : le conteneur EST dans le tunnel. Le cas est apparu sur
+le banc d'essai — un serveur WireGuard local qui traduisait les adresses vers la
+sortie de la maison — et un fournisseur mal configure produirait la meme chose.
+On compare donc l'adresse du tunnel a celle de la machine.
+
+C'est le SEUL appel exterieur de ce module, et il est facultatif : s'il echoue,
+le controle rend quand meme son verdict, d'un cran moins ferme.
+
+L'adresse IP n'est jamais journalisee, ni celle du tunnel ni celle de la
+machine. On ne garde que le pays et l'operateur, qui suffisent a reconnaitre un
+tunnel d'un fournisseur d'acces — et le journal est le fichier qu'on demande aux
+utilisateurs de joindre a un rapport de bug.
 """
 
 from __future__ import annotations
 
 import json
+
+import httpx
 
 from . import catalog
 from .models import Category, StackConfig
@@ -54,10 +67,24 @@ def clients_torrent(cfg: StackConfig) -> list[str]:
     ]
 
 
+def ip_de_l_hote() -> str | None:
+    """Adresse publique de la MACHINE, hors tunnel. None si indeterminable.
+
+    Le seul appel exterieur de tout ce module, et il est facultatif : sans lui
+    le controle rend quand meme son verdict, un cran moins ferme.
+    """
+    try:
+        reponse = httpx.get("https://ipinfo.io/json", timeout=6.0)
+        return str(reponse.json().get("ip") or "") or None
+    except Exception:  # noqa: BLE001 - un diagnostic ne tombe pas pour ca
+        return None
+
+
 def _sortie(conteneur: str) -> tuple[bool, str]:
     """Pays et operateur vus depuis l'interieur du conteneur.
 
-    Renvoie (protege, description). L'IP elle-meme n'est jamais renvoyee.
+    Renvoie (protege, description). L'IP elle-meme n'est JAMAIS renvoyee : le
+    journal est le fichier qu'on demande de joindre aux rapports de bug.
     """
     ok, sortie = exec_in(conteneur, ["wget", "-qO-", "--timeout=8", CONTROLE])
     if not ok or not sortie:
@@ -66,11 +93,27 @@ def _sortie(conteneur: str) -> tuple[bool, str]:
         donnees = json.loads(sortie)
     except ValueError:
         return False, f"reponse illisible de Gluetun : {sortie[:80]}"
+    tunnel = donnees.get("public_ip")
+    if not tunnel:
+        return False, "Gluetun ne rapporte aucune adresse publique : le tunnel est-il monte ?"
     pays = donnees.get("country") or "?"
     operateur = (donnees.get("organization") or "?")[:40]
-    if not donnees.get("public_ip"):
-        return False, "Gluetun ne rapporte aucune adresse publique : le tunnel est-il monte ?"
-    return True, f"sortie par {pays}, {operateur}"
+
+    # Un tunnel qui RESSORT chez vous ne protege de rien. Le cas s'est presente
+    # pour de vrai sur un serveur WireGuard d'essai qui traduisait les adresses
+    # vers la connexion de la maison : le conteneur etait bien dans le tunnel,
+    # tout etait vert, et l'adresse vue de l'exterieur restait celle du domicile.
+    # Un fournisseur commercial ne fait jamais cela ; une configuration
+    # bricolee, si.
+    hote = ip_de_l_hote()
+    if hote and hote == tunnel:
+        return False, (
+            f"NON PROTEGE : le tunnel ressort sur VOTRE adresse publique "
+            f"({pays}, {operateur}). Verifiez la configuration du fournisseur."
+        )
+    if hote is None:
+        return True, f"sortie par {pays}, {operateur} (adresse de l'hote indeterminable)"
+    return True, f"sortie par {pays}, {operateur}, differente de la votre"
 
 
 def verifier(cfg: StackConfig) -> list[Check]:

@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>arrsenal</title>
+<meta name="description" content="arrsenal deploie et cable une stack media complete : Prowlarr, Sonarr, Radarr, Lidarr, qBittorrent, Jellyfin. Une commande, zero clic dans huit interfaces web.">
+<meta property="og:title" content="arrsenal">
+<meta property="og:description" content="Deploie et cable une stack media complete. Une commande, zero clic dans huit interfaces web.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Fira+Code:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+/* ---------------------------------------------------------------
+   Palette relevee dans les captures de l'assistant lui-meme :
+   pane #1e1e1e, chrome #242f38, ambre #ffa62b, bleu #0178d4.
+   Le site vit dans le meme monde sombre que le produit.
+   --------------------------------------------------------------- */
+:root{
+  --ground:#12171c;
+  --ground-2:#0d1216;
+  --surface:#1b222a;
+  --chrome:#242f38;
+  --line:#2e3a45;
+  --line-soft:#232d36;
+  --text:#e6e7e4;
+  --muted:#93a2b0;
+  --amber:#ffa62b;
+  --blue:#6db2ff;
+  --ok:#63c08a;
+  --shadow:0 18px 40px -24px rgba(0,0,0,.9);
+  --step:clamp(1rem,.9rem + .4vw,1.0625rem);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--text);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:var(--step);
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--blue);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{color:var(--amber)}
+a[aria-disabled="true"]{color:var(--muted);text-decoration:none;pointer-events:none}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:2px}
+code,kbd,pre,.mono{font-family:"Fira Code",ui-monospace,"SFMono-Regular",Consolas,monospace}
+
+/* --- structure ------------------------------------------------ */
+.wrap{width:min(1080px,100% - 2.5rem);margin-inline:auto}
+.prose{max-width:64ch}
+section{padding-block:clamp(3.5rem,7vw,6rem);border-top:1px solid var(--line-soft)}
+.stack{display:flex;flex-direction:column}
+.gap-s{gap:.75rem}.gap-m{gap:1.25rem}.gap-l{gap:2.25rem}
+
+/* --- typographie ---------------------------------------------- */
+h1,h2,h3,.eyebrow,.btn,.chip,th{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+h2{
+  font-size:clamp(1.5rem,1.15rem + 1.5vw,2.2rem);
+  font-weight:800;letter-spacing:-.02em;line-height:1.15;
+  margin:0;text-wrap:balance;
+}
+h3{font-size:1.0625rem;font-weight:600;letter-spacing:-.01em;margin:0}
+.eyebrow{
+  font-size:.6875rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--amber);margin:0;
+}
+.lead{font-size:clamp(1.125rem,1rem + .6vw,1.375rem);line-height:1.5;margin:0}
+.muted{color:var(--muted)}
+p{margin:0}
+.note{font-size:.9375rem;color:var(--muted)}
+
+/* --- hero ------------------------------------------------------ */
+.hero{
+  padding-block:clamp(3.5rem,9vw,7rem) clamp(3rem,6vw,5rem);
+  background:
+    radial-gradient(60rem 32rem at 12% -10%,rgba(255,166,43,.07),transparent 60%),
+    radial-gradient(50rem 30rem at 90% 0%,rgba(109,178,255,.06),transparent 55%),
+    var(--ground);
+}
+.wordmark{
+  font-family:"Fira Code",ui-monospace,monospace;font-weight:500;
+  font-size:clamp(2.75rem,1.6rem + 5.4vw,5rem);
+  letter-spacing:-.045em;line-height:1;margin:0;color:var(--text);
+}
+.caret{
+  display:inline-block;width:.5em;height:.9em;margin-left:.12em;
+  background:var(--amber);vertical-align:-.06em;
+}
+.hero-lead{max-width:34ch}
+.hero-meta{
+  display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;
+  font-size:.8125rem;color:var(--muted);font-family:Archivo,sans-serif;letter-spacing:.02em;
+}
+.hero-meta b{color:var(--text);font-weight:600}
+
+/* --- terminal --------------------------------------------------- */
+.term{
+  border:1px solid var(--line);border-radius:8px;overflow:hidden;
+  background:#1e1e1e;box-shadow:var(--shadow);max-width:38rem;
+}
+.term-bar{
+  display:flex;align-items:center;gap:.45rem;
+  padding:.5rem .75rem;background:var(--chrome);border-bottom:1px solid #1a232b;
+}
+.dot{width:9px;height:9px;border-radius:50%;background:#3d4b57;display:inline-block}
+.term-bar span{
+  margin-left:.4rem;font-family:Archivo,sans-serif;font-size:.6875rem;
+  letter-spacing:.1em;text-transform:uppercase;color:#7d8b98;
+}
+.term pre{margin:0;padding:1rem 1.1rem;overflow-x:auto;font-size:.9375rem;line-height:1.75;color:#e0e0e0}
+.term .p{color:var(--ok)}
+.term .c{color:#7d8b98}
+.term .f{color:var(--blue)}
+
+/* --- boutons ---------------------------------------------------- */
+.cta{display:flex;flex-wrap:wrap;gap:.75rem}
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.7rem 1.15rem;border-radius:6px;border:1px solid var(--line);
+  background:var(--surface);color:var(--text);
+  font-size:.875rem;font-weight:600;letter-spacing:.01em;text-decoration:none;
+  transition:border-color .16s ease,background .16s ease,transform .16s ease;
+}
+.btn:hover{border-color:#43525f;background:#212a33;color:var(--text);transform:translateY(-1px)}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1a1204}
+.btn-primary:hover{background:#ffb84f;border-color:#ffb84f;color:#1a1204}
+.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.btn svg{width:16px;height:16px;flex:none;fill:currentColor}
+
+/* --- diagramme -------------------------------------------------- */
+.patch{
+  border:1px solid var(--line);border-radius:10px;background:var(--ground-2);
+  padding:1.25rem 1rem;overflow-x:auto;
+}
+.patch svg{min-width:620px;width:100%;height:auto}
+.patch .node{fill:var(--surface);stroke:var(--line);stroke-width:1}
+.patch .label{
+  fill:var(--text);font-family:"Fira Code",ui-monospace,monospace;font-size:14px;
+  text-anchor:middle;dominant-baseline:middle;
+}
+.patch .port{fill:var(--chrome);stroke:#4a5b69;stroke-width:1}
+.patch .cable{fill:none;stroke-width:2;stroke-linecap:round;opacity:.85}
+.patch .c-amber{stroke:var(--amber)}
+.patch .c-blue{stroke:var(--blue)}
+.legend{display:flex;flex-wrap:wrap;gap:.35rem 1.75rem;font-size:.8125rem;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:2px;margin-right:.5rem;vertical-align:.3em;border-radius:1px}
+@media (prefers-reduced-motion:no-preference){
+  .patch .cable{stroke-dasharray:400;stroke-dashoffset:400;animation:draw 1.1s ease-out forwards}
+  .patch .cable:nth-of-type(2){animation-delay:.08s}
+  .patch .cable:nth-of-type(3){animation-delay:.16s}
+  .patch .cable:nth-of-type(4){animation-delay:.32s}
+  .patch .cable:nth-of-type(5){animation-delay:.40s}
+  .patch .cable:nth-of-type(6){animation-delay:.48s}
+  .patch .cable:nth-of-type(7){animation-delay:.56s}
+  .patch .cable:nth-of-type(8){animation-delay:.64s}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .caret{animation:blink 1.2s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+}
+
+/* --- tableaux ---------------------------------------------------- */
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:.9375rem}
+th,td{padding:.7rem .9rem;text-align:left;border-bottom:1px solid var(--line-soft)}
+tbody tr:last-child td{border-bottom:0}
+th{
+  font-size:.6875rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);background:var(--ground-2);
+}
+tr.self td{background:rgba(255,166,43,.06)}
+tr.self td:first-child{color:var(--amber);font-weight:600}
+td.yes{color:var(--ok)}
+td.no{color:#6b7885}
+
+/* --- liste de cablage -------------------------------------------- */
+.wiring{
+  display:grid;gap:1px;background:var(--line-soft);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;
+}
+.wiring div{background:var(--ground-2);padding:.9rem 1.1rem;display:grid;gap:.15rem}
+.wiring .link{font-family:"Fira Code",ui-monospace,monospace;font-size:.8125rem;color:var(--amber)}
+.wiring .what{font-size:.9375rem;color:var(--text)}
+@media (min-width:720px){.wiring{grid-template-columns:1fr 1fr}}
+
+/* --- arborescence ------------------------------------------------ */
+.tree{
+  border:1px solid var(--line);border-radius:10px;background:var(--ground-2);
+  padding:1.1rem 1.25rem;margin:0;overflow-x:auto;
+  font-size:.875rem;line-height:1.8;color:#c9d2da;
+}
+.tree b{color:var(--amber);font-weight:500}
+.tree i{color:var(--muted);font-style:normal}
+
+/* --- captures ---------------------------------------------------- */
+.shots{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+figure{margin:0;display:grid;gap:.5rem}
+figure img{border:1px solid var(--line);border-radius:8px;background:#1e1e1e}
+figcaption{font-size:.8125rem;color:var(--muted);font-family:Archivo,sans-serif}
+
+/* --- catalogue --------------------------------------------------- */
+.chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.chip{
+  padding:.4rem .7rem;border:1px solid var(--line);border-radius:999px;
+  background:var(--surface);font-size:.8125rem;font-weight:600;letter-spacing:.01em;
+}
+.chip em{font-style:normal;color:var(--muted);font-weight:400}
+.chip-vpn{border-color:rgba(109,178,255,.4)}
+
+/* --- cartes ------------------------------------------------------ */
+.cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.card{
+  border:1px solid var(--line);border-radius:10px;background:var(--ground-2);
+  padding:1.15rem 1.25rem;display:grid;gap:.5rem;align-content:start;
+}
+.card p{font-size:.9375rem;color:var(--muted)}
+
+/* --- pied -------------------------------------------------------- */
+footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:var(--ground-2)}
+.footer-grid{display:flex;flex-wrap:wrap;gap:1.75rem 3rem;justify-content:space-between;align-items:flex-start}
+.footer-links{display:flex;flex-wrap:wrap;gap:.4rem 1.5rem;font-size:.9375rem}
+.footer-note{font-size:.8125rem;color:var(--muted);max-width:52ch}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap stack gap-l">
+    <p class="eyebrow">Stack media &middot; Docker &middot; une seule commande</p>
+    <h1 class="wordmark">arrsenal<span class="caret" aria-hidden="true"></span></h1>
+    <p class="lead hero-lead">Deploie <em>et cable</em> une stack media complete. Une commande, zero clic dans huit interfaces web.</p>
+
+    <div class="term">
+      <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>terminal</span></div>
+<pre><code><span class="p">$</span> arrsenal
+<span class="c"># ou, pour un script ou une CI :</span>
+<span class="p">$</span> arrsenal install <span class="f">--yes</span> <span class="f">--data-root</span> /srv/data</code></pre>
+    </div>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/yannickuhrig1/arrsenal">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Le depot GitHub
+      </a>
+      <a class="btn" href="https://github.com/yannickuhrig1/arrsenal/releases">Telecharger arrsenal.exe</a>
+      <!-- Discord : renseigner DISCORD_URL dans le script en bas de ce fichier. -->
+      <a class="btn" id="discord-cta" href="#" aria-disabled="true">Discord &mdash; bientot</a>
+    </div>
+
+    <p class="hero-meta">
+      <span>Licence <b>MIT</b></span>
+      <span>Version <b>0.1.12</b></span>
+      <span>Windows, Linux, <b>unRAID</b>, Synology</span>
+      <span>Python 3.12+ ou <b>un seul .exe</b></span>
+    </p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap stack gap-l">
+    <div class="stack gap-m prose">
+      <p class="eyebrow">Le probleme</p>
+      <h2>Poser six conteneurs, tout le monde sait faire. C'est l'apres qui prend trois heures.</h2>
+      <p class="muted">Ouvrir chaque interface, copier une cle API, la coller dans une autre, recommencer,
+      se tromper de port, et decouvrir trois jours plus tard que les imports recopient 40 Go au lieu
+      de faire un lien. <strong>arrsenal automatise cette partie-la.</strong></p>
+    </div>
+
+    <div class="patch">
+      <svg viewBox="0 0 668 300" role="img" aria-label="Diagramme : Prowlarr pousse ses indexeurs vers Sonarr, Radarr et Lidarr ; les trois sont relies a qBittorrent ; Sonarr et Radarr notifient Jellyfin.">
+        <path class="cable c-amber" d="M144 150 C 197 150 197 56 250 56"/>
+        <path class="cable c-amber" d="M144 150 C 197 150 197 150 250 150"/>
+        <path class="cable c-amber" d="M144 150 C 197 150 197 244 250 244"/>
+        <path class="cable c-blue" d="M386 56 C 443 56 443 78 500 78"/>
+        <path class="cable c-blue" d="M386 150 C 443 150 443 78 500 78"/>
+        <path class="cable c-blue" d="M386 244 C 443 244 443 78 500 78"/>
+        <path class="cable c-blue" d="M386 56 C 443 56 443 222 500 222"/>
+        <path class="cable c-blue" d="M386 150 C 443 150 443 222 500 222"/>
+
+        <rect class="node" x="8" y="124" width="136" height="52" rx="7"/>
+        <rect class="node" x="250" y="30" width="136" height="52" rx="7"/>
+        <rect class="node" x="250" y="124" width="136" height="52" rx="7"/>
+        <rect class="node" x="250" y="218" width="136" height="52" rx="7"/>
+        <rect class="node" x="500" y="52" width="160" height="52" rx="7"/>
+        <rect class="node" x="500" y="196" width="160" height="52" rx="7"/>
+
+        <circle class="port" cx="144" cy="150" r="4"/>
+        <circle class="port" cx="250" cy="56" r="4"/>
+        <circle class="port" cx="250" cy="150" r="4"/>
+        <circle class="port" cx="250" cy="244" r="4"/>
+        <circle class="port" cx="386" cy="56" r="4"/>
+        <circle class="port" cx="386" cy="150" r="4"/>
+        <circle class="port" cx="386" cy="244" r="4"/>
+        <circle class="port" cx="500" cy="78" r="4"/>
+        <circle class="port" cx="500" cy="222" r="4"/>
+
+        <text class="label" x="76" y="150">Prowlarr</text>
+        <text class="label" x="318" y="56">Sonarr</text>
+        <text class="label" x="318" y="150">Radarr</text>
+        <text class="label" x="318" y="244">Lidarr</text>
+        <text class="label" x="580" y="78">qBittorrent</text>
+        <text class="label" x="580" y="222">Jellyfin</text>
+      </svg>
+    </div>
+    <p class="legend">
+      <span><i style="background:#ffa62b"></i>indexeurs pousses, <span class="mono">fullSync</span></span>
+      <span><i style="background:#6db2ff"></i>client de telechargement et notification d'import</span>
+    </p>
+
+    <p class="prose"><strong>Chaque lien est relu depuis l'API cible apres creation.</strong>
+    Le rapport final ne dit pas &laquo;&nbsp;j'ai envoye un POST&nbsp;&raquo;, il dit
+    &laquo;&nbsp;le lien existe&nbsp;&raquo;.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Outil</th><th>Deploiement</th><th>Cablage inter-apps</th><th>Profils qualite</th></tr></thead>
+        <tbody>
+          <tr><td>DockSTARTer</td><td class="yes">oui</td><td class="no">non</td><td class="no">non</td></tr>
+          <tr><td>Saltbox</td><td class="yes">oui</td><td class="no">partiel</td><td class="no">non</td></tr>
+          <tr><td>Recyclarr / Configarr</td><td class="no">non</td><td class="no">non</td><td class="yes">oui</td></tr>
+          <tr class="self"><td>arrsenal</td><td class="yes">oui</td><td class="yes">oui</td><td class="yes">oui <span class="muted">(via Recyclarr)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack gap-l">
+    <div class="stack gap-m prose">
+      <p class="eyebrow">Ce qui est cable automatiquement</p>
+      <h2>Des liaisons posees, puis relues une par une</h2>
+    </div>
+    <div class="wiring">
+      <div><span class="link">Prowlarr &rarr; Sonarr, Radarr, Lidarr</span><span class="what">Enregistrement en <em>Application</em> et <span class="mono">fullSync</span> des indexeurs.</span></div>
+      <div><span class="link">*arr &rarr; client de telechargement</span><span class="what">Rattachement et routage par categorie ou par repertoire.</span></div>
+      <div><span class="link">*arr &rarr; systeme de fichiers</span><span class="what">Dossier racine cree sous <span class="mono">/data/media</span>.</span></div>
+      <div><span class="link">qBittorrent &rarr; lui-meme</span><span class="what">Categories creees avec leur chemin de sauvegarde.</span></div>
+      <div><span class="link">Sonarr, Radarr &rarr; Jellyfin</span><span class="what">Notification de rafraichissement apres chaque import.</span></div>
+      <div><span class="link">Jellyfin &rarr; systeme de fichiers</span><span class="what">Assistant de demarrage et bibliotheques Films, Series, Musique.</span></div>
+      <div><span class="link">autobrr &rarr; toute la stack</span><span class="what">*arr et client de telechargement declares, connexions testees.</span></div>
+      <div><span class="link">Recyclarr &rarr; Sonarr, Radarr</span><span class="what">Profils et custom formats des TRaSH Guides, premiere synchronisation lancee.</span></div>
+      <div><span class="link">*arr &rarr; interface web</span><span class="what">Compte cree, et connexion <strong>reellement testee</strong>.</span></div>
+      <div><span class="link">Toutes les interfaces</span><span class="what">Langue choisie une fois, appliquee partout ou c'est possible.</span></div>
+    </div>
+    <p class="note">La liste complete, ligne par ligne, vit dans le
+      <a href="https://github.com/yannickuhrig1/arrsenal#ce-qui-est-c%C3%A2bl%C3%A9-automatiquement">README</a>.
+      Les deux clients de telechargement peuvent coexister&nbsp;: chaque *arr est rattache aux deux,
+      et le routage s'adapte tout seul &mdash; qBittorrent a des categories natives, Transmission n'en a pas.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack gap-l">
+    <div class="stack gap-m prose">
+      <p class="eyebrow">Le piege que tout le monde rate</p>
+      <h2>Un seul montage <span class="mono">/data</span>, sinon chaque import recopie le fichier</h2>
+      <p class="muted">Monter <span class="mono">/downloads</span> et <span class="mono">/media</span> separement
+      donne deux systemes de fichiers vus depuis le conteneur. Les hardlinks deviennent impossibles.
+      arrsenal impose un montage unique dans tous les conteneurs.</p>
+    </div>
+<pre class="tree">${DATA_ROOT}/                    <i>-&gt;  /data   (dans TOUS les conteneurs)</i>
+&#9500;&#9472;&#9472; torrents/
+&#9474;   &#9500;&#9472;&#9472; movies/
+&#9474;   &#9500;&#9472;&#9472; tv/
+&#9474;   &#9500;&#9472;&#9472; music/
+&#9474;   &#9492;&#9472;&#9472; .incomplete/
+&#9492;&#9472;&#9472; media/
+    &#9500;&#9472;&#9472; <b>movies/</b>                  <i>&lt;- dossier racine Radarr + bibliotheque Jellyfin</i>
+    &#9500;&#9472;&#9472; <b>tv/</b>                      <i>&lt;- dossier racine Sonarr + bibliotheque Jellyfin</i>
+    &#9492;&#9472;&#9472; <b>music/</b>                   <i>&lt;- dossier racine Lidarr + bibliotheque Jellyfin</i></pre>
+    <p class="prose">Le preflight ne se contente pas de l'esperer&nbsp;: il <strong>cree un vrai hardlink</strong>
+    entre <span class="mono">torrents/</span> et <span class="mono">media/</span>, et vous dit si ca a marche.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack gap-l">
+    <div class="stack gap-m prose">
+      <p class="eyebrow">L'assistant</p>
+      <h2>Vous cochez ce que vous voulez, il s'occupe du reste</h2>
+      <p class="muted">Toutes les captures sont generees automatiquement, sans terminal ni Docker,
+      et versionnees&nbsp;: une regression visuelle apparait dans le diff d'une pull request.</p>
+    </div>
+    <div class="shots">
+      <figure><img src="screenshots/2-services.svg" alt="Ecran de selection des services" loading="lazy" width="1287" height="880"><figcaption>Selection des services</figcaption></figure>
+      <figure><img src="screenshots/3-chemins.svg" alt="Ecran des chemins et de la plateforme" loading="lazy" width="1287" height="880"><figcaption>Chemins et plateforme</figcaption></figure>
+      <figure><img src="screenshots/4-vpn.svg" alt="Ecran du VPN et du fournisseur" loading="lazy" width="1287" height="880"><figcaption>VPN et fournisseur</figcaption></figure>
+      <figure><img src="screenshots/7-installation.svg" alt="Cablage en cours" loading="lazy" width="1287" height="880"><figcaption>Cablage en cours</figcaption></figure>
+      <figure><img src="screenshots/8-indexeurs.svg" alt="Ecran de saisie des indexeurs" loading="lazy" width="1287" height="880"><figcaption>Vos indexeurs</figcaption></figure>
+      <figure><img src="screenshots/9-rapport.svg" alt="Rapport final de l'installation" loading="lazy" width="1287" height="880"><figcaption>Rapport final</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack gap-l">
+    <div class="stack gap-m prose">
+      <p class="eyebrow">Installation</p>
+      <h2>Windows&nbsp;: un seul fichier, sans Python</h2>
+      <p class="muted">Telechargez <span class="mono">arrsenal.exe</span>, ouvrez un terminal dans le dossier
+      de telechargement, et lancez-le. Seul Docker Desktop est necessaire&nbsp;: l'executable embarque
+      son propre interpreteur. 20&nbsp;Mo, environ une seconde et demie au demarrage.</p>
+    </div>
+
+    <div class="term">
+      <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>windows</span></div>
+<pre><code><span class="p">&gt;</span> .\arrsenal.exe</code></pre>
+    </div>
+    <p class="note prose">Windows SmartScreen peut afficher un avertissement au premier lancement&nbsp;:
+    le binaire n'est pas signe, une signature de code coutant plusieurs centaines d'euros par an.
+    &laquo;&nbsp;Informations complementaires&nbsp;&raquo;, puis &laquo;&nbsp;Executer quand meme&nbsp;&raquo;.</p>
+
+    <div class="stack gap-m prose">
+      <h3>Les autres plateformes</h3>
+      <p class="muted">Docker Engine avec le plugin <span class="mono">docker compose</span>, et Python 3.12
+      ou plus recent. Quatre profils&nbsp;: <span class="mono">windows</span>,
+      <span class="mono">generic-linux</span>, <span class="mono">unraid</span>,
+      <span class="mono">synology</span>. Celui de la machine est preselectionne.</p>
+    </div>
+
+    <div class="term">
+      <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>bash</span></div>
+<pre><code><span class="p">$</span> pipx install git+https://github.com/yannickuhrig1/arrsenal
+
+<span class="p">$</span> arrsenal              <span class="c"># assistant interactif</span>
+<span class="p">$</span> arrsenal scan         <span class="c"># detecte une stack existante</span>
+<span class="p">$</span> arrsenal adopt        <span class="c"># la cable sans rien recreer</span>
+<span class="p">$</span> arrsenal serve        <span class="c"># page d'administration</span>
+<span class="p">$</span> arrsenal doctor       <span class="c"># diagnostique une installation</span>
+<span class="p">$</span> arrsenal uninstall    <span class="c"># ne touche jamais a vos medias</span></code></pre>
+    </div>
+    <p class="note">Le paquet n'est pas encore publie sur PyPI.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap stack gap-l">
+    <div class="stack gap-m prose">
+      <p class="eyebrow">Le catalogue</p>
+      <h2>Douze services installes et cables en une passe</h2>
+    </div>
+    <p class="chips">
+      <span class="chip">Prowlarr</span>
+      <span class="chip">Sonarr</span>
+      <span class="chip">Radarr</span>
+      <span class="chip">Lidarr</span>
+      <span class="chip">Transmission</span>
+      <span class="chip">qBittorrent</span>
+      <span class="chip">Jellyfin</span>
+      <span class="chip">Silo <em>experimental</em></span>
+      <span class="chip">autobrr</span>
+      <span class="chip">Recyclarr</span>
+      <span class="chip">Flood <em>UI</em></span>
+      <span class="chip">qui <em>UI</em></span>
+      <span class="chip chip-vpn">Gluetun <em>VPN optionnel</em></span>
+    </p>
+    <div class="cards">
+      <div class="card">
+        <h3>Des secrets par installation</h3>
+        <p>Mots de passe de 20 caracteres et cles API tires par la source cryptographique de Python,
+        environ 125 bits d'entropie. Aucun mot de passe par defaut n'existe.</p>
+      </div>
+      <div class="card">
+        <h3>Un VPN qui ne fuit pas</h3>
+        <p>Le client de telechargement ne demarre pas tant que Gluetun n'est pas <em>healthy</em>.
+        Verifie avec des identifiants volontairement faux&nbsp;: qBittorrent ne quitte jamais
+        l'etat <span class="mono">created</span>.</p>
+      </div>
+      <div class="card">
+        <h3>Un journal joignable a une issue</h3>
+        <p><span class="mono">arrsenal.log</span> contient chaque etape et la trace complete d'une erreur.
+        Les mots de passe et cles API y sont remplaces par leur nom avant ecriture.</p>
+      </div>
+      <div class="card">
+        <h3>Vos profils de qualite</h3>
+        <p>arrsenal ne reimplemente pas les TRaSH Guides&nbsp;: il installe Recyclarr, choisit un
+        template officiel, et lance la premiere synchronisation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+   <div class="stack gap-m prose">
+    <p class="eyebrow">A lire avant de commencer</p>
+    <h2>Ce que ce projet ne fait pas</h2>
+    <p class="muted">arrsenal ne fournit, n'heberge et ne recommande <strong>aucun indexeur, aucun tracker,
+    aucun contenu</strong>, et n'en preconfigure aucun. Aucune liste n'est livree avec le code&nbsp;:
+    celle de l'assistant vient de votre propre Prowlarr. C'est un outil d'automatisation de mediatheque
+    personnelle. Ce que vous y branchez, et sa legalite, vous regardent.</p>
+    <p><a href="https://github.com/yannickuhrig1/arrsenal/blob/main/DISCLAIMER.md">Lire l'avertissement complet</a></p>
+   </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-grid">
+    <div class="stack gap-s">
+      <p class="mono" style="font-size:1.25rem;letter-spacing:-.03em">arrsenal</p>
+      <p class="footer-links">
+        <a href="https://github.com/yannickuhrig1/arrsenal">GitHub</a>
+        <a href="https://github.com/yannickuhrig1/arrsenal/releases">Telechargements</a>
+        <a href="https://github.com/yannickuhrig1/arrsenal/blob/main/ROADMAP.md">Feuille de route</a>
+        <a href="https://github.com/yannickuhrig1/arrsenal/issues">Signaler un probleme</a>
+        <a id="discord-footer" href="#" aria-disabled="true">Discord (bientot)</a>
+      </p>
+    </div>
+    <p class="footer-note">Licence MIT &middot; version 0.1.12 &middot; les captures de cette page sont
+    generees par <span class="mono">scripts/screenshots.py</span> et versionnees avec le code.</p>
+  </div>
+</footer>
+
+<script>
+  /* ================================================================
+     DISCORD : coller l'invitation ici, par exemple
+       const DISCORD_URL = "https://discord.gg/xxxxxxx";
+     Les deux liens s'activent tout seuls. Laisser vide = "bientot".
+     ================================================================ */
+  const DISCORD_URL = "";
+
+  if (DISCORD_URL) {
+    const cta = document.getElementById("discord-cta");
+    cta.href = DISCORD_URL;
+    cta.textContent = "Rejoindre le Discord";
+    cta.removeAttribute("aria-disabled");
+    const foot = document.getElementById("discord-footer");
+    foot.href = DISCORD_URL;
+    foot.textContent = "Discord";
+    foot.removeAttribute("aria-disabled");
+  }
+</script>
+
+</body>
+</html>

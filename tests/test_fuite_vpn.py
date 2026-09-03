@@ -15,6 +15,8 @@ dans le tunnel : le client de telechargement y est et perd son alias DNS.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from arrsenal import compose, orchestrator, vpncheck
@@ -168,3 +170,63 @@ def test_seuls_les_clients_torrent_comptent():
         from arrsenal import catalog
 
         assert catalog.get(sid).category is Category.DOWNLOAD
+
+
+# ------------------------------ le tunnel ressort-il ailleurs que chez vous ?
+
+
+def _tunnel(monkeypatch, ip_tunnel, ip_hote):
+    monkeypatch.setattr(vpncheck, "container_id", lambda n: "abc")
+    monkeypatch.setattr(vpncheck, "network_mode", lambda n: "container:abc")
+    monkeypatch.setattr(
+        vpncheck,
+        "exec_in",
+        lambda c, cmd, **kw: (
+            True,
+            json.dumps(
+                {
+                    "public_ip": ip_tunnel,
+                    "country": "France",
+                    "organization": "AS12322 Free",
+                }
+            ),
+        ),
+    )
+    monkeypatch.setattr(vpncheck, "ip_de_l_hote", lambda: ip_hote)
+    return vpncheck.verifier(_cfg("qbittorrent", vpn=True))[0]
+
+
+def test_un_tunnel_qui_reboucle_a_la_maison_est_une_fuite(monkeypatch):
+    """Les deux premiers controles le declarent bon : le conteneur EST dans le
+    tunnel. Trouve sur le banc d'essai, avec un serveur WireGuard local qui
+    traduisait les adresses vers la sortie du domicile. Un fournisseur mal
+    configure produirait exactement la meme chose."""
+    controle = _tunnel(monkeypatch, "82.67.130.52", "82.67.130.52")
+
+    assert not controle.ok
+    assert controle.blocking
+    assert "VOTRE adresse publique" in controle.detail
+
+
+def test_une_sortie_differente_est_acceptee(monkeypatch):
+    controle = _tunnel(monkeypatch, "62.112.9.192", "82.67.130.52")
+
+    assert controle.ok
+    assert "differente de la votre" in controle.detail
+
+
+def test_l_adresse_de_l_hote_introuvable_ne_fait_pas_echouer(monkeypatch):
+    """Le diagnostic ne tombe pas parce qu'un service d'adresse est muet : il
+    rend son verdict, d'un cran moins ferme, et le dit."""
+    controle = _tunnel(monkeypatch, "62.112.9.192", None)
+
+    assert controle.ok
+    assert "indeterminable" in controle.detail
+
+
+def test_aucune_adresse_ne_fuit_dans_le_message(monkeypatch):
+    """Ni celle du tunnel ni celle de la machine : le journal se partage."""
+    for tunnel, hote in (("82.67.130.52", "82.67.130.52"), ("62.112.9.192", "82.67.130.52")):
+        detail = _tunnel(monkeypatch, tunnel, hote).detail
+        assert tunnel not in detail
+        assert hote not in detail
