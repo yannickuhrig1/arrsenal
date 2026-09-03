@@ -31,6 +31,7 @@ COUVERTES = {
     "platform": "PathsScreen",
     "host": "PathsScreen",
     "username": "PathsScreen",
+    "project_name": "PathsScreen",
     "language": "PathsScreen",
     "timezone": "PathsScreen",
     "vpn": "VpnScreen",

@@ -29,6 +29,10 @@ class ArrsenalApp(App):
         self.data_root: str | None = None
         self.timezone: str = "Etc/UTC"
         self.username: str = "arrsenal"
+        #: Nom de la pile Docker. Docker identifie une pile par ce nom et non
+        #: par son repertoire : deux installations qui le partagent partagent
+        #: leurs conteneurs, et la seconde recree ceux de la premiere.
+        self.project_name: str = "arrsenal"
         #: Langue des interfaces. Le francais par defaut dans l'assistant : il
         #: est en francais, quelqu'un qui le lit le comprend.
         self.language: str = "fr"
@@ -76,6 +80,7 @@ class ArrsenalApp(App):
             platform=self.platform,
             timezone=self.timezone,
             username=self.username,
+            project_name=self.project_name,
             language=self.language,
             host=self.host,
         )

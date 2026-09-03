@@ -328,6 +328,13 @@ def render_env(cfg: StackConfig) -> str:
         "",
         "# Cles API pre-semees - utilisees par le cablage automatique.",
     ]
+    if cfg.vpn.enabled:
+        # Le compose ne porte plus que le NOM de ces variables.
+        if cfg.vpn.vpn_type == "wireguard":
+            lines.append(f"VPN_WIREGUARD_KEY={_env_value(cfg.vpn.wireguard_private_key)}")
+        else:
+            lines.append(f"VPN_OPENVPN_USER={_env_value(cfg.vpn.openvpn_user)}")
+            lines.append(f"VPN_OPENVPN_PASS={_env_value(cfg.vpn.openvpn_password)}")
     for sid in catalog.STARTUP_ORDER:
         inst = cfg.services.get(sid)
         if inst is None:
@@ -344,6 +351,18 @@ def render_env(cfg: StackConfig) -> str:
         if inst.password:
             lines.append(f"{up}_PASS={_env_value(inst.password)}")
     return "\n".join(lines) + "\n"
+
+
+#: Ce qu'arrsenal depose a cote de ses artefacts. Il n'ecrase jamais un
+#: .gitignore existant : le repertoire peut etre celui de quelqu'un d'autre.
+_GITIGNORE = """# Ecrit par arrsenal. Ces fichiers contiennent vos mots de passe, vos cles API
+# et, si le VPN est active, votre cle privee WireGuard. Ne les commitez pas.
+.env
+stack.yml
+docker-compose.yml
+acces-arrsenal.html
+arrsenal.log
+"""
 
 
 def write_artifacts(cfg: StackConfig, target_dir: Path) -> list[Path]:
@@ -367,6 +386,17 @@ def write_artifacts(cfg: StackConfig, target_dir: Path) -> list[Path]:
         encoding="utf-8",
     )
     written.append(stack_path)
+
+    # arrsenal annonce a l'utilisateur, en fin d'installation et sur la page
+    # d'acces, que ses identifiants sont « deja dans .gitignore ». C'etait faux :
+    # aucun .gitignore n'etait ecrit. Trois des fichiers ci-dessus contiennent
+    # des secrets en clair — .env les porte tous, stack.yml les repete, et
+    # docker-compose.yml porte la cle WireGuard. Une promesse tenue vaut mieux
+    # qu'une promesse repetee.
+    gitignore = target_dir / ".gitignore"
+    if not gitignore.exists():
+        gitignore.write_text(_GITIGNORE, encoding="utf-8")
+        written.append(gitignore)
     return written
 
 

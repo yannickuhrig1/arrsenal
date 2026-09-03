@@ -108,13 +108,16 @@ def _traiter_config_existante(
         return
 
     console.print(
-        f"\n[yellow]Configuration existante detectee[/yellow] pour "
-        f"[bold]{', '.join(concernes)}[/bold] dans {cfg.config_root}.\n"
-        f"[dim]Leurs mots de passe n'y sont stockes que haches : arrsenal ne peut pas "
-        f"les reprendre, et ceux qu'il va annoncer seront refuses.[/dim]"
+        f"\n[yellow]Etat existant detecte[/yellow] pour "
+        f"[bold]{', '.join(concernes)}[/bold].\n"
+        f"[dim]Leurs mots de passe ne se relisent pas : arrsenal ne peut pas les "
+        f"reprendre, et ceux qu'il va annoncer seront refuses.[/dim]"
     )
     for sid in concernes:
-        console.print(f"  [dim]{cfg.config_path(sid)}[/dim]")
+        # La base de Silo n'a pas de dossier : montrer un chemin qui n'existe
+        # pas enverrait l'utilisateur chercher pour rien, et lui ferait douter
+        # de l'avertissement entier.
+        console.print(f"  [dim]{orchestrator.emplacement_etat(cfg, sid)}[/dim]")
 
     if reset is None:
         if assume_yes:
@@ -125,10 +128,10 @@ def _traiter_config_existante(
             )
             return
         console.print(
-            "\n[dim]Vos medias ne sont jamais touches : seuls ces dossiers de "
-            "configuration le seraient.[/dim]"
+            "\n[dim]Vos medias ne sont jamais touches : seul l'etat ci-dessus le "
+            "serait.[/dim]"
         )
-        reset = typer.confirm("Supprimer ces configurations et repartir de zero ?", default=False)
+        reset = typer.confirm("Supprimer cet etat et repartir de zero ?", default=False)
 
     if not reset:
         console.print("[dim]Configurations conservees.[/dim]")
@@ -182,6 +185,14 @@ def install(
     username: str = typer.Option(
         "arrsenal", help="Identifiant commun a tous les services installes."
     ),
+    project_name: str = typer.Option(
+        "arrsenal",
+        help=(
+            "Nom de la pile Docker. A changer pour installer une SECONDE pile "
+            "a cote d'une premiere : Docker identifie une pile par ce nom, pas "
+            "par son repertoire."
+        ),
+    ),
     language: str = typer.Option(
         "en",
         "--langue",
@@ -234,6 +245,7 @@ def install(
         timezone=timezone,
         username=username,
         language=language,
+        project_name=project_name,
     )
 
     chosen = {"sonarr": recyclarr_sonarr.strip(), "radarr": recyclarr_radarr.strip()}

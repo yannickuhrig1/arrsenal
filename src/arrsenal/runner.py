@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import socket
 import subprocess
@@ -83,6 +84,57 @@ def check_docker() -> list[Check]:
         )
     )
     return checks
+
+
+def running_project_dir(project_name: str) -> str | None:
+    """Repertoire d'ou tourne DEJA une pile portant ce nom de projet, s'il y en
+    a une. None si aucun conteneur ne porte ce nom.
+
+    Docker range les conteneurs par LABEL de projet, pas par repertoire : deux
+    installations qui partagent un nom partagent leurs conteneurs, ou que
+    vivent leurs fichiers. Ce label est le seul moyen de les distinguer.
+    """
+    proc = _run(
+        [
+            "docker",
+            "ps",
+            "--all",
+            "--filter",
+            f"label=com.docker.compose.project={project_name}",
+            "--format",
+            "{{.Label \"com.docker.compose.project.working_dir\"}}",
+        ],
+        timeout=PROBE_TIMEOUT,
+    )
+    if proc.returncode != 0:
+        return None
+    for ligne in proc.stdout.splitlines():
+        if ligne.strip():
+            return ligne.strip()
+    return None
+
+
+def volume_name(project_name: str, volume: str) -> str:
+    """Nom REEL d'un volume nomme, tel que Docker Compose le cree.
+
+    Compose prefixe par le nom du projet, en retirant tout ce qui n'est ni
+    lettre, ni chiffre, ni tiret bas, ni tiret. Sans cette regle, on chercherait
+    un volume qui n'existe pas et l'installation repartirait sur une base
+    qu'elle croit neuve.
+    """
+    prefixe = re.sub(r"[^a-zA-Z0-9_-]", "", project_name)
+    return f"{prefixe}_{volume}"
+
+
+def volume_exists(name: str) -> bool:
+    return _run(["docker", "volume", "inspect", name], timeout=PROBE_TIMEOUT).returncode == 0
+
+
+def remove_volume(name: str) -> tuple[bool, str]:
+    """Supprime un volume Docker. Destructeur : reserve a une remise a zero
+    demandee explicitement."""
+    proc = _run(["docker", "volume", "rm", name], timeout=PROBE_TIMEOUT)
+    return proc.returncode == 0, (proc.stderr or proc.stdout).strip()
 
 
 def check_port_free(port: int, label: str) -> Check:

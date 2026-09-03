@@ -274,6 +274,13 @@ class PathsScreen(WizardScreen):
                 id="langue",
             )
 
+            yield Label(
+                "Nom de la pile Docker "
+                "[dim](a changer pour en installer une SECONDE a cote)[/dim]",
+                classes="group-title",
+            )
+            yield Input(value="arrsenal", id="project-name")
+
             yield Label("Fuseau horaire", classes="group-title")
             yield Input(value="Europe/Paris", id="tz")
 
@@ -367,6 +374,9 @@ class PathsScreen(WizardScreen):
         self.app.data_root = self.query_one("#data-root", Input).value.strip()
         self.app.timezone = self.query_one("#tz", Input).value.strip() or "Etc/UTC"
         self.app.username = self.query_one("#username", Input).value.strip() or "arrsenal"
+        self.app.project_name = (
+            self.query_one("#project-name", Input).value.strip() or "arrsenal"
+        )
         choisie = self.query_one("#langue", Select).value
         self.app.language = choisie if isinstance(choisie, str) else "en"
         self.app.host = self.query_one("#host", Input).value.strip() or "localhost"
@@ -1002,11 +1012,20 @@ class ReportScreen(WizardScreen):
             )
             body += "\n\n[dim]Diagnostic : arrsenal doctor[/dim]"
         else:
-            body = (
-                "[b]Prochaine etape[/b] : ajoutez vos indexeurs dans Prowlarr.\n"
-                "Ils descendront automatiquement vers vos applications.\n\n"
-                "[dim]arrsenal ne fournit aucun indexeur : ce choix vous appartient.[/dim]"
+            # `stack_config` est pose par l'installation. S'il manque, le
+            # rapport reste affichable : on retombe sur la formule generale.
+            cfg = self.app.stack_config
+            lignes = (
+                orchestrator.prochaine_etape(cfg)
+                if cfg is not None
+                else ["Prochaine etape : ouvrez chaque service depuis la page d'acces."]
             )
+            # La derniere ligne est un aparte : elle passe en retrait.
+            body = "[b]" + lignes[0] + "[/b]"
+            if len(lignes) > 2:
+                body += "\n" + "\n".join(lignes[1:-1])
+            if len(lignes) > 1:
+                body += "\n\n[dim]" + lignes[-1] + "[/dim]"
         body += (
             f"\n\n[dim]Ces identifiants sont aussi dans "
             f"{self.app.project_dir / '.env'} (chmod 600).[/dim]"

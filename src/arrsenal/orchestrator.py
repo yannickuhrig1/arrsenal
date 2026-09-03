@@ -23,6 +23,10 @@ from .runner import (
     check_docker,
     check_hardlinks,
     check_port_free,
+    remove_volume,
+    running_project_dir,
+    volume_exists,
+    volume_name,
 )
 from .wiring import StepResult, Wirer
 
@@ -61,6 +65,7 @@ def build_config(
     timezone: str = "Etc/UTC",
     username: str = "arrsenal",
     language: str = "en",
+    project_name: str = "arrsenal",
 ) -> StackConfig:
     """Construit une StackConfig complete, secrets generes.
 
@@ -71,6 +76,7 @@ def build_config(
     uid, gid, source, certain = resolve_ids(platform)
 
     cfg = StackConfig(
+        project_name=project_name,
         platform=platform,
         config_root=config_root or defaults.config_root,
         data_root=data_root or defaults.data_root,
@@ -180,6 +186,41 @@ def our_published_ports(cfg: StackConfig, project_dir: Path | None) -> set[int]:
     return ports
 
 
+def check_project_collision(cfg: StackConfig, project_dir: Path | None) -> Check | None:
+    """Une AUTRE installation porte-t-elle deja ce nom de projet ?
+
+    Docker range les conteneurs par label de projet, pas par repertoire. Deux
+    installations qui partagent le nom `arrsenal` partagent donc leurs
+    conteneurs : la seconde RECREE ceux de la premiere, en les pointant vers ses
+    propres chemins. Les fichiers de la premiere restent intacts, mais ses
+    services tournent desormais sur une autre configuration, et rien ne le dit.
+
+    Rencontre en vrai, en installant une pile d'essai a cote d'une pile en
+    service : les six conteneurs de celle-ci ont ete remplacees sans un mot. Le
+    preflight annoncait meme « occupe par votre propre pile arrsenal », ce qui
+    etait vrai du nom et faux de l'installation.
+
+    Non bloquant : reinstaller par-dessus soi-meme est le cas normal. C'est le
+    changement de REPERTOIRE qui merite d'etre signale.
+    """
+    if project_dir is None:
+        return None
+    ailleurs = running_project_dir(cfg.project_name)
+    if ailleurs is None:
+        return None
+    if Path(ailleurs).resolve() == Path(project_dir).resolve():
+        return None
+    return Check(
+        "nom de projet",
+        False,
+        f"des conteneurs nommes {cfg.project_name!r} tournent deja depuis {ailleurs}. "
+        f"Installer ici les REMPLACERA : Docker identifie une pile par son nom, pas "
+        f"par son repertoire. Les fichiers de {ailleurs} ne seront pas touches, mais "
+        f"ses services repartiront sur la configuration de {project_dir}.",
+        blocking=False,
+    )
+
+
 def preflight(cfg: StackConfig, project_dir: Path | None = None) -> list[Check]:
     checks = check_docker()
     nos_ports = our_published_ports(cfg, project_dir)
@@ -205,14 +246,25 @@ def preflight(cfg: StackConfig, project_dir: Path | None = None) -> list[Check]:
     checks.append(check_disk_space(cfg.data_root))
     checks.append(check_hardlinks(cfg.data_root))
     checks.append(check_existing_config(cfg))
+    collision = check_project_collision(cfg, project_dir)
+    if collision is not None:
+        checks.append(collision)
     return checks
 
 
 def existing_configs(cfg: StackConfig) -> list[str]:
-    """Services dont la configuration existe DEJA sous config_root."""
+    """Services dont l'etat existe DEJA, sous config_root ou dans un volume."""
     present = []
     for sid in catalog.STARTUP_ORDER:
         if not cfg.enabled(sid):
+            continue
+        if sid == "silo-postgres":
+            # Sa base ne vit pas sur le disque de l'hote mais dans un VOLUME
+            # Docker (voir compose.PG_VOLUME). Un volume survit a un
+            # `docker compose down` : le chercher au mauvais endroit revenait a
+            # declarer neuve une installation qui ne l'est pas.
+            if volume_exists(volume_name(cfg.project_name, compose.PG_VOLUME)):
+                present.append(sid)
             continue
         directory = Path(cfg.config_path(sid))
         if directory.is_dir() and any(directory.iterdir()):
@@ -234,7 +286,11 @@ def check_existing_config(cfg: StackConfig) -> Check:
     la dire avant de commencer.
     """
     present = existing_configs(cfg)
-    hachants = [s for s in present if catalog.get(s).api_family in _HASHED_PASSWORDS]
+    hachants = [
+        s
+        for s in present
+        if catalog.get(s).api_family in _HASHED_PASSWORDS or s in _SECRET_ILLISIBLE
+    ]
     if not hachants:
         return Check(
             "configuration existante",
@@ -242,20 +298,41 @@ def check_existing_config(cfg: StackConfig) -> Check:
             "aucune, installation neuve" if not present else f"reprise : {', '.join(present)}",
             blocking=False,
         )
+    # La base de Silo n'est pas dans un dossier : le dire evite d'envoyer
+    # chercher sous config_root quelque chose qui n'y est pas.
+    ou = f"dans {cfg.config_root}"
+    if _SECRET_ILLISIBLE[0] in hachants:
+        volume = volume_name(cfg.project_name, compose.PG_VOLUME)
+        ou = (
+            f"dans {cfg.config_root}, et la base de Silo dans le volume Docker {volume}"
+            if len(hachants) > 1
+            else f"dans le volume Docker {volume}"
+        )
     return Check(
         "configuration existante",
         False,
-        f"{', '.join(hachants)} ont deja une configuration dans {cfg.config_root}. "
-        f"Leurs mots de passe y sont haches : arrsenal ne peut pas les relire, et ceux "
-        f"qu'il vient de generer seront refuses. Reprenez l'installation d'origine avec "
-        f"--project-dir, ou supprimez ces dossiers pour repartir a zero.",
+        f"{', '.join(hachants)} ont deja un etat {ou}. "
+        f"Leurs mots de passe ne se relisent pas, et ceux qu'arrsenal vient de generer "
+        f"seront refuses. Reprenez l'installation d'origine avec --project-dir, ou "
+        f"remettez ces services a zero.",
         blocking=False,
     )
 
 
 #: Services dont le mot de passe n'est stocke que sous forme hachee : impossible
 #: a relire, donc impossible a reprendre.
+#:
+#: `silo-postgres` est le meme probleme sous une autre forme. PostgreSQL ne pose
+#: `POSTGRES_PASSWORD` qu'au tout premier demarrage, quand il cree sa base ; sur
+#: un volume deja rempli il l'IGNORE en silence. Reinstaller genere un nouveau
+#: mot de passe, le volume garde l'ancien, et Silo redemarre en boucle sur
+#: « password authentication failed for user "silo" » sans que rien n'explique
+#: pourquoi. Constate en vrai, sur une seconde installation.
 _HASHED_PASSWORDS = ("qbittorrent", "transmission", "jellyfin", "autobrr", "qui")
+
+#: Services illisibles pour une autre raison que le hachage, designes par leur
+#: IDENTIFIANT et non par leur famille d'API — ils n'en ont pas.
+_SECRET_ILLISIBLE = ("silo-postgres",)
 
 
 def unusable_configs(cfg: StackConfig) -> list[str]:
@@ -265,8 +342,22 @@ def unusable_configs(cfg: StackConfig) -> list[str]:
     dans leur `config.xml`.
     """
     return [
-        sid for sid in existing_configs(cfg) if catalog.get(sid).api_family in _HASHED_PASSWORDS
+        sid
+        for sid in existing_configs(cfg)
+        if catalog.get(sid).api_family in _HASHED_PASSWORDS or sid in _SECRET_ILLISIBLE
     ]
+
+
+def emplacement_etat(cfg: StackConfig, service_id: str) -> str:
+    """Ou vit REELLEMENT l'etat d'un service, dit a l'utilisateur.
+
+    Presque toujours un dossier sous config_root. La base de Silo, elle, vit
+    dans un volume Docker : lui annoncer `config/silo-postgres` l'envoyait
+    chercher un dossier inexistant, et faisait douter de tout l'avertissement.
+    """
+    if service_id in _SECRET_ILLISIBLE:
+        return f"volume Docker {volume_name(cfg.project_name, compose.PG_VOLUME)}"
+    return cfg.config_path(service_id)
 
 
 def reset_configs(cfg: StackConfig, services: list[str]) -> list[Path]:
@@ -285,6 +376,15 @@ def reset_configs(cfg: StackConfig, services: list[str]) -> list[Path]:
     efface: list[Path] = []
     for sid in services:
         catalog.get(sid)  # leve une erreur lisible si le service est inconnu
+        if sid == "silo-postgres":
+            # Rien a effacer sur le disque : c'est le VOLUME qu'il faut retirer,
+            # sans quoi la remise a zero laisse la base intacte avec son ancien
+            # mot de passe, et Silo redemarre en boucle apres coup.
+            nom = volume_name(cfg.project_name, compose.PG_VOLUME)
+            if volume_exists(nom):
+                remove_volume(nom)
+                efface.append(Path(f"volume docker {nom}"))
+            continue
         dossier = Path(cfg.config_path(sid)).resolve()
         if not dossier.is_dir():
             continue
@@ -293,6 +393,43 @@ def reset_configs(cfg: StackConfig, services: list[str]) -> list[Path]:
         shutil.rmtree(dossier)
         efface.append(dossier)
     return efface
+
+
+def prochaine_etape(cfg: StackConfig) -> list[str]:
+    """Ce qu'il reste a faire A LA MAIN, selon ce qui est reellement installe.
+
+    arrsenal disait « ajoutez vos indexeurs dans Prowlarr. Ils descendront
+    automatiquement vers Sonarr et Radarr » a la fin de CHAQUE installation.
+    Constate en installant Silo seul : le conseil citait trois applications
+    dont aucune n'existait. Un conseil faux est pire qu'aucun conseil — il
+    envoie chercher un ecran qui n'est nulle part.
+
+    Renvoie des lignes de texte brut : chaque interface les met en forme.
+    """
+    arrs = [sid for sid in ("sonarr", "radarr", "lidarr") if cfg.enabled(sid)]
+    if cfg.enabled("prowlarr"):
+        lignes = ["Prochaine etape : ajoutez vos indexeurs dans Prowlarr."]
+        if arrs:
+            noms = ", ".join(catalog.get(a).display_name for a in arrs)
+            lignes.append(f"Ils descendront automatiquement vers {noms}.")
+        lignes.append("arrsenal ne fournit aucun indexeur : ce choix vous appartient.")
+        return lignes
+    if arrs:
+        # Sans Prowlarr, chaque application reste a alimenter une par une.
+        noms = ", ".join(catalog.get(a).display_name for a in arrs)
+        return [
+            f"Prochaine etape : ajoutez vos indexeurs dans {noms}.",
+            "Prowlarr les aurait distribues a votre place : il n'est pas installe.",
+            "arrsenal ne fournit aucun indexeur : ce choix vous appartient.",
+        ]
+    media = [sid for sid in ("jellyfin", "silo") if cfg.enabled(sid)]
+    if media:
+        noms = ", ".join(catalog.get(m).display_name for m in media)
+        return [
+            f"Prochaine etape : deposez vos medias sous {cfg.data_root}.",
+            f"{noms} les trouvera a la prochaine analyse.",
+        ]
+    return ["Prochaine etape : ouvrez chaque service depuis la page d'acces."]
 
 
 def blocking_failures(checks: list[Check]) -> list[Check]:

@@ -34,6 +34,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import adminauth, catalog, compose, dashboard, imageref, orchestrator, updates
+from .clients.arr import ArrClient
 from .models import StackConfig
 from .runner import Compose
 
@@ -111,6 +112,61 @@ def updates_payload(cfg: StackConfig) -> dict:
             }
         )
     return {"services": entries}
+
+
+#: Controles qui n'ont de sens qu'AVANT d'installer, et qu'un diagnostic ne
+#: doit donc pas rapporter. « Une configuration existe deja » est un
+#: avertissement utile a qui s'apprete a en generer une nouvelle ; sur une
+#: installation en marche c'est la situation normale, et l'annoncer en ECHEC
+#: envoie chercher une panne qui n'existe pas.
+_AVANT_INSTALLATION = ("configuration existante", "nom de projet")
+
+
+def doctor_payload(cfg: StackConfig, project_dir: Path) -> dict:
+    """Le meme diagnostic que `arrsenal doctor`, rendu depuis la console.
+
+    Demande a l'usage : « un bouton pour lancer arrsenal doctor ». Il n'existait
+    qu'en ligne de commande, ce qui allait contre la regle du projet — tout ce
+    qu'arrsenal sait faire doit etre atteignable sans ouvrir un terminal.
+
+    On reutilise `preflight` plutot que d'ecrire un second diagnostic : deux
+    verifications du meme systeme finiraient par ne plus dire la meme chose.
+    """
+    controles = [
+        {"name": c.name, "ok": c.ok, "detail": c.detail, "blocking": c.blocking}
+        for c in orchestrator.preflight(cfg, project_dir)
+        if c.name not in _AVANT_INSTALLATION
+    ]
+
+    # La joignabilite reelle des API : un conteneur qui tourne n'est pas un
+    # service qui repond, et c'est la distinction que `doctor` apporte.
+    for sid, inst in orchestrator.iter_selected(cfg):
+        spec = catalog.get(sid)
+        if spec.api_family != "arr":
+            continue
+        try:
+            with ArrClient(
+                inst.url(cfg.host), inst.api_key or "", api_version=spec.api_version, name=sid
+            ) as client:
+                controles.append(
+                    {
+                        "name": f"API {spec.display_name}",
+                        "ok": True,
+                        "detail": f"repond, version {client.version}",
+                        "blocking": False,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001
+            controles.append(
+                {
+                    "name": f"API {spec.display_name}",
+                    "ok": False,
+                    "detail": str(exc).splitlines()[0],
+                    "blocking": False,
+                }
+            )
+    echecs = sum(1 for c in controles if not c["ok"])
+    return {"checks": controles, "failed": echecs}
 
 
 def apply_update(
@@ -314,6 +370,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(status_payload(self.cfg, self.compose))
         elif route == "/api/updates":
             self._json(updates_payload(self.cfg))
+        elif route == "/api/doctor":
+            self._json(doctor_payload(self.cfg, self.project_dir))
         else:
             self._json({"error": "route inconnue"}, HTTPStatus.NOT_FOUND)
 

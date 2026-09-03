@@ -114,6 +114,8 @@ reste une commande à lancer.
 | État des services | ✅ |
 | Démarrer, arrêter, redémarrer | ✅ |
 | Voir et appliquer les mises à jour | ✅ |
+| Lancer le diagnostic | ✅ 0.1.11 |
+| Forcer la recherche de mises à jour | ✅ 0.1.11 |
 | Renouveler un mot de passe, avec recâblage | ✅ |
 | Renouveler une clé API, avec recâblage | ✅ |
 | Ajouter un service absent de l'installation | ✅ |
@@ -154,6 +156,13 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.1.11** | **La console d'administration n'avait plus aucun JavaScript depuis la 0.1.8.** Le message de confirmation de « ajouter un service » contenait une chaine ouverte sur deux lignes et trois apostrophes francaises non echappees — du JavaScript invalide, qui emportait le script entier. Demarrer, arreter, redemarrer, faire tourner une cle, appliquer une mise a jour : rien ne repondait. Le HTML etait pourtant parfaitement bien forme, et tous les tests Python passaient. Trouve en ouvrant la page dans un vrai navigateur ; un test verifie desormais que chaque bloc `<script>` a ses apostrophes appariees. |
+| **0.1.11** | **Diagnostic et recherche de mises a jour depuis la console.** Deux boutons, demandes a l'usage. La verification des mises a jour tournait deja toutes les quinze minutes, mais en silence : impossible de la declencher ni de savoir quand elle avait eu lieu. Le diagnostic, lui, n'existait qu'en ligne de commande. |
+| **0.1.11** | **Une seconde installation ecrasait la premiere.** Docker identifie une pile par son nom, jamais par son repertoire, et ce nom etait fige a `arrsenal` : installer une pile d'essai a cote d'une pile en service recreait les six conteneurs de celle-ci en les pointant ailleurs. Le preflight rassurait meme — « port occupe par votre propre pile arrsenal » — ce qui etait vrai du nom et faux de l'installation. `--project-name` existe maintenant, l'assistant le demande, et le preflight avertit. |
+| **0.1.11** | **Le volume de la base de Silo survivait a une reinstallation.** PostgreSQL n'applique `POSTGRES_PASSWORD` qu'a la creation de sa base ; sur un volume deja rempli il l'ignore en silence. Reinstaller generait un nouveau mot de passe, le volume gardait l'ancien, et Silo redemarrait en boucle sur « password authentication failed ». La verification ne regardait que le disque. |
+| **0.1.11** | **arrsenal promettait un `.gitignore` qu'il n'ecrivait pas.** Le rapport et la page d'acces annoncaient que les identifiants etaient « deja dans .gitignore » ; aucun fichier n'etait depose. Il l'est desormais. |
+| **0.1.11** | **La cle privee WireGuard etait ecrite en clair dans `docker-compose.yml`**, seul secret a echapper au `.env` protege. Elle passe par le `.env` comme les autres. |
+| **0.1.11** | **Le conseil de fin citait Prowlarr meme absent.** « Ajoutez vos indexeurs dans Prowlarr, ils descendront vers Sonarr et Radarr » s'affichait apres une installation de Silo seul, ou aucune des trois applications n'existait. Il depend maintenant de ce qui est installe. |
 | **0.1.11** | La base de Silo passait par un montage vers le disque Windows : ses migrations de premier démarrage prenaient **49 minutes** au lieu de 5 secondes, et l'installation abandonnait au bout de 300 s alors que PostgreSQL fonctionnait très bien. Un volume Docker règle les deux. Au passage, `config/silo-redis` restait vide à côté du `config/silo/redis` que Docker fabriquait lui-même. |
 | **0.1.10** | **0.1.8 et 0.1.9 etaient ininstallables** : le fichier des pays VPN n'entrait ni dans l'exécutable ni dans le paquet, et l'assistant mourait sur l'écran VPN. Un test compare désormais les fichiers non-Python réels aux deux déclarations d'empaquetage, et le contrôle de l'exe parcourt l'assistant au lieu de l'ouvrir. |
 | **0.1.9** | La console démarre toute seule, sur l'hôte, et se protège par un mot de passe. Un cookie contenant un caractère accentué tuait la requête sans authentification. |

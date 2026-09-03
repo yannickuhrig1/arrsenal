@@ -484,6 +484,12 @@ Flood et qui *(UI optionnelles)*
 
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
+**Deux piles sur une machine.** Docker identifie une pile par son *nom*, jamais
+par son répertoire : deux installations qui partagent le nom `arrsenal`
+partagent leurs conteneurs, et la seconde recrée ceux de la première. Passez
+`--project-name` (ou remplissez le champ correspondant dans l'assistant) pour en
+installer une seconde à côté. Le préflight avertit si le cas se présente.
+
 ### Feuille de route
 
 Le détail vit dans [ROADMAP.md](ROADMAP.md), tenue à jour : ce qui marche, ce

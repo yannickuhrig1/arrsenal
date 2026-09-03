@@ -154,13 +154,18 @@ class VpnConfig(BaseModel):
             "VPN_TYPE": self.vpn_type,
             "TZ": timezone,
         }
+        # Les secrets passent par le .env, comme tous les autres. Ils etaient
+        # ecrits EN CLAIR dans docker-compose.yml : la cle privee WireGuard —
+        # celle qui ouvre le compte VPN — etait le seul secret d'arrsenal a
+        # echapper au fichier protege par chmod 600. Constate en relisant le
+        # compose d'une installation reelle.
         if self.vpn_type == "wireguard":
-            env["WIREGUARD_PRIVATE_KEY"] = self.wireguard_private_key
+            env["WIREGUARD_PRIVATE_KEY"] = "${VPN_WIREGUARD_KEY}"
             if self.wireguard_addresses:
                 env["WIREGUARD_ADDRESSES"] = self.wireguard_addresses
         else:
-            env["OPENVPN_USER"] = self.openvpn_user
-            env["OPENVPN_PASSWORD"] = self.openvpn_password
+            env["OPENVPN_USER"] = "${VPN_OPENVPN_USER}"
+            env["OPENVPN_PASSWORD"] = "${VPN_OPENVPN_PASS}"
         if self.countries:
             # PAS toujours SERVER_COUNTRIES. Cinq fournisseurs n'exposent aucun
             # pays dans les donnees de Gluetun : Windscribe, VyprVPN, Giganews

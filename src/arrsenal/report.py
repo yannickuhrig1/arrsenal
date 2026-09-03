@@ -164,9 +164,7 @@ def print_final(cfg: StackConfig, results: list[StepResult]) -> None:
         body += [f"  - {r.name}: {r.detail}" for r in failed]
         body.append("\nDiagnostic : `arrsenal doctor`")
     else:
-        body.append(
-            "\nProchaine etape : ajoutez vos indexeurs dans Prowlarr.\n"
-            "Ils descendront automatiquement vers Sonarr et Radarr.\n"
-            "arrsenal ne fournit aucun indexeur : ce choix vous appartient."
-        )
+        from .orchestrator import prochaine_etape
+
+        body.append("\n" + "\n".join(prochaine_etape(cfg)))
     console.print(Panel("\n".join(body), title="Resultat", border_style=style))

@@ -286,14 +286,22 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
             f"<code>{LAUNCHER_NAME}</code>, depose a cote de cette page.</div>"
         )
 
+    # Importe ici et non en tete : `orchestrator` importe `dashboard`.
+    from .orchestrator import prochaine_etape
+
     return _TEMPLATE.format(
         generated=generated,
         count=count,
         cards=_cards(cfg, host, live=live),
         paths=_paths(cfg),
         ajouts=_ajouts(cfg) if live else "",
+        outils=_OUTILS if live else "",
         banner=banner,
         data_root=html.escape(cfg.data_root),
+        # Le conseil de fin depend de ce qui est REELLEMENT installe : citer
+        # Prowlarr a qui n'a installe que Silo envoyait chercher un ecran
+        # inexistant.
+        prochaine_etape=html.escape(" ".join(prochaine_etape(cfg))),
         version=__version__,
         live_script=_LIVE_SCRIPT if live else "",
         title="Administration" if live else "Acces",
@@ -444,6 +452,18 @@ _TEMPLATE = """<!doctype html>
     font-weight: 600;
   }}
   button.upgrade:disabled {{ opacity: .5; cursor: not-allowed; }}
+  .outils {{ display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }}
+  button.outil {{
+    font: inherit; padding: .35rem .8rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }}
+  button.outil:disabled {{ opacity: .5; cursor: progress; }}
+  .outil-etat {{ font-size: .85rem; color: var(--muted); }}
+  pre.rapport {{
+    margin-top: .75rem; padding: .75rem 1rem; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--panel); overflow-x: auto;
+    font-size: .85rem; line-height: 1.5; white-space: pre-wrap;
+  }}
 </style>
 </head>
 <body>
@@ -452,6 +472,7 @@ _TEMPLATE = """<!doctype html>
     <h1>Votre stack media</h1>
     <p>{count} services installes et cables le {generated}.</p>
     {banner}
+    {outils}
   </header>
 
   <h2>Services</h2>
@@ -472,8 +493,7 @@ _TEMPLATE = """<!doctype html>
   par un partage reseau.</p>
 
   <footer>
-    <p><strong>Prochaine etape</strong> : ajoutez vos indexeurs dans Prowlarr. Ils
-    descendront automatiquement vers vos applications. arrsenal n'en fournit aucun.</p>
+    <p><strong>{prochaine_etape}</strong></p>
     <p>Cette page contient vos mots de passe et vos cles API. Elle est en lecture seule
     pour vous (<code>chmod 600</code>) et exclue du depot git. Ne la partagez pas.</p>
     <p>Genere par arrsenal {version} — donnees dans <code>{data_root}</code>.</p>
@@ -505,6 +525,18 @@ _TEMPLATE = """<!doctype html>
 {live_script}</body>
 </html>
 """
+
+#: Barre d'outils de la console. Deux actions demandees a l'usage : lancer le
+#: diagnostic, et forcer la recherche de mises a jour. Celle-ci tournait deja,
+#: mais seule et en silence — toutes les quinze minutes, sans qu'on puisse la
+#: declencher ni savoir quand elle avait eu lieu.
+_OUTILS = """<div class="outils">
+      <button class="outil" id="btn-doctor">diagnostic</button>
+      <button class="outil" id="btn-maj">chercher les mises a jour</button>
+      <span class="outil-etat" id="outil-etat"></span>
+    </div>
+    <pre class="rapport" id="rapport-doctor" hidden></pre>"""
+
 
 _LIVE_SCRIPT = """<script>
   // Sert uniquement quand la page vient de `arrsenal serve` : c'est ce serveur
@@ -596,12 +628,10 @@ _LIVE_SCRIPT = """<script>
     btn.addEventListener('click', function () {
       var carte = btn.closest('.card');
       if (!window.confirm(
-            'Installer ce service et le cabler ?
-
-'
+            'Installer ce service et le cabler ?\\n\\n'
             + 'Son image sera telechargee, ce qui peut prendre plusieurs minutes. '
-            + 'Aucun service en marche n'est arrete, et aucun mot de passe existant '
-            + 'n'est touche.')) {
+            + 'Aucun service en marche n\\'est arrete, et aucun mot de passe existant '
+            + 'n\\'est touche.')) {
         return;
       }
       btn.disabled = true;
@@ -702,6 +732,67 @@ _LIVE_SCRIPT = """<script>
   // Le controle interroge les registres : lent, et sans urgence.
   verifierMaj();
   setInterval(verifierMaj, 900000);
+
+  // -- barre d'outils ------------------------------------------------------
+
+  var etat = document.getElementById('outil-etat');
+
+  function heure() {
+    return new Date().toLocaleTimeString();
+  }
+
+  var btnMaj = document.getElementById('btn-maj');
+  if (btnMaj) {
+    btnMaj.addEventListener('click', function () {
+      btnMaj.disabled = true;
+      etat.textContent = 'interrogation des registres…';
+      // La verification tournait deja toutes les 15 minutes, en silence. Ce
+      // bouton ne l'ajoute pas : il la rend declenchable et DATEE.
+      fetch('/api/updates', {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var liste = d.services || [];
+          peindreMaj(liste);
+          var n = liste.filter(function (s) { return s.available; }).length;
+          var soucis = liste.filter(function (s) { return (s.problems || []).length; }).length;
+          etat.textContent = (n ? n + ' mise(s) a jour disponible(s)' : 'tout est a jour')
+            + (soucis ? ', ' + soucis + ' service(s) non verifiable(s)' : '')
+            + ' — ' + heure();
+        })
+        .catch(function () { etat.textContent = 'serveur injoignable'; })
+        .then(function () { btnMaj.disabled = false; });
+    });
+  }
+
+  var btnDoc = document.getElementById('btn-doctor');
+  var rapport = document.getElementById('rapport-doctor');
+  if (btnDoc) {
+    btnDoc.addEventListener('click', function () {
+      if (!rapport.hidden && rapport.dataset.rempli === '1') {
+        rapport.hidden = true;
+        rapport.dataset.rempli = '0';
+        etat.textContent = '';
+        return;
+      }
+      btnDoc.disabled = true;
+      etat.textContent = 'diagnostic en cours…';
+      fetch('/api/doctor', {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var lignes = (d.checks || []).map(function (c) {
+            return (c.ok ? '  OK    ' : '  ECHEC ') + c.name + ' : ' + c.detail;
+          });
+          rapport.textContent = lignes.join('\\n') || 'aucun controle';
+          rapport.hidden = false;
+          rapport.dataset.rempli = '1';
+          etat.textContent = (d.failed
+            ? d.failed + ' controle(s) en echec'
+            : 'tout est en ordre') + ' — ' + heure();
+        })
+        .catch(function () { etat.textContent = 'serveur injoignable'; })
+        .then(function () { btnDoc.disabled = false; });
+    });
+  }
 </script>
 """
 
