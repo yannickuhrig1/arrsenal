@@ -675,6 +675,110 @@ class Wirer:
             created=change,
         )
 
+    def _hote_port(self, service_id: str) -> tuple[str, int]:
+        """Hote et port d'un service, separes.
+
+        Seerr recompose l'URL lui-meme a partir de trois champs : lui en passer
+        une toute faite rend « INVALID_URL ».
+        """
+        reste = self.internal_url(service_id).split("://", 1)[1]
+        hote, _, port = reste.partition(":")
+        return hote, int(port.split("/", 1)[0])
+
+    def _redemarrer(self, service_id: str) -> bool:
+        """Redemarre UN conteneur. Renvoie False si on ne peut pas.
+
+        Certaines applications accusent reception d'un changement et ne
+        l'appliquent qu'au demarrage suivant : les *arr le font pour leur cle
+        API et pour les identifiants de leur interface web.
+        """
+        if not self.cfg.project_dir:
+            return False
+        from pathlib import Path
+
+        from .runner import Compose
+
+        ok, _message = Compose(
+            Path(str(self.cfg.project_dir)), self.cfg.project_name
+        ).control("restart", service_id)
+        return ok
+
+    def step_seerr_setup(self) -> StepResult:
+        """Accueil de Seerr et declaration des *arr.
+
+        Seerr n'a pas de mot de passe a lui : son administrateur EST le compte
+        Jellyfin. C'est sa specification qui le dit — s'authentifier contre le
+        serveur media cree le premier compte avec les pleins droits. PlugArr
+        n'en genere donc aucun pour lui, et ne pretend pas le contraire.
+
+        L'ordre est impose. `settings/initialize` ferme l'accueil : l'appeler
+        avant d'avoir declare les *arr laisse une instance qui se croit prete
+        et ne peut rien demander.
+        """
+        from .clients.seerr import SeerrClient
+
+        inst = self.cfg.services["seerr"]
+        jellyfin = self.cfg.services["jellyfin"]
+        identifiant = jellyfin.username or self.cfg.username
+
+        declares: list[str] = []
+        with SeerrClient(inst.url(self.cfg.host)) as seerr:
+            seerr.wait_ready()
+            deja = seerr.initialized
+            # L'hote et le port SEPAREMENT : Seerr les recompose lui-meme, et
+            # lui passer une URL complete rend « INVALID_URL ».
+            hote_jf, port_jf = self._hote_port("jellyfin")
+            seerr.login_jellyfin(
+                username=identifiant,
+                password=jellyfin.password or "",
+                hostname=hote_jf,
+                port=port_jf,
+            )
+
+            for arr_id, genre, dossier, anime in (
+                ("sonarr", "sonarr", CONTAINER_PATHS["media_tv"], CONTAINER_PATHS["media_anime"]),
+                ("radarr", "radarr", CONTAINER_PATHS["media_movies"], None),
+            ):
+                if not self.cfg.enabled(arr_id):
+                    continue
+                client = self.arr(arr_id)
+                profils = client.get("qualityprofile") or []
+                if not profils:
+                    continue
+                # Le profil par NOM, jamais par identifiant : ils ne sont pas
+                # stables d'une version a l'autre.
+                profil = profils[0]
+                hote, port = self._hote_port(arr_id)
+                if seerr.ensure_servarr(
+                    genre,
+                    name=catalog.get(arr_id).display_name,
+                    hostname=hote,
+                    port=port,
+                    api_key=self.cfg.services[arr_id].api_key or "",
+                    profile_id=int(profil["id"]),
+                    profile_name=str(profil["name"]),
+                    directory=dossier,
+                    anime_directory=anime,
+                ):
+                    declares.append(arr_id)
+
+            # EN DERNIER, une fois les *arr declares.
+            if not deja:
+                seerr.initialize()
+            pret = seerr.initialized
+
+        detail = "accueil deja termine" if deja else "accueil execute"
+        detail += f", identifiant Jellyfin ({identifiant})"
+        if declares:
+            detail += f", declares : {', '.join(declares)}"
+        return StepResult(
+            "seerr: accueil + applications",
+            # Relu depuis l'application : « initialise » est son propre verdict.
+            ok=pret,
+            detail=detail,
+            created=not deja or bool(declares),
+        )
+
     def step_audiobookshelf_setup(self) -> StepResult:
         """Accueil d'Audiobookshelf et creation de ses deux bibliotheques.
 
@@ -1012,10 +1116,32 @@ class Wirer:
 
         client.ensure_web_user(username, password)
         repaired = client.web_login_works(username, password)
+        redemarre = False
+        if not repaired:
+            # `PUT config/host` repond 202 et n'applique les identifiants qu'au
+            # REDEMARRAGE. Verifie sur Sonarr 4.0.19 : methode d'authentification
+            # relue a « forms », mot de passe pose, et pourtant le formulaire
+            # refusait — y compris avec un mot de passe purement alphanumerique,
+            # ce qui ecarte la piste des caracteres speciaux. Un redemarrage, et
+            # la connexion passe.
+            #
+            # C'est le meme piege que pour la cle API, ou seule la reecriture du
+            # config.xml suivie d'un redemarrage fonctionnait. L'application
+            # accepte, accuse reception, et ne change rien avant de repartir.
+            redemarre = self._redemarrer(arr_id)
+            if redemarre:
+                client.wait_ready()
+                repaired = client.web_login_works(username, password)
+
+        detail = "compte cree"
+        if redemarre:
+            detail += " (redemarrage necessaire)"
+        if not repaired:
+            detail = "compte cree, connexion toujours refusee meme apres redemarrage"
         return StepResult(
             f"{arr_id}: acces web",
             ok=repaired,
-            detail="compte cree" if repaired else "compte cree, connexion toujours refusee",
+            detail=detail,
             created=repaired,
             warnings=[]
             if repaired
@@ -1163,6 +1289,11 @@ class Wirer:
             steps.append(
                 WiringStep("audiobookshelf/setup", self.step_audiobookshelf_setup)
             )
+
+        # Seerr en DERNIER : il declare les *arr et s'authentifie contre
+        # Jellyfin. Les deux doivent etre cables avant lui.
+        if cfg.enabled("seerr"):
+            steps.append(WiringStep("seerr/setup", self.step_seerr_setup))
         return steps
 
     def execute(self, *, on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:

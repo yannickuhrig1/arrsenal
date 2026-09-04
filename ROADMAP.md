@@ -9,7 +9,7 @@ séance de travail.
 
 ## Ce qui marche aujourd'hui
 
-Treize services installés et **câblés** en une passe, vérifiés contre des
+Quatorze services installés et **câblés** en une passe, vérifiés contre des
 instances réelles à chaque livraison.
 
 | | |
@@ -19,6 +19,7 @@ instances réelles à chaque livraison.
 | **Indexeurs** | Prowlarr |
 | **Média** | Jellyfin, Silo *(expérimental)* |
 | **Livres** | Audiobookshelf |
+| **Demandes** | Seerr |
 | **Automatisation** | autobrr, Recyclarr |
 | **Interfaces** | Flood, qui |
 | **Réseau** | Gluetun *(VPN optionnel)* |
@@ -125,7 +126,6 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 | | Ce qu'il reste à faire |
 |---|---|
 | **Plex** | Second serveur média. Son jeton s'obtient par `plex.tv`, pas par l'API locale : c'est le point à vérifier avant de l'inscrire. |
-| **Seerr** | Demandes de médias. Jellyseerr et Overseerr ont fusionné sous ce nom, confirmé par le projet lui-même. Image `ghcr.io/seerr-team/seerr`, **v3.4.1**, 11 versions publiées — épinglable. Le câblage vise Sonarr, Radarr et le serveur média. |
 | **Notifiarr** | Notifications centralisées. Chaque *arr s'y déclare par une clé API. |
 | **Bazarr** | Sous-titres. Sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
 | **SABnzbd** | Client Usenet, à côté des deux clients torrent. |
@@ -194,6 +194,8 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.3.0** | **Seerr entre au catalogue.** Successeur commun de Jellyseerr et d'Overseerr. Son compte administrateur **est** le compte Jellyfin — PlugArr ne lui en génère aucun, ce serait mentir. Il déclare Sonarr et Radarr, dossier anime compris, puis ferme son accueil **en dernier** : l'inverse laisserait une instance qui se croit prête et ne peut rien demander. Sa spécification OpenAPI embarquée **ment par omission** : `hostname` est l'hôte seul et `port`, `useSsl`, `urlBase` ne sont pas déclarés alors que l'implémentation les lit ; `serverType` est obligatoire alors qu'elle le donne pour facultatif ; et `minimumAvailability` n'existe que pour Radarr. Trois essais réels pour les trouver, chacun derrière un message trompeur. |
+| **0.3.0** | **Les identifiants des *arr n'étaient pas appliqués sans redémarrage.** `PUT config/host` répond **202**, accuse réception, et ne change rien avant que l'application reparte — le même piège que pour la clé API. Écarté au passage : ce n'est pas une question de caractères spéciaux, un mot de passe purement alphanumérique était refusé de la même façon. L'étape redémarre désormais le conteneur et revérifie. |
 | **0.3.0** | **Audiobookshelf entre au catalogue.** Il remplit `books` et `audiobooks`, les deux bibliothèques que PlugArr rangeait depuis la 0.1.12 sans que personne ne les lise. Trois pièges relevés contre une instance réelle : il met **quarante secondes** à démarrer et répond 404 avant, ce qui fait croire à une image cassée ; sa base SQLite se lit **avec son journal `-wal`** ou pas du tout, sans quoi la table `users` paraît vide pendant que `/status` annonce `isInit: true` ; et `POST /init` répond 200 **avec un corps vide**, sans jeton — là où l'accueil de Silo en renvoie deux. Ce dernier a donné 0 liaison sur 1 au premier essai réel. |
 | **0.2.1** | **La restauration se fait depuis l'assistant.** Elle avait d'abord été laissée en ligne de commande, au motif qu'un bouton serait dangereux — argument faible, la ligne de commande a le même pouvoir. La vraie raison désigne le bon endroit : la console d'administration commence par lire un `stack.yml`, et sur une machine fraîchement formatée il n'y en a pas, puisque c'est ce que l'archive contient. Un bouton là-bas aurait été inutilisable dans le seul cas où il sert. L'assistant, lui, démarre sans rien. Un bouton **Examiner l'archive** montre ce qu'elle contient avant d'écraser quoi que ce soit, et remplace la confirmation. |
 | **0.2.1** | **Sauvegarde et restauration complètes.** Vérifié sur une pile réelle et non simulé : un témoin posé dans Sonarr, sauvegarde, **destruction totale** — conteneurs, volumes, dossiers — puis restauration ailleurs. Le témoin est revenu, Silo est reparti *healthy* du premier coup, et le recâblage a compté **12 liaisons sur 12, zéro créée** : tout existait déjà. Un bouton sur la console ; la restauration reste en ligne de commande, car elle écrase une configuration en place. |

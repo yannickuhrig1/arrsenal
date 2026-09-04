@@ -35,6 +35,12 @@ _TAGS = {
 #: Ses deux appoints sont epingles de la meme facon : `redis:alpine` et
 #: `pgvector:pg18` sont des tags FLOTTANTS, qui designent un nom et non un
 #: contenu. Sans digest, deux installations du meme jour peuvent differer.
+#: Seerr, successeur commun de Jellyseerr et d'Overseerr.
+_SEERR = (
+    "ghcr.io/seerr-team/seerr:v3.4.1"
+    "@sha256:f4768de5f616248d723e05891f3345a1402123775d03bf0890dbfedc0831bda1"
+)
+
 #: Audiobookshelf. 128 versions publiees : il s'epingle sans exception.
 _AUDIOBOOKSHELF = (
     "ghcr.io/advplyr/audiobookshelf:2.36.0"
@@ -145,6 +151,19 @@ CATALOG: dict[str, ServiceSpec] = {
         config_dir="jellyfin",
         api_family="jellyfin",
         notes="Serveur media. Bibliotheques creees pour vous.",
+    ),
+    "seerr": ServiceSpec(
+        id="seerr",
+        display_name="Seerr",
+        category=Category.MEDIA,
+        image=_SEERR,
+        internal_port=5055,
+        default_host_port=5055,
+        config_dir="seerr",
+        api_family="seerr",
+        # Il ne sert a rien seul : il demande des medias A des applications.
+        requires=("jellyfin",),
+        notes="Demandes de medias. Successeur de Jellyseerr et d'Overseerr.",
     ),
     "audiobookshelf": ServiceSpec(
         id="audiobookshelf",
@@ -285,6 +304,9 @@ STARTUP_ORDER = (
     # Audiobookshelf ne depend de personne : il lit des dossiers. Sa place ici
     # est celle de l'affichage, a cote des autres serveurs media.
     "audiobookshelf",
+    # Seerr APRES Jellyfin et les *arr : son accueil s'authentifie contre le
+    # serveur media, et il declare les *arr dans la foulee.
+    "seerr",
     "flood",
     "qui",
 )

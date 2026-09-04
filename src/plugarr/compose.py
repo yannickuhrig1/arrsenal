@@ -178,6 +178,11 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # des *arr. `CRON_SCHEDULE` est sa planification, pas un reglage de plugarr.
         block["environment"] = {"TZ": cfg.timezone, "CRON_SCHEDULE": "@daily"}
         block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
+    elif service_id == "seerr":
+        # Ni PUID ni PGID, ni acces aux medias : Seerr ne touche AUCUN fichier.
+        # Il transmet des demandes aux *arr, qui telechargent.
+        block["environment"] = {"TZ": cfg.timezone, "LOG_LEVEL": "info"}
+        block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/app/config"]
     elif service_id == "audiobookshelf":
         # Ni PUID ni PGID : ce n'est pas une image LinuxServer.
         block["environment"] = {"TZ": cfg.timezone}
