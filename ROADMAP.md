@@ -139,6 +139,10 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 
 **Readarr n'est pas au programme** : le projet est archivé depuis le 27 juin 2025.
 
+### Distribution à étudier
+
+- [ ] **Proxmox VE Helper-Scripts / Community Scripts** — Étudier l’ajout de PlugArr au catalogue des scripts communautaires Proxmox afin de simplifier son installation. Vérifier les critères d’admission, le mode de déploiement adapté et la maintenance du script avant toute proposition.
+
 ---
 
 ## La console PlugArr
