@@ -105,6 +105,7 @@ class WelcomeScreen(WizardScreen):
             yield Static(id="docker-status")
             yield Horizontal(
                 Button("Commencer", variant="primary", id="start", disabled=True),
+                Button("Restaurer une sauvegarde", id="restaurer", disabled=True),
                 Button("Quitter", id="quit"),
                 classes="actions",
             )
@@ -134,14 +135,134 @@ class WelcomeScreen(WizardScreen):
     def _render_docker(self, text: str, ok: bool) -> None:
         self.query_one("#docker-status", Static).update(text)
         self.query_one("#start", Button).disabled = not ok
+        self.query_one("#restaurer", Button).disabled = not ok
 
     @on(Button.Pressed, "#start")
     def go(self) -> None:
         self.app.push_screen(ServicesScreen())
 
+    @on(Button.Pressed, "#restaurer")
+    def restaurer(self) -> None:
+        self.app.push_screen(RestaurationScreen())
+
     @on(Button.Pressed, "#quit")
     def leave(self) -> None:
         self.app.exit(0)
+
+
+class RestaurationScreen(WizardScreen):
+    """Repose une sauvegarde, depuis l'assistant.
+
+    Signale a l'usage : « pourquoi ne pas mettre un bouton restauration avec
+    charger le fichier de sauvegarde ? Ce serait pratique pour restaurer apres
+    un formatage ou changement de setup. »
+
+    L'objection etait juste et ma premiere reponse mauvaise. La restauration ne
+    peut PAS vivre sur la console d'administration : celle-ci commence par lire
+    un `stack.yml`, et sur une machine fraichement formatee il n'y en a pas —
+    c'est justement ce que l'archive contient. Le bouton aurait ete inutilisable
+    dans le seul cas ou il sert.
+
+    L'assistant, lui, demarre sans rien : c'est ici que la restauration
+    appartient, et nulle part ailleurs.
+    """
+
+    SUB_TITLE = "Restaurer une installation sauvegardee"
+
+    def content(self) -> ComposeResult:
+        with Vertical(id="restauration"):
+            yield Static(
+                "Reposez une archive produite par [b]plugarr backup[/b] ou par le "
+                "bouton [b]Sauvegarder la configuration[/b] de la page "
+                "d'administration.\n\n"
+                "Elle contient vos services, vos identifiants et tout ce que vous "
+                "aviez saisi : indexeurs, profils, bibliotheques. "
+                "[b]Vos medias ne sont pas dedans[/b] et ne seront pas touches.",
+                id="pitch",
+            )
+            yield Rule()
+            yield Label("Fichier de sauvegarde (.zip)", classes="group-title")
+            yield Input(placeholder="C:/sauvegardes/plugarr-....zip", id="archive")
+            yield Label(
+                "Ou reposer la configuration [dim](vide = l'emplacement d'origine)[/dim]",
+                classes="group-title",
+            )
+            yield Input(id="cible")
+            yield Rule()
+            yield Static(id="restauration-etat")
+            yield Horizontal(
+                Button("Examiner l'archive", id="examiner"),
+                Button("Restaurer", variant="primary", id="poser", disabled=True),
+                Button("Retour", id="retour"),
+                classes="actions",
+            )
+
+    @on(Button.Pressed, "#examiner")
+    def examiner(self) -> None:
+        """Montre ce que l'archive contient AVANT d'ecraser quoi que ce soit.
+
+        C'est ce qui remplace la confirmation en ligne de commande : on ne
+        restaure pas a l'aveugle, et le bouton reste inerte tant que l'archive
+        n'a pas ete lue.
+        """
+        from .. import sauvegarde
+
+        etat = self.query_one("#restauration-etat", Static)
+        chemin = Path(self.query_one("#archive", Input).value.strip().strip('"'))
+        if not chemin.is_file():
+            etat.update(f"[red]{chemin} introuvable.[/red]")
+            return
+        try:
+            manifeste = sauvegarde.lire_manifeste(chemin)
+        except (ValueError, OSError) as exc:
+            etat.update(f"[red]{exc}[/red]")
+            return
+
+        lignes = [
+            f"[b]Date[/b] : {manifeste['date']}",
+            f"[b]Pile[/b] : {manifeste['project_name']}",
+            f"[b]Services[/b] : {', '.join(manifeste['services'])}",
+            f"[b]Volumes[/b] : {', '.join(manifeste['volumes']) or 'aucun'}",
+            f"[b]Configuration d'origine[/b] : {manifeste['config_root']}",
+        ]
+        if manifeste.get("a_chaud"):
+            lignes.append(
+                "[yellow]Prise A CHAUD, conteneurs en marche : ses bases peuvent "
+                "etre corrompues.[/yellow]"
+            )
+        etat.update("\n".join(lignes))
+        self.query_one("#poser", Button).disabled = False
+
+    @on(Button.Pressed, "#poser")
+    def poser(self) -> None:
+        self._restaurer()
+
+    @work(thread=True)
+    def _restaurer(self) -> None:
+        from .. import sauvegarde
+
+        etat = self.query_one("#restauration-etat", Static)
+        chemin = Path(self.query_one("#archive", Input).value.strip().strip('"'))
+        ailleurs = self.query_one("#cible", Input).value.strip() or None
+        self.app.call_from_thread(etat.update, "Restauration en cours...")
+        try:
+            manifeste = sauvegarde.restaurer(
+                chemin, self.app.project_dir or Path("."), config_root=ailleurs
+            )
+        except Exception as exc:  # noqa: BLE001
+            journal.LOGGER.exception("restauration")
+            self.app.call_from_thread(etat.update, f"[red]{type(exc).__name__} : {exc}[/red]")
+            return
+        self.app.call_from_thread(
+            etat.update,
+            "[green]Restauration terminee.[/green]\n\n"
+            f"{len(manifeste['services'])} services reposes. Demarrez la pile, "
+            "puis [b]plugarr wire[/b] pour verifier que tout repond.",
+        )
+
+    @on(Button.Pressed, "#retour")
+    def retour(self) -> None:
+        self.app.pop_screen()
 
 
 # ------------------------------------------------------------------- selection
