@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>plugarr</title>
-<meta name="description" content="plugarr deploie et cable une stack media complete : Prowlarr, Sonarr, Radarr, Lidarr, qBittorrent, Jellyfin. Une commande, zero clic dans huit interfaces web.">
-<meta property="og:title" content="plugarr">
+<title>PlugArr</title>
+<meta name="description" content="PlugArr deploie et cable une stack media complete : Prowlarr, Sonarr, Radarr, Lidarr, qBittorrent, Jellyfin. Une commande, zero clic dans huit interfaces web.">
+<meta property="og:title" content="PlugArr">
 <meta property="og:description" content="Deploie et cable une stack media complete. Une commande, zero clic dans huit interfaces web.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,7 +27,8 @@
   --text:#e6e7e4;
   --muted:#93a2b0;
   --amber:#ffa62b;
-  --blue:#6db2ff;
+  --violet:#b98cf0;
+  --magenta:#e2568f;
   --ok:#63c08a;
   --shadow:0 18px 40px -24px rgba(0,0,0,.9);
   --step:clamp(1rem,.9rem + .4vw,1.0625rem);
@@ -44,7 +45,7 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 img{max-width:100%;height:auto;display:block}
-a{color:var(--blue);text-decoration-thickness:1px;text-underline-offset:3px}
+a{color:var(--violet);text-decoration-thickness:1px;text-underline-offset:3px}
 a:hover{color:var(--amber)}
 a[aria-disabled="true"]{color:var(--muted);text-decoration:none;pointer-events:none}
 :focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:2px}
@@ -79,13 +80,21 @@ p{margin:0}
   padding-block:clamp(3.5rem,9vw,7rem) clamp(3rem,6vw,5rem);
   background:
     radial-gradient(60rem 32rem at 12% -10%,rgba(255,166,43,.07),transparent 60%),
-    radial-gradient(50rem 30rem at 90% 0%,rgba(109,178,255,.06),transparent 55%),
+    radial-gradient(50rem 30rem at 90% 0%,rgba(226,86,143,.09),transparent 55%),
     var(--ground);
 }
 .wordmark{
   font-family:"Fira Code",ui-monospace,monospace;font-weight:500;
   font-size:clamp(2.75rem,1.6rem + 5.4vw,5rem);
   letter-spacing:-.045em;line-height:1;margin:0;color:var(--text);
+}
+/* Le degrade du logo : orange, magenta, violet. Le texte reste lisible
+   si background-clip:text n'est pas supporte. */
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .wordmark span.nom{
+    background:linear-gradient(102deg,var(--amber) 0%,var(--magenta) 52%,var(--violet) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
 }
 .caret{
   display:inline-block;width:.5em;height:.9em;margin-left:.12em;
@@ -115,7 +124,7 @@ p{margin:0}
 .term pre{margin:0;padding:1rem 1.1rem;overflow-x:auto;font-size:.9375rem;line-height:1.75;color:#e0e0e0}
 .term .p{color:var(--ok)}
 .term .c{color:#7d8b98}
-.term .f{color:var(--blue)}
+.term .f{color:var(--violet)}
 
 /* --- boutons ---------------------------------------------------- */
 .cta{display:flex;flex-wrap:wrap;gap:.75rem}
@@ -146,7 +155,7 @@ p{margin:0}
 .patch .port{fill:var(--chrome);stroke:#4a5b69;stroke-width:1}
 .patch .cable{fill:none;stroke-width:2;stroke-linecap:round;opacity:.85}
 .patch .c-amber{stroke:var(--amber)}
-.patch .c-blue{stroke:var(--blue)}
+.patch .c-violet{stroke:var(--violet)}
 .legend{display:flex;flex-wrap:wrap;gap:.35rem 1.75rem;font-size:.8125rem;color:var(--muted)}
 .legend i{display:inline-block;width:18px;height:2px;margin-right:.5rem;vertical-align:.3em;border-radius:1px}
 @media (prefers-reduced-motion:no-preference){
@@ -230,8 +239,8 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
 
 <header class="hero">
   <div class="wrap stack gap-l">
-    <p class="eyebrow">Stack media &middot; Docker &middot; une seule commande</p>
-    <h1 class="wordmark">plugarr<span class="caret" aria-hidden="true"></span></h1>
+    <p class="eyebrow">Connecter &middot; Automatiser &middot; Optimiser</p>
+    <h1 class="wordmark"><span class="nom">PlugArr</span><span class="caret" aria-hidden="true"></span></h1>
     <p class="lead hero-lead">Deploie <em>et cable</em> une stack media complete. Une commande, zero clic dans huit interfaces web.</p>
 
     <div class="term">
@@ -267,7 +276,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       <h2>Poser six conteneurs, tout le monde sait faire. C'est l'apres qui prend trois heures.</h2>
       <p class="muted">Ouvrir chaque interface, copier une cle API, la coller dans une autre, recommencer,
       se tromper de port, et decouvrir trois jours plus tard que les imports recopient 40 Go au lieu
-      de faire un lien. <strong>plugarr automatise cette partie-la.</strong></p>
+      de faire un lien. <strong>PlugArr automatise cette partie-la.</strong></p>
     </div>
 
     <div class="patch">
@@ -275,11 +284,11 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
         <path class="cable c-amber" d="M144 150 C 197 150 197 56 250 56"/>
         <path class="cable c-amber" d="M144 150 C 197 150 197 150 250 150"/>
         <path class="cable c-amber" d="M144 150 C 197 150 197 244 250 244"/>
-        <path class="cable c-blue" d="M386 56 C 443 56 443 78 500 78"/>
-        <path class="cable c-blue" d="M386 150 C 443 150 443 78 500 78"/>
-        <path class="cable c-blue" d="M386 244 C 443 244 443 78 500 78"/>
-        <path class="cable c-blue" d="M386 56 C 443 56 443 222 500 222"/>
-        <path class="cable c-blue" d="M386 150 C 443 150 443 222 500 222"/>
+        <path class="cable c-violet" d="M386 56 C 443 56 443 78 500 78"/>
+        <path class="cable c-violet" d="M386 150 C 443 150 443 78 500 78"/>
+        <path class="cable c-violet" d="M386 244 C 443 244 443 78 500 78"/>
+        <path class="cable c-violet" d="M386 56 C 443 56 443 222 500 222"/>
+        <path class="cable c-violet" d="M386 150 C 443 150 443 222 500 222"/>
 
         <rect class="node" x="8" y="124" width="136" height="52" rx="7"/>
         <rect class="node" x="250" y="30" width="136" height="52" rx="7"/>
@@ -308,7 +317,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
     </div>
     <p class="legend">
       <span><i style="background:#ffa62b"></i>indexeurs pousses, <span class="mono">fullSync</span></span>
-      <span><i style="background:#6db2ff"></i>client de telechargement et notification d'import</span>
+      <span><i style="background:#b98cf0"></i>client de telechargement et notification d'import</span>
     </p>
 
     <p class="prose"><strong>Chaque lien est relu depuis l'API cible apres creation.</strong>
@@ -322,7 +331,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
           <tr><td>DockSTARTer</td><td class="yes">oui</td><td class="no">non</td><td class="no">non</td></tr>
           <tr><td>Saltbox</td><td class="yes">oui</td><td class="no">partiel</td><td class="no">non</td></tr>
           <tr><td>Recyclarr / Configarr</td><td class="no">non</td><td class="no">non</td><td class="yes">oui</td></tr>
-          <tr class="self"><td>plugarr</td><td class="yes">oui</td><td class="yes">oui</td><td class="yes">oui <span class="muted">(via Recyclarr)</span></td></tr>
+          <tr class="self"><td>PlugArr</td><td class="yes">oui</td><td class="yes">oui</td><td class="yes">oui <span class="muted">(via Recyclarr)</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -361,7 +370,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       <h2>Un seul montage <span class="mono">/data</span>, sinon chaque import recopie le fichier</h2>
       <p class="muted">Monter <span class="mono">/downloads</span> et <span class="mono">/media</span> separement
       donne deux systemes de fichiers vus depuis le conteneur. Les hardlinks deviennent impossibles.
-      plugarr impose un montage unique dans tous les conteneurs.</p>
+      PlugArr impose un montage unique dans tous les conteneurs.</p>
     </div>
 <pre class="tree">${DATA_ROOT}/                    <i>-&gt;  /data   (dans TOUS les conteneurs)</i>
 &#9500;&#9472;&#9472; torrents/
@@ -478,7 +487,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       </div>
       <div class="card">
         <h3>Vos profils de qualite</h3>
-        <p>plugarr ne reimplemente pas les TRaSH Guides&nbsp;: il installe Recyclarr, choisit un
+        <p>PlugArr ne reimplemente pas les TRaSH Guides&nbsp;: il installe Recyclarr, choisit un
         template officiel, et lance la premiere synchronisation.</p>
       </div>
     </div>
@@ -490,7 +499,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
    <div class="stack gap-m prose">
     <p class="eyebrow">A lire avant de commencer</p>
     <h2>Ce que ce projet ne fait pas</h2>
-    <p class="muted">plugarr ne fournit, n'heberge et ne recommande <strong>aucun indexeur, aucun tracker,
+    <p class="muted">PlugArr ne fournit, n'heberge et ne recommande <strong>aucun indexeur, aucun tracker,
     aucun contenu</strong>, et n'en preconfigure aucun. Aucune liste n'est livree avec le code&nbsp;:
     celle de l'assistant vient de votre propre Prowlarr. C'est un outil d'automatisation de mediatheque
     personnelle. Ce que vous y branchez, et sa legalite, vous regardent.</p>
@@ -502,7 +511,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
 <footer>
   <div class="wrap footer-grid">
     <div class="stack gap-s">
-      <p class="mono" style="font-size:1.25rem;letter-spacing:-.03em">plugarr</p>
+      <p class="mono" style="font-size:1.25rem;letter-spacing:-.03em">PlugArr</p>
       <p class="footer-links">
         <a href="https://github.com/yannickuhrig1/plugarr">GitHub</a>
         <a href="https://github.com/yannickuhrig1/plugarr/releases">Telechargements</a>

@@ -59,7 +59,7 @@ HTTP 400 — propertyName: "TvCategory", errorMessage: "Cannot use Category and 
 déjà remplie** (`tv-sonarr` pour Sonarr, `radarr` pour Radarr). Il ne suffit pas
 d'omettre le champ, il faut le **vider explicitement**.
 
-`plugarr` retient `Directory`, qui pointe vers un chemin explicite sous
+PlugArr retient `Directory`, qui pointe vers un chemin explicite sous
 `/data/torrents` et garde les hardlinks possibles.
 
 ### La notification Jellyfin exige une clé API
@@ -70,7 +70,7 @@ L'implémentation `MediaBrowser` de Sonarr et Radarr refuse un `apiKey` vide :
 HTTP 400 — propertyName: "ApiKey", errorMessage: "'Api Key' must not be empty."
 ```
 
-`plugarr` crée donc une clé Jellyfin via `POST /Auth/Keys?app=plugarr` (répond `204`)
+PlugArr crée donc une clé Jellyfin via `POST /Auth/Keys?app=plugarr` (répond `204`)
 pendant l'étape d'assistant, puis la relit par `GET /Auth/Keys`, et l'injecte dans les
 notifications. C'est ce qui impose l'ordre : Jellyfin avant les notifications.
 
@@ -207,7 +207,7 @@ Sources : [forums Unraid](https://forums.unraid.net/topic/117661-docker-user-pui
 
 Observation faite sur un Unraid réel faisant tourner 75 conteneurs, dont un
 `sonarr` sur le port 8989 avec `/mnt/user/appdata/sonarr` en configuration :
-**plugarr codait `container_name` en dur**, donc il ne pouvait ni cohabiter avec une
+**PlugArr codait `container_name` en dur**, donc il ne pouvait ni cohabiter avec une
 stack existante, ni être déployé deux fois sur la même machine.
 
 Les noms de conteneurs sont désormais préfixés par le nom de projet
@@ -364,13 +364,13 @@ une **fusion des deux projets**, annoncée le 10 février 2026.
 Seerr couvre Jellyfin, Emby **et** Plex — les deux projets d'origine se partageaient
 ces cibles — et migre automatiquement les données au premier démarrage.
 
-Conséquence pour plugarr : la feuille de route ne vise plus qu'un seul service de
+Conséquence pour PlugArr : la feuille de route ne vise plus qu'un seul service de
 demandes utilisateurs. Prévoir la reprise d'une installation Jellyseerr ou Overseerr
 existante est inutile : Seerr le fait lui-même.
 
 ## Reprise d'une stack existante — vérifié le 2026-08-31
 
-Testé contre une stack **que plugarr n'a pas créée** : quatre conteneurs aux noms
+Testé contre une stack **que PlugArr n'a pas créée** : quatre conteneurs aux noms
 libres, répartis sur **deux réseaux Docker différents**, dont deux Sonarr.
 
 Résultat : `prowlarr → sonarr` établi et validé par le bouton Test, sur des conteneurs
@@ -380,12 +380,12 @@ Trois erreurs de conception que seul le test réel a révélées.
 
 ### Ne pas imposer son arborescence
 
-Le premier essai a échoué : `Path '/data/media/tv' does not exist`. plugarr appliquait
+Le premier essai a échoué : `Path '/data/media/tv' does not exist`. PlugArr appliquait
 sa propre arborescence à une stack qui a la sienne.
 
 **Adopter, c'est câbler des services entre eux, pas réorganiser les dossiers de
 quelqu'un.** Les dossiers racine existants sont désormais lus et respectés ; quand il
-n'y en a aucun, plugarr le signale au lieu d'en inventer un. Même règle pour les
+n'y en a aucun, PlugArr le signale au lieu d'en inventer un. Même règle pour les
 catégories qBittorrent : les écraser déplacerait des téléchargements en cours.
 
 ### `localhost` ne veut rien dire entre conteneurs
@@ -401,7 +401,7 @@ s'il n'y arrive pas plutôt que de câbler des URL mortes.
 ### Un nom de conteneur ne prouve rien
 
 `looks_like_plugarr` reconnaissait ses propres conteneurs à leur nom
-(`<projet>-<service>`). Un test a montré que `mon-sonarr` correspondait : plugarr
+(`<projet>-<service>`). Un test a montré que `mon-sonarr` correspondait : PlugArr
 **sautait en silence un conteneur qui ne lui appartenait pas**.
 
 Les services générés portent maintenant un libellé `plugarr.managed=true`, et la
@@ -530,7 +530,7 @@ inutile.
 
 ### Le tag déployé devait sortir du code
 
-`plugarr` épinglait ses tags dans `catalog.py`. Conséquence non voulue : **personne
+PlugArr épinglait ses tags dans `catalog.py`. Conséquence non voulue : **personne
 n'aurait pu mettre Sonarr à jour sans attendre une nouvelle version de l'outil.**
 Le tag vit désormais dans `stack.yml` ; le catalogue ne fournit que la valeur initiale.
 
@@ -586,7 +586,7 @@ avec `WinError 10048`, et il ne reste qu'une écoute.
 ## Recyclarr 8.7.1 — vérifié le 2026-09-01
 
 Image `ghcr.io/recyclarr/recyclarr:8.7.1`. Recyclarr synchronise les profils de qualité
-et les *custom formats* des TRaSH Guides vers Sonarr et Radarr. `plugarr` ne
+et les *custom formats* des TRaSH Guides vers Sonarr et Radarr. PlugArr ne
 réimplémente rien : il demande à Recyclarr de générer sa configuration à partir d'un
 template **officiel**, puis n'y écrit que l'adresse et la clé API.
 
@@ -627,14 +627,14 @@ sonarr:
     api_key: Put your API key here
 ```
 
-Ce sont les deux seules lignes que `plugarr` remplace. Tout le reste vient du guide et
+Ce sont les deux seules lignes que PlugArr remplace. Tout le reste vient du guide et
 doit rester intact — c'est la garantie centrale du module.
 
 ### Deux défauts trouvés par les tests, pas par la lecture
 
 **`\s` matche aussi le retour à la ligne.** Le motif se terminait par `\s*$` : gourmand,
 il avalait les lignes vides qui suivaient le marqueur. Le fichier restait valide et la
-synchronisation réussissait, mais `plugarr` reformatait au passage un fichier qu'il
+synchronisation réussissait, mais PlugArr reformatait au passage un fichier qu'il
 s'était engagé à ne pas toucher. Les motifs sont désormais bornés à l'espace
 **horizontal**, `[^\S\n]`.
 
@@ -688,7 +688,7 @@ Vérifié de bout en bout avec un profil français : `french-multi-vf-hd-bluray-
 exists`. Le refus est légitime : le fichier a pu être modifié à la main. Mais
 `plugarr wire` est documenté comme rejouable, et il échouait donc au second passage.
 
-`plugarr` ne demande désormais que les templates **absents**. `--force` existe, mais
+PlugArr ne demande désormais que les templates **absents**. `--force` existe, mais
 l'employer détruirait les réglages de l'utilisateur à chaque câblage.
 
 Corollaire dans la lecture du résultat : un fichier déjà renseigné n'a plus de marqueur
@@ -704,7 +704,7 @@ foi.
 
 Un fichier laissé par une installation précédente — l'utilisateur avait Radarr, il l'a
 retiré — garde ses marqueurs et fait échouer `recyclarr sync` avec un message obscur.
-`plugarr` le signale par son nom à la fin du câblage.
+PlugArr le signale par son nom à la fin du câblage.
 
 ### Résultat, confirmé par Sonarr et Radarr eux-mêmes
 
@@ -798,7 +798,7 @@ Les *arr n'ont pas ce problème : leur gabarit de client de téléchargement por
 
 Plus gênant, parce qu'invisible dans le rapport : `qui` était déployée avec un simple
 `depends_on: qbittorrent` et **aucune connexion**. L'utilisateur ouvrait une interface
-qui lui redemandait l'adresse et les identifiants que plugarr venait de générer. Flood,
+qui lui redemandait l'adresse et les identifiants que PlugArr venait de générer. Flood,
 lui, recevait bien son `--qburl` et ses identifiants au démarrage.
 
 Quatre relevés sur l'instance, aucun devinable :
@@ -1094,7 +1094,7 @@ Une seule cause de départ, et quatre défauts qu'elle a révélés.
 ### La cause : des mots de passe annoncés mais jamais appliqués
 
 Les dossiers de configuration dataient de la veille, l'installation était de l'heure.
-plugarr conservait les configurations existantes **mais générait de nouveaux mots de
+PlugArr conservait les configurations existantes **mais générait de nouveaux mots de
 passe**, qu'il affichait dans son rapport. Les services refusaient donc les identifiants
 montrés à l'utilisateur. Vérifié : l'empreinte PBKDF2 stockée dans `qBittorrent.conf` ne
 correspondait pas au mot de passe du `stack.yml`.
@@ -1139,7 +1139,7 @@ la panne suivante : le redémarrage invalidait l'adresse mise en cache par Sonar
 ### Ce qui reste impossible, et qui est maintenant dit
 
 Jellyfin, autobrr et qui ne stockent leur mot de passe que **haché**, et aucune API ne
-permet de le réinitialiser sans lui. plugarr ne peut donc pas reprendre ces trois
+permet de le réinitialiser sans lui. PlugArr ne peut donc pas reprendre ces trois
 services. Le préflight l'annonce avant de commencer, et chaque échec porte désormais la
 phrase utile : supprimez ce dossier, ou reprenez l'installation d'origine avec
 `--project-dir`.
@@ -1203,7 +1203,7 @@ pendant une CI n'aurait aucun sens.
 
 ## L'identifiant se choisit — 2026-09-01
 
-Demandé à l'usage : « pas tout le monde veut mettre plugarr comme username ».
+Demandé à l'usage : « pas tout le monde veut mettre PlugArr comme username ».
 
 Un seul endroit du code fixait ce nom ; tout le reste n'était qu'un repli. Il est
 maintenant porté par `StackConfig`, exposé par `--username` et par un champ de

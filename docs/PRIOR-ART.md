@@ -13,7 +13,7 @@ mis à jour depuis. Chaque projet a été lu, pas supposé.
 | [Recyclarr](https://github.com/recyclarr/recyclarr) | non | non | **oui** | non |
 | [Configarr](https://github.com/raydak-labs/configarr) | non | non | **oui** | non |
 | [TRaSH Guides](https://trash-guides.info/) | non | non | manuel | non |
-| **plugarr** | **oui** | **oui** | **oui** (délégués à Recyclarr) | **oui** |
+| **PlugArr** | **oui** | **oui** | **oui** (délégués à Recyclarr) | **oui** |
 
 La colonne qui compte est la deuxième. C'est celle où presque personne ne va.
 
@@ -26,7 +26,7 @@ un `docker-compose.yml`. Très mature, très large — plus de cent applications
 
 **Ce qu'il ne fait pas** : une fois les conteneurs lancés, tout reste à faire. Aucune
 clé API n'est échangée, aucun dossier racine n'est créé, aucun client de téléchargement
-n'est rattaché. C'est exactement le travail de trois heures que `plugarr` supprime.
+n'est rattaché. C'est exactement le travail de trois heures que PlugArr supprime.
 
 ### Saltbox (et Cloudbox avant lui)
 
@@ -50,11 +50,11 @@ là pour vous guider à travers, pas pour le faire à votre place.
 Ils synchronisent les profils de qualité et les *custom formats* des TRaSH Guides vers
 Sonarr et Radarr. Chacun fait très bien ce travail.
 
-**Ils ne se recoupent pas avec `plugarr`** : ils supposent une stack déjà installée et
+**Ils ne se recoupent pas avec PlugArr** : ils supposent une stack déjà installée et
 déjà câblée. Ils interviennent après.
 
 C'est exactement pour cela que Recyclarr est désormais **intégré, pas remplacé**.
-`plugarr` lui demande de générer sa configuration à partir d'un template officiel, puis
+PlugArr lui demande de générer sa configuration à partir d'un template officiel, puis
 n'y écrit que l'adresse et la clé API — les deux choses qu'il est seul à connaître, et
 les deux seules lignes que l'utilisateur aurait dû aller chercher à la main. Le contenu
 des profils reste celui du guide.
@@ -62,12 +62,12 @@ des profils reste celui du guide.
 ### TRaSH Guides et le wiki Servarr
 
 La référence documentaire du domaine. C'est de là que vient le principe du montage
-`/data` unique, et la raison pour laquelle `plugarr` l'impose.
+`/data` unique, et la raison pour laquelle PlugArr l'impose.
 
-Rien à concurrencer : ce sont des guides. `plugarr` cherche à en appliquer les
+Rien à concurrencer : ce sont des guides. PlugArr cherche à en appliquer les
 recommandations automatiquement, et les crédite.
 
-## Où se situe plugarr
+## Où se situe PlugArr
 
 Le trou est net : **déploiement et câblage complet, dans un seul outil, avec un
 assistant**.
@@ -75,14 +75,14 @@ assistant**.
 Trois choix découlent de cette analyse.
 
 **Le câblage est la raison d'être, pas un bonus.** Générer un `docker-compose.yml` est
-un moyen. Si `plugarr` ne faisait que ça, il n'aurait aucune raison d'exister à côté
+un moyen. Si PlugArr ne faisait que ça, il n'aurait aucune raison d'exister à côté
 de DockSTARTer.
 
 **Le câblage doit être vérifié, pas supposé.** C'est ce qui distingue un outil d'un
 script. Chaque lien est validé par le bouton *Test* de l'application cible.
 
 **Les profils de qualité viennent de Recyclarr.** Réimplémenter les TRaSH Guides serait
-une duplication inutile et vite périmée. `plugarr` fournit le câblage, TRaSH fournit
+une duplication inutile et vite périmée. PlugArr fournit le câblage, TRaSH fournit
 les profils.
 
 ## L'écosystème autobrr
@@ -95,7 +95,7 @@ Signalé en cours de route, et il change deux choses.
 de bord de surveillance et de gestion d'une stack média. C'est-à-dire, pour une bonne
 part, ce que fait `plugarr serve`.
 
-Autant le dire plutôt que de faire semblant. Ce qui reste à `plugarr` : la page sort de
+Autant le dire plutôt que de faire semblant. Ce qui reste à PlugArr : la page sort de
 l'installation, sans conteneur supplémentaire ni configuration. dashbrr est plus riche et
 plus abouti pour qui veut un tableau de bord permanent.
 
@@ -117,7 +117,7 @@ position de ce projet, qui ne fournit ni tracker ni facilitation.
 
 ## Ce qu'aucun ne fait, et que nous non plus (encore)
 
-- **Vérifier que les hardlinks fonctionnent vraiment** avant l'installation. `plugarr`
+- **Vérifier que les hardlinks fonctionnent vraiment** avant l'installation. PlugArr
   le fait — c'est peut-être son ajout le plus utile après le câblage.
 - **Un mode « diagnostic » d'une installation qu'on n'a pas faite soi-même.**
   `plugarr doctor` n'en fait qu'une partie.
@@ -125,7 +125,7 @@ position de ce projet, qui ne fournit ni tracker ni facilitation.
 ## Méthode
 
 Ce document est relu à chaque phase. Un projet qui se met à câbler les applications
-entre elles change le positionnement d'`plugarr`, et il vaut mieux le savoir tôt que
+entre elles change le positionnement de PlugArr, et il vaut mieux le savoir tôt que
 de le découvrir dans un commentaire Reddit.
 
 Dernière relecture : 2026-08-31.

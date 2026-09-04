@@ -1,4 +1,4 @@
-# plugarr
+# PlugArr
 
 **Déploie *et câble* une stack média complète. Une commande, zéro clic dans huit interfaces web.**
 
@@ -33,14 +33,14 @@ Ce qui prend trois heures, c'est **l'après** : ouvrir chaque interface, copier 
 API, la coller dans une autre, recommencer, se tromper de port, découvrir trois jours
 plus tard que les imports recopient 40 Go au lieu de faire un lien.
 
-`plugarr` automatise cette partie-là.
+PlugArr automatise cette partie-là.
 
 | | Déploiement | Câblage inter-apps | Profils qualité |
 |---|---|---|---|
 | DockSTARTer | oui | non | non |
 | Saltbox | oui | partiel | non |
 | Recyclarr / Configarr | non | non | oui |
-| **plugarr** | **oui** | **oui** | **oui** (via Recyclarr) |
+| **PlugArr** | **oui** | **oui** | **oui** (via Recyclarr) |
 
 ---
 
@@ -78,7 +78,7 @@ C'est l'erreur numéro un des stacks média. Monter `/downloads` et `/media` sé
 donne deux systèmes de fichiers *vus depuis le conteneur*. Les hardlinks deviennent
 impossibles, et chaque import **recopie** le fichier au lieu de le lier.
 
-`plugarr` impose un montage unique dans tous les conteneurs :
+PlugArr impose un montage unique dans tous les conteneurs :
 
 ```
 ${DATA_ROOT}/                    ->  /data   (dans TOUS les conteneurs)
@@ -241,7 +241,7 @@ régression visuelle apparaît dans le diff d'une pull request.
 ## Vous avez déjà une stack ?
 
 `install` s'adresse à qui part de zéro. Si vos services tournent déjà, montés à la main
-au fil des années, `plugarr` peut **les câbler sans rien recréer** :
+au fil des années, PlugArr peut **les câbler sans rien recréer** :
 
 ```bash
 plugarr scan     # ce qui est détecté sur cette machine, sans rien écrire
@@ -256,16 +256,16 @@ Trois principes, appris en le testant sur une vraie stack :
 
 - **Votre arborescence est la vôtre.** Les dossiers racine existants sont lus et
   respectés, jamais remplacés. Idem pour les catégories de votre client.
-- **Deux Sonarr ? plugarr ne devine pas.** Il s'arrête et demande
+- **Deux Sonarr ? PlugArr ne devine pas.** Il s'arrête et demande
   `--pick sonarr=<conteneur>`. Un choix silencieux serait pire qu'une question.
-- **Un nom de conteneur ne prouve rien.** plugarr reconnaît ses propres services à un
+- **Un nom de conteneur ne prouve rien.** PlugArr reconnaît ses propres services à un
   libellé qu'il pose, pas à leur nom : `mon-sonarr` est à vous, il n'y touche pas.
 
 ---
 
 ## La page d'accès
 
-À la fin de l'installation, `plugarr` génère une page HTML locale et l'ouvre dans votre
+À la fin de l'installation, PlugArr génère une page HTML locale et l'ouvre dans votre
 navigateur. Plus besoin de retrouver quel service écoute sur quel port : une carte par
 service, les dossiers de téléchargement et de médiathèque, les identifiants.
 
@@ -275,7 +275,7 @@ Trois détails qui comptent :
   fichier local en `chmod 600`, exclu du dépôt — mais on la montre parfois à quelqu'un,
   et elle ne doit pas afficher votre clé Sonarr d'entrée.
 - **Les liens n'utilisent pas `localhost`.** Installée sur un NAS, une URL en localhost
-  pointerait vers la machine qui consulte. `plugarr` détecte l'adresse de la machine
+  pointerait vers la machine qui consulte. PlugArr détecte l'adresse de la machine
   sur le réseau local et génère les liens avec.
 - **Les raccourcis vers les dossiers sont donnés en chemin copiable *et* en lien.**
   Un lien `file://` ne fonctionne que si le navigateur tourne sur la machine
@@ -310,7 +310,7 @@ distinctes, présentées séparément parce qu'elles n'ont pas les mêmes consé
 - **l'image a été reconstruite** — même version, contenu republié en amont. LinuxServer
   le fait très souvent, pour les correctifs de sécurité de l'image de base.
 
-Le tag déployé vit dans `stack.yml`, pas dans le code d'`plugarr` : vous pouvez donc
+Le tag déployé vit dans `stack.yml`, pas dans le code de PlugArr : vous pouvez donc
 mettre Sonarr à jour sans attendre une nouvelle version de l'outil, ou rester
 délibérément sur une version ancienne.
 
@@ -323,18 +323,18 @@ le tag est remis comme il était.
 ## Comment ça marche
 
 **Les clés API sont pré-semées, pas devinées.** Plutôt que de démarrer les conteneurs
-puis de courir après une clé générée aléatoirement, `plugarr` écrit lui-même le
+puis de courir après une clé générée aléatoirement, PlugArr écrit lui-même le
 `config.xml` avant le premier démarrage. Le câblage devient déterministe et rejouable.
 
 **Les payloads viennent des schémas.** Aucun JSON de client de téléchargement n'est codé
-en dur. `plugarr` demande son gabarit à l'application (`/api/v3/downloadclient/schema`),
+en dur. PlugArr demande son gabarit à l'application (`/api/v3/downloadclient/schema`),
 remplit les champs par nom, et renvoie l'objet. Quand une nouvelle version renomme un
 champ, le gabarit suit. Les champs qu'une version n'expose pas sont **signalés**, jamais
 perdus en silence.
 
 **Tout est idempotent.** Relancer `install` sur une stack existante ne crée pas de
 doublon et n'écrase aucun réglage manuel. Un `config.xml` déjà présent fait autorité :
-`plugarr` adopte sa clé plutôt que d'imposer la sienne.
+PlugArr adopte sa clé plutôt que d'imposer la sienne.
 
 **`stack.yml` est la source de vérité.** `docker-compose.yml` et `.env` en sont des
 artefacts générés, versionnables et diffables. Ne les éditez pas à la main.
@@ -350,7 +350,7 @@ automatique sans laisser Sonarr et Radarr ouverts à tout le réseau local.
 Les identifiants sont écrits dans `.env` en `chmod 600`, déjà couvert par le
 `.gitignore` généré, et masqués dans les journaux.
 
-L'identifiant est **le vôtre** : `plugarr` n'est qu'un défaut, changeable dans
+L'identifiant est **le vôtre** : PlugArr n'est qu'un défaut, changeable dans
 l'assistant ou par `--username`. Le même pour tous les services, ce qui garde la page
 d'accès lisible.
 
@@ -372,7 +372,7 @@ de variable, et un mot de passe contenant `$HOME` arriverait déformé dans le c
 Sont aussi exclus l'apostrophe, le guillemet, l'antislash, le backtick, `#` et tout
 métacaractère de shell. Les valeurs du `.env` sont en outre écrites entre apostrophes.
 
-**Sans VPN**, le trafic BitTorrent sort sur votre IP publique. `plugarr` vous
+**Sans VPN**, le trafic BitTorrent sort sur votre IP publique. PlugArr vous
 l'affiche au récapitulatif.
 
 L'assistant pose la question juste après les chemins, dès qu'un client de
@@ -391,7 +391,7 @@ L'assistant propose ensuite les **serveurs que Gluetun connaît pour ce
 fournisseur**, en liste cliquable, plutôt qu'un champ libre où une valeur
 inventée ferait échouer le démarrage. Attention, tous ne se filtrent pas par
 pays : Windscribe, VyprVPN, Giganews et Private Internet Access classent leurs
-serveurs par **région**, Perfect Privacy par **ville**. `plugarr` pose donc
+serveurs par **région**, Perfect Privacy par **ville**. PlugArr pose donc
 `SERVER_COUNTRIES`, `SERVER_REGIONS` ou `SERVER_CITIES` selon le cas. Les listes
 sont extraites de l'image **épinglée** par `python scripts/vpn_countries.py`.
 
@@ -413,7 +413,7 @@ Une fois la stack en place, l'assistant propose une **étape optionnelle** pour 
 les indexeurs que vous utilisez déjà. Elle se passe d'un bouton.
 
 La liste proposée n'est pas la nôtre : ce sont les **626 définitions que votre propre
-Prowlarr embarque**. `plugarr` n'est qu'un formulaire par-dessus, et n'en présélectionne
+Prowlarr embarque**. PlugArr n'est qu'un formulaire par-dessus, et n'en présélectionne
 aucune. Il devine quels champs sont des identifiants (clé API, passkey, cookie, mot de
 passe) et n'affiche que ceux-là, plutôt que de vous noyer sous la douzaine d'options de
 réglage que chaque définition traîne.
@@ -437,7 +437,7 @@ identifiants sont bons.
 
 Sans profil de qualité, un *arr accepte **n'importe quel encodage** : le premier résultat
 venu, pas le meilleur. C'est le travail des [TRaSH Guides](https://trash-guides.info/),
-et `plugarr` ne les réimplémente pas — il installe **Recyclarr**, lui demande de générer
+et PlugArr ne les réimplémente pas — il installe **Recyclarr**, lui demande de générer
 sa configuration à partir d'un template officiel, et n'y écrit que les deux lignes qu'il
 est seul à connaître : l'adresse et la clé API.
 
@@ -468,7 +468,7 @@ Résultat mesuré sur une installation neuve, lu dans l'API de chaque instance :
 
 ## Ce que ce projet ne fait pas
 
-`plugarr` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
+PlugArr ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
 contenu**, et n'en préconfigure aucun. Aucune liste n'est livrée avec le code : celle de
 l'assistant vient de Prowlarr. C'est un outil d'automatisation de médiathèque personnelle.
 Ce que vous y branchez, et sa légalité, vous regardent.
@@ -495,7 +495,7 @@ installer une seconde à côté. Le préflight avertit si le cas se présente.
 Le détail vit dans [ROADMAP.md](ROADMAP.md), tenue à jour : ce qui marche, ce
 qui est en cours, ce qu'on ne fera pas et pourquoi. Résumé ci-dessous.
 
-**La console plugarr** est le prochain gros morceau, et le seul qui ne soit pas
+**La console PlugArr** est le prochain gros morceau, et le seul qui ne soit pas
 un service de plus au catalogue. Aujourd'hui l'assistant installe puis s'efface :
 la page d'accès est un fichier HTML mort, et tout ce qui vient après se fait à la
 main, service par service. Une console web, dans son propre conteneur, tiendrait
@@ -551,7 +551,7 @@ document le plus utile du dépôt.
 
 Le reste est dans [CONTRIBUTING.md](CONTRIBUTING.md) : mise en place, découpage du code,
 comment ajouter un service. Et [docs/PRIOR-ART.md](docs/PRIOR-ART.md) explique où
-`plugarr` se situe par rapport à DockSTARTer, Saltbox et Recyclarr, et pourquoi il ne
+PlugArr se situe par rapport à DockSTARTer, Saltbox et Recyclarr, et pourquoi il ne
 cherche pas à les remplacer.
 
 ## Remerciements

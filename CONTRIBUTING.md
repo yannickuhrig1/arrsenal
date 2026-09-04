@@ -126,7 +126,7 @@ hexadécimale, et un masquage par motif le laisse passer.
 
 ## Indexeurs et contenu
 
-`plugarr` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
+PlugArr ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
 contenu**. La liste que voit l'utilisateur vient de son propre Prowlarr.
 
 Les pull requests qui ajouteraient une liste d'indexeurs, un tracker préconfiguré ou une
