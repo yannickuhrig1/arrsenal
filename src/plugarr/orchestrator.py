@@ -98,7 +98,7 @@ def build_config(
 #: Familles qui recoivent un identifiant et un mot de passe.
 _AVEC_COMPTE = (
     "arr", "transmission", "qbittorrent", "jellyfin", "autobrr", "qui", "silo",
-    "audiobookshelf",
+    "audiobookshelf", "droppedneedle",
 )
 
 
@@ -268,18 +268,31 @@ def preflight(cfg: StackConfig, project_dir: Path | None = None) -> list[Check]:
     return checks
 
 
+def volumes_nommes(cfg: StackConfig, service_id: str) -> list[str]:
+    """Volumes Docker d'un service, tels que Compose les nomme reellement.
+
+    Deduit du catalogue plutot qu'ecrit en dur : le jour ou un troisieme
+    service passe au volume, il entre ici sans qu'on ait a y penser. Les deux
+    premiers ont chacun demande une correction dispersee en cinq endroits.
+    """
+    return [
+        volume_name(cfg.project_name, nom)
+        for nom, _chemin in catalog.get(service_id).named_volumes
+    ]
+
+
 def existing_configs(cfg: StackConfig) -> list[str]:
     """Services dont l'etat existe DEJA, sous config_root ou dans un volume."""
     present = []
     for sid in catalog.STARTUP_ORDER:
         if not cfg.enabled(sid):
             continue
-        if sid == "silo-postgres":
-            # Sa base ne vit pas sur le disque de l'hote mais dans un VOLUME
-            # Docker (voir compose.PG_VOLUME). Un volume survit a un
-            # `docker compose down` : le chercher au mauvais endroit revenait a
-            # declarer neuve une installation qui ne l'est pas.
-            if volume_exists(volume_name(cfg.project_name, compose.PG_VOLUME)):
+        if catalog.get(sid).named_volumes:
+            # Son etat ne vit pas sur le disque de l'hote mais dans un VOLUME
+            # Docker. Un volume survit a un `docker compose down` : le chercher
+            # au mauvais endroit revenait a declarer neuve une installation qui
+            # ne l'est pas.
+            if any(volume_exists(n) for n in volumes_nommes(cfg, sid)):
                 present.append(sid)
             continue
         directory = Path(cfg.config_path(sid))
@@ -318,11 +331,12 @@ def check_existing_config(cfg: StackConfig) -> Check:
     # chercher sous config_root quelque chose qui n'y est pas.
     ou = f"dans {cfg.config_root}"
     if _SECRET_ILLISIBLE[0] in hachants:
-        volume = volume_name(cfg.project_name, compose.PG_VOLUME)
+        volumes = [n for s in _SECRET_ILLISIBLE if s in hachants for n in volumes_nommes(cfg, s)]
+        liste = ", ".join(volumes)
         ou = (
-            f"dans {cfg.config_root}, et la base de Silo dans le volume Docker {volume}"
+            f"dans {cfg.config_root}, et dans les volumes Docker {liste}"
             if len(hachants) > 1
-            else f"dans le volume Docker {volume}"
+            else f"dans le volume Docker {liste}"
         )
     return Check(
         "configuration existante",
@@ -346,9 +360,14 @@ def check_existing_config(cfg: StackConfig) -> Check:
 #: pourquoi. Constate en vrai, sur une seconde installation.
 _HASHED_PASSWORDS = ("qbittorrent", "transmission", "jellyfin", "autobrr", "qui")
 
-#: Services illisibles pour une autre raison que le hachage, designes par leur
-#: IDENTIFIANT et non par leur famille d'API — ils n'en ont pas.
-_SECRET_ILLISIBLE = ("silo-postgres",)
+#: Services illisibles pour une autre raison que le hachage : leur etat vit
+#: dans un volume Docker, dont le contenu ne se relit pas.
+#:
+#: PostgreSQL n'applique `POSTGRES_PASSWORD` qu'a la creation de sa base et
+#: l'IGNORE ensuite ; DroppedNeedle garde son compte administrateur dans la
+#: sienne. Dans les deux cas, reinstaller par-dessus un volume survivant
+#: produit des identifiants annonces que l'application refuse.
+_SECRET_ILLISIBLE = ("silo-postgres", "droppedneedle")
 
 
 def unusable_configs(cfg: StackConfig) -> list[str]:
@@ -371,8 +390,9 @@ def emplacement_etat(cfg: StackConfig, service_id: str) -> str:
     dans un volume Docker : lui annoncer `config/silo-postgres` l'envoyait
     chercher un dossier inexistant, et faisait douter de tout l'avertissement.
     """
-    if service_id in _SECRET_ILLISIBLE:
-        return f"volume Docker {volume_name(cfg.project_name, compose.PG_VOLUME)}"
+    noms = volumes_nommes(cfg, service_id)
+    if noms:
+        return "volume Docker " + ", ".join(noms)
     return cfg.config_path(service_id)
 
 
@@ -392,14 +412,14 @@ def reset_configs(cfg: StackConfig, services: list[str]) -> list[Path]:
     efface: list[Path] = []
     for sid in services:
         catalog.get(sid)  # leve une erreur lisible si le service est inconnu
-        if sid == "silo-postgres":
-            # Rien a effacer sur le disque : c'est le VOLUME qu'il faut retirer,
-            # sans quoi la remise a zero laisse la base intacte avec son ancien
-            # mot de passe, et Silo redemarre en boucle apres coup.
-            nom = volume_name(cfg.project_name, compose.PG_VOLUME)
-            if volume_exists(nom):
-                remove_volume(nom)
-                efface.append(Path(f"volume docker {nom}"))
+        if catalog.get(sid).named_volumes:
+            # Rien a effacer sur le disque : ce sont les VOLUMES qu'il faut
+            # retirer, sans quoi la remise a zero laisse l'etat intact avec ses
+            # anciens identifiants, et le service les refuse apres coup.
+            for nom in volumes_nommes(cfg, sid):
+                if volume_exists(nom):
+                    remove_volume(nom)
+                    efface.append(Path(f"volume docker {nom}"))
             continue
         dossier = Path(cfg.config_path(sid)).resolve()
         if not dossier.is_dir():

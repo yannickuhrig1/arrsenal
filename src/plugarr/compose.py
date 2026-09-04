@@ -198,6 +198,27 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
             # import a recopier le fichier.
             "${DATA_ROOT}:/data",
         ]
+    elif service_id == "droppedneedle":
+        block["environment"] = {
+            "PUID": str(cfg.puid),
+            "PGID": str(cfg.pgid),
+            "TZ": cfg.timezone,
+        }
+        block["volumes"] = [
+            f"${{CONFIG_ROOT}}/{spec.config_dir}/config:/app/config",
+            # `/app/cache` PORTE LA BASE, et rien ne le dit. La table
+            # `auth_users` vit dans `/app/cache/library.db` : sans ce montage,
+            # toute recreation du conteneur efface le compte administrateur, les
+            # reglages du client de telechargement et la bibliotheque entiere.
+            # Constate en vrai — l'accueil reussissait, puis la connexion avec
+            # les identifiants annonces repondait 401 apres un simple
+            # redemarrage. Le compose amont ne monte que /app/config.
+            # `/data` ENTIER, comme SABnzbd. C'est ce qui fait que DroppedNeedle
+            # voit les telechargements termines exactement la ou SABnzbd les
+            # depose : son champ `downloads_mount` n'a alors rien a remapper, et
+            # l'import lie le fichier au lieu de le recopier.
+            "${DATA_ROOT}:/data",
+        ]
     elif service_id == "audiobookshelf":
         # Ni PUID ni PGID : ce n'est pas une image LinuxServer.
         block["environment"] = {"TZ": cfg.timezone}
@@ -238,7 +259,7 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # que PostgreSQL fonctionnait parfaitement : il etait simplement 590
         # fois plus lent. Une base de donnees n'a de toute facon rien a faire
         # dans un dossier que l'utilisateur ouvre et sauvegarde a la main.
-        block["volumes"] = [f"{PG_VOLUME}:/var/lib/postgresql"]
+        block["volumes"] = []
         block["healthcheck"] = {
             "test": ["CMD-SHELL", "pg_isready -U silo"],
             "interval": "5s",
@@ -302,6 +323,9 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # pousse des sorties vers les applications.
         block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
 
+    for nom, chemin in spec.named_volumes:
+        block.setdefault("volumes", []).insert(0, f"{nom}:{chemin}")
+
     torrent_client = spec.category is Category.DOWNLOAD
     if cfg.vpn_enabled and torrent_client:
         # Forme VPN : le client perd son reseau et ses ports. Gluetun les porte.
@@ -343,12 +367,20 @@ def build_compose(cfg: StackConfig) -> dict:
         "services": services,
         "networks": {NETWORK_NAME: {"driver": "bridge"}},
     }
-    if "silo-postgres" in services:
-        # Compose prefixe le nom par celui du projet : deux installations ne se
-        # marchent pas dessus. `plugarr uninstall --volumes` l'emporte avec le
-        # reste, et sans l'option la base survit a un `down` — ce qui est le
-        # comportement voulu pour une base de donnees.
-        doc["volumes"] = {PG_VOLUME: {}}
+    # Les volumes nommes, deduits du catalogue. Compose prefixe leur nom par
+    # celui du projet : deux installations ne se marchent pas dessus.
+    # `plugarr uninstall --remove-config` les emporte ; sans l'option ils
+    # survivent a un `down`, ce qui est le comportement voulu pour une base.
+    # `gluetun` est bati a part et n'entre pas au catalogue : l'interroger ici
+    # levait « service inconnu: 'gluetun' » des qu'un VPN etait actif.
+    nommes = {
+        nom: {}
+        for sid in services
+        if sid in catalog.CATALOG
+        for nom, _chemin in catalog.get(sid).named_volumes
+    }
+    if nommes:
+        doc["volumes"] = nommes
     return doc
 
 

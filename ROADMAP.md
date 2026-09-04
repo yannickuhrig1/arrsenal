@@ -9,7 +9,7 @@ séance de travail.
 
 ## Ce qui marche aujourd'hui
 
-Quinze services installés et **câblés** en une passe, vérifiés contre des
+Seize services installés et **câblés** en une passe, vérifiés contre des
 instances réelles à chaque livraison.
 
 | | |
@@ -19,6 +19,7 @@ instances réelles à chaque livraison.
 | **Indexeurs** | Prowlarr |
 | **Média** | Jellyfin, Silo *(expérimental)* |
 | **Livres** | Audiobookshelf |
+| **Musique** | DroppedNeedle *(remplace Lidarr)* |
 | **Demandes** | Seerr |
 | **Automatisation** | autobrr, Recyclarr |
 | **Interfaces** | Flood, qui |
@@ -128,7 +129,6 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 | **Plex** | Second serveur média. Son jeton s'obtient par `plex.tv`, pas par l'API locale : c'est le point à vérifier avant de l'inscrire. |
 | **Notifiarr** | Notifications centralisées. Chaque *arr s'y déclare par une clé API. |
 | **Bazarr** | Sous-titres. Sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
-| **DroppedNeedle** | `ghcr.io/droppedneedle/droppedneedle`, **v2.9.0**. Musique, anciennement *MusicSeerr*. **Remplace Lidarr** plutôt que de le compléter. Un conteneur, `PUID`/`PGID` et un montage `/data` à parent commun : nos conventions exactes. Deux obstacles : il télécharge par slskd ou SABnzbd, aucun des deux au catalogue, et son premier compte administrateur se crée par l'interface web. |
 | **Wizarr** | Invitations et gestion des comptes pour Jellyfin, Plex et Emby. Le plus autonome de la liste : un conteneur, et le câblage se réduit au serveur média et à sa clé. |
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut pas précéder Plex. |
 | **Jellystat** | Statistiques Jellyfin. Exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue tient en un seul. |
@@ -197,6 +197,8 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.4.0** | **DroppedNeedle entre au catalogue**, débloqué par SABnzbd comme prévu. Il **remplace** Lidarr : la musique de la demande au rangement. Une note de cette feuille de route affirmait que son premier compte se créait par l'interface web — **c'était faux**, `POST /api/v1/auth/setup` existe. Deux défauts trouvés en l'intégrant, aucun visible autrement : sa table `auth_users` vit dans `/app/cache`, que le compose amont ne monte pas, si bien que l'accueil réussissait puis la connexion échouait après un simple redémarrage ; et sa base SQLite **refuse de démarrer** sur un montage Windows — « The upgraded library database could not be verified ». Même remède que la base de Silo. |
+| **0.4.0** | **Les volumes Docker nommés sont déduits du catalogue.** Ils étaient codés en dur en **cinq endroits** pour le seul PostgreSQL de Silo — compose, détection d'état existant, remise à zéro, message d'emplacement, sauvegarde. Le deuxième cas a rendu la dispersion intenable : un `named_volumes` sur la fiche du service suffit désormais, et tout le reste en découle. |
 | **0.4.0** | **SABnzbd entre au catalogue.** Demandé comme « remplaçant pour DroppedNeedle », la prémisse méritait correction : DroppedNeedle n'est pas un mauvais choix, il est bloqué par son client de téléchargement, et **tous** les chemins vers l'acquisition automatisée de musique passent par slskd ou SABnzbd. Ajouter le client le débloque sans le remplacer, et sert toute la pile : Sonarr, Radarr et Lidarr y gagnent l'Usenet à côté des torrents. L'Usenet reçoit sa **propre arborescence** sous `/data/usenet` — un torrent doit rester en partage après l'import, un NZB non, et les mélanger fait effacer par l'un ce que l'autre partage encore. Quatre pièges enchaînés, chacun muet : sa liste blanche d'hôtes refuse `http://sabnzbd:8080` ; sa clé API n'était pas générée ; son pré-semis ne tournait pas ; et ses catégories d'usine ont un répertoire **vide**, si bien que « créer si absente » les laissait inutilisables. Prowlarr, lui, refuse de se déclarer sans sa propre catégorie. |
 | **0.3.0** | **Seerr entre au catalogue.** Successeur commun de Jellyseerr et d'Overseerr. Son compte administrateur **est** le compte Jellyfin — PlugArr ne lui en génère aucun, ce serait mentir. Il déclare Sonarr et Radarr, dossier anime compris, puis ferme son accueil **en dernier** : l'inverse laisserait une instance qui se croit prête et ne peut rien demander. Sa spécification OpenAPI embarquée **ment par omission** : `hostname` est l'hôte seul et `port`, `useSsl`, `urlBase` ne sont pas déclarés alors que l'implémentation les lit ; `serverType` est obligatoire alors qu'elle le donne pour facultatif ; et `minimumAvailability` n'existe que pour Radarr. Trois essais réels pour les trouver, chacun derrière un message trompeur. |
 | **0.3.0** | **Les identifiants des *arr n'étaient pas appliqués sans redémarrage.** `PUT config/host` répond **202**, accuse réception, et ne change rien avant que l'application reparte — le même piège que pour la clé API. Écarté au passage : ce n'est pas une question de caractères spéciaux, un mot de passe purement alphanumérique était refusé de la même façon. L'étape redémarre désormais le conteneur et revérifie. |

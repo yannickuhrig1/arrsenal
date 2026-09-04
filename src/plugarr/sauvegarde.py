@@ -47,7 +47,7 @@ import yaml
 
 from . import compose as compose_mod
 from .models import StackConfig
-from .runner import Compose, _run, volume_exists, volume_name
+from .runner import Compose, _run, volume_exists
 
 #: Version du FORMAT d'archive, pas celle de PlugArr. Elle ne bouge que si la
 #: disposition interne change, pour qu'une restauration sache dire « cette
@@ -113,14 +113,19 @@ def _exclu(chemin: Path, racine: Path) -> bool:
 def volumes_du_projet(cfg: StackConfig) -> list[str]:
     """Volumes Docker qui portent de l'etat a sauvegarder.
 
-    Un seul aujourd'hui, la base de Silo. La liste est deduite du catalogue
-    plutot qu'ecrite en dur : le jour ou un second service passe au volume, il
-    entre ici sans qu'on ait a y penser.
+    Deduits du catalogue : la base de Silo et celle de DroppedNeedle
+    aujourd'hui. Une sauvegarde qui n'archive que des dossiers les manquerait
+    en silence, et la restauration rendrait des services qui refusent les
+    identifiants annonces.
     """
-    if not cfg.enabled("silo-postgres"):
-        return []
-    nom = volume_name(cfg.project_name, compose_mod.PG_VOLUME)
-    return [nom] if volume_exists(nom) else []
+    from .orchestrator import volumes_nommes
+
+    return [
+        nom
+        for sid in cfg.services
+        for nom in volumes_nommes(cfg, sid)
+        if volume_exists(nom)
+    ]
 
 
 def _sauver_volume(nom: str, destination: Path) -> bool:

@@ -841,6 +841,70 @@ class Wirer:
             ),
         )
 
+    def step_droppedneedle_setup(self) -> StepResult:
+        """Accueil de DroppedNeedle, serveur media et client de telechargement.
+
+        Il REMPLACE Lidarr plutot qu'il ne le complete : il gere la musique de
+        la demande au rangement. Il est reste hors du catalogue tant qu'aucun
+        client de telechargement ne l'accompagnait — c'est SABnzbd qui l'a
+        debloque, et c'est pourquoi il le tire comme prerequis.
+
+        Jellyfin est declare s'il est present, sans etre exige : DroppedNeedle
+        sait tenir une bibliotheque locale seul, et forcer un serveur media a
+        qui ne veut que de la musique n'aurait pas de sens.
+        """
+        from .clients.droppedneedle import DroppedNeedleClient
+
+        inst = self.cfg.services["droppedneedle"]
+        identifiant = inst.username or self.cfg.username
+        faits: list[str] = []
+
+        with DroppedNeedleClient(inst.url(self.cfg.host)) as dn:
+            dn.wait_ready()
+            cree = dn.setup(username=identifiant, password=inst.password or "")
+            # TOUJOURS se connecter : l'accueil pose bien un cookie, mais un
+            # second passage n'appelle pas l'accueil et resterait sans session.
+            dn.login(identifiant, inst.password or "")
+
+            # L'etape `jellyfin/setup`, qui precede celle-ci dans le plan, a
+            # deja cree une cle API et l'a rangee dans la configuration. En
+            # demander une seconde en creerait une de plus a chaque passage, et
+            # Jellyfin les accumule sans jamais les nettoyer.
+            jf = self.cfg.services.get("jellyfin")
+            if (
+                jf is not None
+                and jf.api_key
+                and dn.ensure_jellyfin(url=self.internal_url("jellyfin"), api_key=jf.api_key)
+            ):
+                faits.append("Jellyfin")
+
+            sab = self.cfg.services["sabnzbd"]
+            if dn.ensure_sabnzbd(
+                url=self.internal_url("sabnzbd"),
+                api_key=sab.api_key or sab.password or "",
+                # La categorie que l'etape SABnzbd vient de creer, avec son
+                # repertoire : sans elle, tout atterrirait a la racine.
+                categorie="music",
+                # Les deux conteneurs montent ${DATA_ROOT} sur /data : rien a
+                # remapper, et l'import lie au lieu de recopier.
+                montage=CONTAINER_PATHS["usenet_root"],
+            ):
+                faits.append("SABnzbd")
+
+            teste, detail_test = dn.test_sabnzbd() if self.run_tests else (True, "")
+
+        detail = "accueil execute" if cree else "accueil deja termine"
+        if faits:
+            detail += f", declares : {', '.join(faits)}"
+        if self.run_tests:
+            detail += f", test SABnzbd : {'OK' if teste else detail_test[:80]}"
+        return StepResult(
+            "droppedneedle: accueil + client de telechargement",
+            ok=teste,
+            detail=detail,
+            created=cree or bool(faits),
+        )
+
     def step_audiobookshelf_setup(self) -> StepResult:
         """Accueil d'Audiobookshelf et creation de ses deux bibliotheques.
 
@@ -1351,6 +1415,13 @@ class Wirer:
 
         if cfg.enabled("silo"):
             steps.append(WiringStep("silo/setup", self.step_silo_setup))
+
+        # DroppedNeedle APRES les categories de SABnzbd, qu'il cite, et apres
+        # Jellyfin, dont il reprend la cle API.
+        if cfg.enabled("droppedneedle"):
+            steps.append(
+                WiringStep("droppedneedle/setup", self.step_droppedneedle_setup)
+            )
 
         if cfg.enabled("audiobookshelf"):
             steps.append(

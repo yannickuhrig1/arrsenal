@@ -69,6 +69,17 @@ class ServiceSpec(BaseModel):
     #: Au moins UN de ces services est necessaire. Sert aux interfaces qui
     #: acceptent plusieurs backends, comme Flood.
     requires_one_of: tuple[str, ...] = ()
+    #: Volumes DOCKER NOMMES, sous forme (nom, chemin dans le conteneur).
+    #:
+    #: Reserve a ce qui ne SUPPORTE PAS un montage vers le disque de l'hote.
+    #: Deux cas mesures, tous deux des bases de donnees : PostgreSQL, dont les
+    #: migrations passent de 2935 s a 5 s, et la base SQLite de DroppedNeedle,
+    #: dont la verification apres mise a jour echoue purement et simplement.
+    #:
+    #: Tout le reste vit sous CONFIG_ROOT, ou l'utilisateur peut le lire, le
+    #: sauvegarder et le corriger.
+    named_volumes: tuple[tuple[str, str], ...] = ()
+
     #: Famille d'API, pilote le cablage. Voir wiring.py.
     api_family: str | None = None
     #: Version d'API des *arr : v3 pour Sonarr/Radarr, v1 pour Prowlarr.

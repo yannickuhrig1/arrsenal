@@ -35,6 +35,12 @@ _TAGS = {
 #: Ses deux appoints sont epingles de la meme facon : `redis:alpine` et
 #: `pgvector:pg18` sont des tags FLOTTANTS, qui designent un nom et non un
 #: contenu. Sans digest, deux installations du meme jour peuvent differer.
+#: DroppedNeedle, anciennement MusicSeerr.
+_DROPPEDNEEDLE = (
+    "ghcr.io/droppedneedle/droppedneedle:v2.9.0"
+    "@sha256:4687b3913ef07645dfa392cc03002ba0a6f4f07d32801065c533ecd08c5f2a82"
+)
+
 #: SABnzbd. Image LinuxServer : nos conventions exactes.
 _SABNZBD = (
     "lscr.io/linuxserver/sabnzbd:5.1.2"
@@ -184,6 +190,28 @@ CATALOG: dict[str, ServiceSpec] = {
         api_family="sabnzbd",
         notes="Client Usenet. Complete les torrents, il ne les remplace pas.",
     ),
+    "droppedneedle": ServiceSpec(
+        id="droppedneedle",
+        display_name="DroppedNeedle",
+        category=Category.MEDIA,
+        image=_DROPPEDNEEDLE,
+        internal_port=8688,
+        default_host_port=8688,
+        config_dir="droppedneedle",
+        # `/app/cache` porte sa base SQLite, `auth_users` comprise. Sur un
+        # montage Windows, sa verification apres mise a jour echoue et le
+        # conteneur refuse de demarrer : « The upgraded library database could
+        # not be verified after installation ». Meme remede que pour la base de
+        # Silo, et meme cause probable — SQLite et la couche de partage de
+        # fichiers de Docker Desktop ne s'entendent pas.
+        named_volumes=(("droppedneedle-cache", "/app/cache"),),
+        api_family="droppedneedle",
+        # Il ne telecharge rien sans client. SABnzbd est celui que PlugArr sait
+        # lui cabler ; sans lui, l'installer donnerait une interface qui
+        # cherche et ne peut rien obtenir.
+        requires=("sabnzbd",),
+        notes="Musique, de la demande au rangement. REMPLACE Lidarr, ne le complete pas.",
+    ),
     "audiobookshelf": ServiceSpec(
         id="audiobookshelf",
         display_name="Audiobookshelf",
@@ -210,6 +238,7 @@ CATALOG: dict[str, ServiceSpec] = {
         # Un montage vers le disque Windows rendait ses migrations 590 fois plus
         # lentes — 2935 s contre 5 s, mesure. Voir compose.PG_VOLUME.
         config_dir=None,
+        named_volumes=(("silo-pgdata", "/var/lib/postgresql"),),
         internal=True,
         notes="Base de donnees de Silo. Installee avec lui, jamais seule.",
     ),
@@ -325,6 +354,8 @@ STARTUP_ORDER = (
     # Audiobookshelf ne depend de personne : il lit des dossiers. Sa place ici
     # est celle de l'affichage, a cote des autres serveurs media.
     "audiobookshelf",
+    # DroppedNeedle apres SABnzbd, qu'il declare.
+    "droppedneedle",
     # Seerr APRES Jellyfin et les *arr : son accueil s'authentifie contre le
     # serveur media, et il declare les *arr dans la foulee.
     "seerr",
