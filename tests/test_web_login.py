@@ -15,9 +15,9 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from arrsenal.clients.arr import ArrClient
-from arrsenal.orchestrator import build_config
-from arrsenal.wiring import Wirer
+from plugarr.clients.arr import ArrClient
+from plugarr.orchestrator import build_config
+from plugarr.wiring import Wirer
 
 
 class FakeHttp:
@@ -53,46 +53,46 @@ def _redirect(location: str, status: int = 302):
 
 def test_une_redirection_vers_la_racine_vaut_succes():
     client = _client({"/login": _redirect("/")})
-    assert client.web_login_works("arrsenal", "secret") is True
+    assert client.web_login_works("plugarr", "secret") is True
 
 
 def test_loginfailed_dans_la_redirection_vaut_echec():
     """C'est la reponse exacte de Prowlarr quand aucun compte n'existe."""
     client = _client({"/login": _redirect("/login?returnUrl=&loginFailed=true")})
-    assert client.web_login_works("arrsenal", "secret") is False
+    assert client.web_login_works("plugarr", "secret") is False
 
 
 def test_la_casse_de_loginfailed_ne_change_rien():
     client = _client({"/login": _redirect("/login?LoginFailed=True")})
-    assert client.web_login_works("arrsenal", "secret") is False
+    assert client.web_login_works("plugarr", "secret") is False
 
 
 def test_une_page_rendue_sans_redirection_vaut_echec():
     """Un succes redirige toujours. Un 200 est la page de connexion reaffichee."""
     client = _client({"/login": httpx.Response(200, text="<html>Login</html>")})
-    assert client.web_login_works("arrsenal", "secret") is False
+    assert client.web_login_works("plugarr", "secret") is False
 
 
 def test_un_service_injoignable_ne_leve_pas():
     """La verification ne doit pas interrompre le cablage."""
     client = _client({"/login": httpx.ConnectError("refuse")})
-    assert client.web_login_works("arrsenal", "secret") is False
+    assert client.web_login_works("plugarr", "secret") is False
 
 
 def test_sans_identifiants_il_n_y_a_rien_a_verifier():
     client = _client({})
     assert client.web_login_works("", "secret") is False
-    assert client.web_login_works("arrsenal", "") is False
+    assert client.web_login_works("plugarr", "") is False
     assert client._http.posts == [], "aucun appel ne devait partir"
 
 
 def test_le_formulaire_est_poste_comme_un_navigateur():
     client = _client({"/login": _redirect("/")})
-    client.web_login_works("arrsenal", "secret")
+    client.web_login_works("plugarr", "secret")
 
     path, data = client._http.posts[0]
     assert path == "/login"
-    assert data["username"] == "arrsenal"
+    assert data["username"] == "plugarr"
     assert data["password"] == "secret"
 
 

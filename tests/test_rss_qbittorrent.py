@@ -3,7 +3,7 @@
 Demande a l'usage : « le lecteur RSS interne de qBittorrent avec ses regles de
 telechargement automatique, oui c'est de ca que je parle ».
 
-Le piege est net et verifie contre une 5.2.3 installee par arrsenal : le moteur
+Le piege est net et verifie contre une 5.2.3 installee par plugarr : le moteur
 RSS est livre ACTIF, mais le telechargement automatique ETEINT.
 
     rss_processing_enabled       = True
@@ -11,7 +11,7 @@ RSS est livre ACTIF, mais le telechargement automatique ETEINT.
 
 Une regle ecrite dans cet etat ne se declenche jamais, et rien ne l'explique.
 
-arrsenal n'ajoute AUCUN flux ni AUCUNE regle : ils dependent de vos traqueurs,
+plugarr n'ajoute AUCUN flux ni AUCUNE regle : ils dependent de vos traqueurs,
 exactement comme les indexeurs de Prowlarr. Il pose l'interrupteur.
 """
 
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 
-from arrsenal.clients.qbittorrent import QBittorrentClient
+from plugarr.clients.qbittorrent import QBittorrentClient
 
 
 class _FauxQb(QBittorrentClient):
@@ -111,8 +111,8 @@ def test_le_resultat_est_RELU_et_non_suppose():
 
 
 def test_l_etape_est_au_plan_quand_qbittorrent_est_installe():
-    from arrsenal import orchestrator
-    from arrsenal.wiring import Wirer
+    from plugarr import orchestrator
+    from plugarr.wiring import Wirer
 
     cfg = orchestrator.build_config(
         services=["qbittorrent", "sonarr"], config_root="/c", data_root="/d"
@@ -123,8 +123,8 @@ def test_l_etape_est_au_plan_quand_qbittorrent_est_installe():
 
 def test_aucune_etape_rss_sans_qbittorrent():
     """Transmission n'a pas de lecteur RSS."""
-    from arrsenal import orchestrator
-    from arrsenal.wiring import Wirer
+    from plugarr import orchestrator
+    from plugarr.wiring import Wirer
 
     cfg = orchestrator.build_config(
         services=["transmission", "sonarr"], config_root="/c", data_root="/d"

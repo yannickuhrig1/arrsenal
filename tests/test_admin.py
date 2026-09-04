@@ -17,8 +17,8 @@ import urllib.request
 
 import pytest
 
-from arrsenal import admin, orchestrator
-from arrsenal.models import PlatformProfile
+from plugarr import admin, orchestrator
+from plugarr.models import PlatformProfile
 
 TOKEN = "jeton-de-test"
 
@@ -243,7 +243,7 @@ def test_the_served_page_carries_the_controls(server):
 def test_compose_control_refuses_an_action_outside_the_list(tmp_path):
     """Deuxieme barriere, cote runner : meme appele directement, `control` ne
     laisse pas passer autre chose que start/stop/restart."""
-    from arrsenal.runner import Compose
+    from plugarr.runner import Compose
 
     with pytest.raises(ValueError, match="non autorisee"):
         Compose(tmp_path, "test").control("down", "sonarr")
@@ -273,7 +273,7 @@ def test_updating_a_service_outside_the_config_is_refused(server):
 
 
 def test_a_valid_version_is_accepted_by_the_validator():
-    from arrsenal import updates
+    from plugarr import updates
 
     assert updates.parse_version("4.0.19") == (4, 0, 19)
     assert updates.parse_version("v1.85.0") == (1, 85, 0)

@@ -1,6 +1,6 @@
 """Le conseil de fin doit parler de ce qui est INSTALLE.
 
-arrsenal terminait chaque installation par « ajoutez vos indexeurs dans
+plugarr terminait chaque installation par « ajoutez vos indexeurs dans
 Prowlarr. Ils descendront automatiquement vers Sonarr et Radarr », quelle que
 soit la selection. Constate en installant Silo seul depuis l'executable : le
 conseil citait trois applications dont aucune n'existait, et envoyait chercher
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from arrsenal import dashboard, orchestrator
+from plugarr import dashboard, orchestrator
 
 
 def _cfg(*services: str, data_root: str = "/d"):

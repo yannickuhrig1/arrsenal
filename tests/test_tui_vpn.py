@@ -11,14 +11,14 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Button, Input, RadioButton, Select, SelectionList, Static
 
-from arrsenal.models import VPN_PROVIDERS, VpnConfig
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.screens import PathsScreen, SummaryScreen, TemplatesScreen, VpnScreen
+from plugarr.models import VPN_PROVIDERS, VpnConfig
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.screens import PathsScreen, SummaryScreen, TemplatesScreen, VpnScreen
 
 
 @pytest.fixture
 def app(tmp_path):
-    return ArrsenalApp(project_dir=tmp_path)
+    return PlugArrApp(project_dir=tmp_path)
 
 
 async def _vpn(pilot, selection=("sonarr", "qbittorrent")) -> VpnScreen:

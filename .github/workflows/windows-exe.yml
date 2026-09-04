@@ -27,12 +27,12 @@ jobs:
       - run: pip install . pyinstaller
 
       - name: Construction
-        run: pyinstaller packaging/arrsenal.spec --noconfirm
+        run: pyinstaller packaging/plugarr.spec --noconfirm
 
       - name: Le binaire repond
         run: |
-          dist\arrsenal.exe --help
-          dist\arrsenal.exe list | Select-String -Pattern "sonarr" -Quiet
+          dist\plugarr.exe --help
+          dist\plugarr.exe list | Select-String -Pattern "sonarr" -Quiet
           if (-not $?) { throw "le catalogue ne cite pas sonarr" }
         shell: pwsh
 
@@ -47,22 +47,22 @@ jobs:
           pyinstaller packaging/smoke_tui.py --onefile --console --noconfirm `
             --name smoke --distpath dist-smoke --workpath build-smoke --specpath build-smoke `
             --paths src --collect-all textual `
-            --add-data "${{ github.workspace }}/src/arrsenal/tui/app.tcss;arrsenal/tui" `
-            --add-data "${{ github.workspace }}/src/arrsenal/data/vpn_countries.json;arrsenal/data"
+            --add-data "${{ github.workspace }}/src/plugarr/tui/app.tcss;plugarr/tui" `
+            --add-data "${{ github.workspace }}/src/plugarr/data/vpn_countries.json;plugarr/data"
           dist-smoke\smoke.exe
         shell: pwsh
 
       - name: Les modules charges tardivement sont dans l'archive
         # `clients/silo.py` n'est importe qu'au fond d'une etape de cablage, et
-        # `arrsenal.exe` ne l'ouvre donc jamais avant qu'un utilisateur installe
+        # `plugarr.exe` ne l'ouvre donc jamais avant qu'un utilisateur installe
         # Silo pour de vrai. Un module qu'aucun import de premier niveau ne
         # designe est exactement ce que l'empaquetage laisse au bord de la route
         # sans rien dire. On lit la liste que PyInstaller a REELLEMENT ecrite,
         # plutot que de faire confiance a son analyse.
         run: |
-          $toc = Get-Content build\arrsenal\Analysis-00.toc -Raw
-          foreach ($m in @('arrsenal.clients.silo','arrsenal.langues',
-                           'arrsenal.clients.jellyfin','arrsenal.wiring','arrsenal.vpncheck')) {
+          $toc = Get-Content build\plugarr\Analysis-00.toc -Raw
+          foreach ($m in @('plugarr.clients.silo','plugarr.langues',
+                           'plugarr.clients.jellyfin','plugarr.wiring','plugarr.vpncheck')) {
             if ($toc -notmatch [regex]::Escape("'$m'")) {
               throw "$m absent de l'executable"
             }
@@ -72,19 +72,19 @@ jobs:
 
       - name: Taille du binaire
         run: |
-          $mo = [math]::Round((Get-Item dist\arrsenal.exe).Length / 1MB, 1)
-          Write-Output "arrsenal.exe : $mo Mo"
+          $mo = [math]::Round((Get-Item dist\plugarr.exe).Length / 1MB, 1)
+          Write-Output "plugarr.exe : $mo Mo"
         shell: pwsh
 
       - uses: actions/upload-artifact@v4
         with:
-          name: arrsenal-windows
-          path: dist/arrsenal.exe
+          name: plugarr-windows
+          path: dist/plugarr.exe
           if-no-files-found: error
 
       - name: Publier sur la release
         if: startsWith(github.ref, 'refs/tags/v')
-        run: gh release upload "${{ github.ref_name }}" dist/arrsenal.exe --clobber
+        run: gh release upload "${{ github.ref_name }}" dist/plugarr.exe --clobber
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh

@@ -1,6 +1,6 @@
 """Authentification de la console d'administration.
 
-Le jeton tire a chaque demarrage convient tant qu'on lance `arrsenal serve` a
+Le jeton tire a chaque demarrage convient tant qu'on lance `plugarr serve` a
 la main : il s'affiche dans le terminal, juste au-dessus de l'URL. Il ne
 convient plus des que la console tourne en permanence — personne n'ira lire un
 journal de conteneur pour retrouver un jeton a chaque redemarrage, et un jeton
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from arrsenal import admin, adminauth, orchestrator
+from plugarr import admin, adminauth, orchestrator
 
 MOT_DE_PASSE = "unmotdepassecorrect"
 
@@ -178,7 +178,7 @@ def test_sans_rien_le_formulaire_est_propose(console):
 
 
 def test_le_jeton_ouvre_toujours_la_console(console):
-    """Lancer `arrsenal serve` a la main ne doit pas imposer d'inventer un mot
+    """Lancer `plugarr serve` a la main ne doit pas imposer d'inventer un mot
     de passe pour regarder l'etat de ses services."""
     code, _cookie, page = appel(console, "GET", "/?t=jetondetest")
 
@@ -216,7 +216,7 @@ def test_un_cookie_accentue_ne_tue_pas_la_requete(console):
     """`compare_digest` refuse les chaines non-ASCII et leve `TypeError`. Un
     cookie accentue suffisait donc a tuer le fil de traitement, sans la moindre
     authentification."""
-    code, _cookie, _page = appel(console, "GET", "/api/status", cookie="arrsenal_token=inventé")
+    code, _cookie, _page = appel(console, "GET", "/api/status", cookie="plugarr_token=inventé")
 
     assert code == 401
 
@@ -265,7 +265,7 @@ def test_sans_mot_de_passe_configure_aucun_formulaire_n_est_propose():
         code, _cookie, page = appel(port, "GET", "/")
         assert code == 401
         assert 'name="password"' not in page
-        assert "arrsenal serve" in page
+        assert "plugarr serve" in page
 
         # Et le mot de passe ne peut pas ouvrir de session : il n'y en a pas.
         code, _cookie, _page = appel(port, "POST", "/login", {"password": MOT_DE_PASSE})

@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from arrsenal import catalog, orchestrator
-from arrsenal.orchestrator import Progress, expected_events
-from arrsenal.wiring import StepResult
+from plugarr import catalog, orchestrator
+from plugarr.orchestrator import Progress, expected_events
+from plugarr.wiring import StepResult
 
 SELECTIONS = [
     ["sonarr", "radarr", "prowlarr", "transmission", "jellyfin", "recyclarr"],
@@ -125,13 +125,13 @@ async def test_la_barre_du_tui_ne_depasse_jamais_son_total(tmp_path, monkeypatch
     """Le total est une estimation. Une barre a 110 % ferait douter du reste."""
     from textual.widgets import ProgressBar
 
-    from arrsenal.tui.app import ArrsenalApp
-    from arrsenal.tui.screens import InstallScreen
+    from plugarr.tui.app import PlugArrApp
+    from plugarr.tui.screens import InstallScreen
 
     # monkeypatch, pas une affectation de classe : sans annulation, l'ecran
     # resterait inerte pour tous les tests suivants de la meme session.
     monkeypatch.setattr(InstallScreen, "run_install", lambda self: None)
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     async with app.run_test() as pilot:
         app.selection = ["sonarr"]
         app.push_screen(InstallScreen())

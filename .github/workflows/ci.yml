@@ -39,17 +39,17 @@ jobs:
 
       - name: Installation complete
         run: |
-          sudo mkdir -p /srv/data /opt/arrsenal/config
-          sudo chown -R "$(id -u):$(id -g)" /srv/data /opt/arrsenal
-          arrsenal install --yes \
+          sudo mkdir -p /srv/data /opt/plugarr/config
+          sudo chown -R "$(id -u):$(id -g)" /srv/data /opt/plugarr
+          plugarr install --yes \
             --services prowlarr,sonarr,radarr,lidarr,transmission,qbittorrent,jellyfin \
             --data-root /srv/data \
-            --config-root /opt/arrsenal/config \
+            --config-root /opt/plugarr/config \
             --project-dir "$RUNNER_TEMP/stack"
 
       - name: Idempotence - le second passage ne doit rien creer
         run: |
-          arrsenal wire --project-dir "$RUNNER_TEMP/stack" | tee /tmp/second.log
+          plugarr wire --project-dir "$RUNNER_TEMP/stack" | tee /tmp/second.log
           if grep -q "cree (id=" /tmp/second.log; then
             echo "ECHEC : le second passage a cree des ressources, le cablage n'est pas idempotent"
             exit 1
@@ -67,4 +67,4 @@ jobs:
 
       - name: Journaux en cas d'echec
         if: failure()
-        run: docker compose -p arrsenal -f "$RUNNER_TEMP/stack/docker-compose.yml" logs --tail 100
+        run: docker compose -p plugarr -f "$RUNNER_TEMP/stack/docker-compose.yml" logs --tail 100

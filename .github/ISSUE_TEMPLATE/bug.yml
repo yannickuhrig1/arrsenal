@@ -5,10 +5,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Merci. La sortie de `arrsenal doctor` repond a la moitie des questions
+        Merci. La sortie de `plugarr doctor` repond a la moitie des questions
         ci-dessous : lancez-la d'abord, ca ira plus vite pour tout le monde.
 
-        **Ne collez aucune cle API ni mot de passe.** `arrsenal doctor` ne les
+        **Ne collez aucune cle API ni mot de passe.** `plugarr doctor` ne les
         affiche pas, mais `.env` et la page d'acces en contiennent.
   - type: textarea
     id: attendu
@@ -24,13 +24,13 @@ body:
     attributes:
       label: La commande exacte
       render: shell
-      placeholder: arrsenal install --services sonarr,qbittorrent --data-root /srv/data
+      placeholder: plugarr install --services sonarr,qbittorrent --data-root /srv/data
     validations:
       required: true
   - type: textarea
     id: doctor
     attributes:
-      label: Sortie de `arrsenal doctor`
+      label: Sortie de `plugarr doctor`
       render: shell
     validations:
       required: true

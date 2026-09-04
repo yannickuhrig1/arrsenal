@@ -1,9 +1,9 @@
-# arrsenal
+# plugarr
 
 **Déploie *et câble* une stack média complète. Une commande, zéro clic dans huit interfaces web.**
 
 ```bash
-arrsenal
+plugarr
 ```
 
 <p align="center">
@@ -19,7 +19,7 @@ import.
 Pas d'assistant ? La même chose en une ligne, pour un script ou une CI :
 
 ```bash
-arrsenal install --yes --data-root /srv/data --config-root /opt/arrsenal/config
+plugarr install --yes --data-root /srv/data --config-root /opt/plugarr/config
 ```
 
 ---
@@ -33,14 +33,14 @@ Ce qui prend trois heures, c'est **l'après** : ouvrir chaque interface, copier 
 API, la coller dans une autre, recommencer, se tromper de port, découvrir trois jours
 plus tard que les imports recopient 40 Go au lieu de faire un lien.
 
-`arrsenal` automatise cette partie-là.
+`plugarr` automatise cette partie-là.
 
 | | Déploiement | Câblage inter-apps | Profils qualité |
 |---|---|---|---|
 | DockSTARTer | oui | non | non |
 | Saltbox | oui | partiel | non |
 | Recyclarr / Configarr | non | non | oui |
-| **arrsenal** | **oui** | **oui** | **oui** (via Recyclarr) |
+| **plugarr** | **oui** | **oui** | **oui** (via Recyclarr) |
 
 ---
 
@@ -78,7 +78,7 @@ C'est l'erreur numéro un des stacks média. Monter `/downloads` et `/media` sé
 donne deux systèmes de fichiers *vus depuis le conteneur*. Les hardlinks deviennent
 impossibles, et chaque import **recopie** le fichier au lieu de le lier.
 
-`arrsenal` impose un montage unique dans tous les conteneurs :
+`plugarr` impose un montage unique dans tous les conteneurs :
 
 ```
 ${DATA_ROOT}/                    ->  /data   (dans TOUS les conteneurs)
@@ -102,12 +102,12 @@ Le préflight ne se contente pas de l'espérer : il **crée un vrai hardlink** e
 
 ### Windows : un seul fichier, sans Python
 
-Téléchargez `arrsenal.exe` depuis la
-[dernière version](https://github.com/yannickuhrig1/arrsenal/releases), ouvrez un
+Téléchargez `plugarr.exe` depuis la
+[dernière version](https://github.com/yannickuhrig1/plugarr/releases), ouvrez un
 terminal dans le dossier de téléchargement, et lancez :
 
 ```bash
-.\arrsenal.exe
+.\plugarr.exe
 ```
 
 Seul Docker Desktop est nécessaire. L'exécutable embarque son propre interpréteur : il
@@ -127,43 +127,43 @@ Quatre profils de plateforme : `windows`, `generic-linux`, `unraid`, `synology`.
 Celui de la machine est présélectionné, avec les chemins qui vont avec.
 
 ```bash
-pipx install git+https://github.com/yannickuhrig1/arrsenal
+pipx install git+https://github.com/yannickuhrig1/plugarr
 ```
 
 Sans `pipx`, un environnement virtuel fait la même chose :
 
 ```bash
-python -m venv ~/.venvs/arrsenal && ~/.venvs/arrsenal/bin/pip install git+https://github.com/yannickuhrig1/arrsenal
+python -m venv ~/.venvs/plugarr && ~/.venvs/plugarr/bin/pip install git+https://github.com/yannickuhrig1/plugarr
 ```
 
-Le paquet n'est pas encore sur PyPI : `pipx install arrsenal` ne fonctionnera qu'après
+Le paquet n'est pas encore sur PyPI : `pipx install plugarr` ne fonctionnera qu'après
 la première publication.
 
 Aperçu sans rien écrire :
 
 ```bash
-arrsenal install --dry-run
+plugarr install --dry-run
 ```
 
 Sélection à la carte :
 
 ```bash
-arrsenal install --services prowlarr,sonarr,radarr,qbittorrent,jellyfin
+plugarr install --services prowlarr,sonarr,radarr,qbittorrent,jellyfin
 ```
 
 Autres commandes :
 
 ```bash
-arrsenal             # assistant interactif
-arrsenal list        # catalogue des services
-arrsenal scan        # detecte une stack existante
-arrsenal adopt       # cable une stack existante sans la recreer
-arrsenal serve       # page d'administration : etat, demarrer / arreter
-arrsenal indexers    # chercher et ajouter vos indexeurs
-arrsenal wire        # rejoue le câblage sur une stack déjà démarrée
-arrsenal doctor      # diagnostique une installation existante
-arrsenal generate    # régénère docker-compose.yml depuis stack.yml
-arrsenal uninstall   # arrête la stack, ne touche jamais à vos médias
+plugarr             # assistant interactif
+plugarr list        # catalogue des services
+plugarr scan        # detecte une stack existante
+plugarr adopt       # cable une stack existante sans la recreer
+plugarr serve       # page d'administration : etat, demarrer / arreter
+plugarr indexers    # chercher et ajouter vos indexeurs
+plugarr wire        # rejoue le câblage sur une stack déjà démarrée
+plugarr doctor      # diagnostique une installation existante
+plugarr generate    # régénère docker-compose.yml depuis stack.yml
+plugarr uninstall   # arrête la stack, ne touche jamais à vos médias
 ```
 
 ### Après l'installation : la page d'administration
@@ -174,14 +174,14 @@ mises à jour disponibles viennent d'un petit serveur local.
 
 Un fichier `administration.cmd` (`administration.sh` ailleurs) est déposé à côté des
 artefacts : **double-cliquez dessus**. Il connaît le chemin de votre installation, donc
-il fonctionne même sans `arrsenal` dans le PATH.
+il fonctionne même sans `plugarr` dans le PATH.
 
 L'accès se fait par un jeton tiré au hasard à chaque démarrage, affiché juste
 au-dessus de l'URL. C'est suffisant tant que vous lancez la console à la main.
 Si vous la laissez tourner, posez plutôt un mot de passe :
 
 ```bash
-arrsenal admin-password
+plugarr admin-password
 ```
 
 Seule son empreinte rejoint `stack.yml` — PBKDF2, 600 000 itérations. Les
@@ -190,7 +190,7 @@ tentatives sont limitées, et une session expire au bout de douze heures.
 Pour ne plus avoir à la lancer du tout :
 
 ```bash
-arrsenal autostart
+plugarr autostart
 ```
 
 La console démarre alors à chaque ouverture de session — **sur l'hôte, pas dans
@@ -202,14 +202,14 @@ votre compte, écoute sur `127.0.0.1`, et reste hors du réseau Docker.
 
 Windows dépose un script dans votre dossier Démarrage ; Linux installe une unité
 systemd *utilisateur*. Aucun des deux ne demande les droits administrateur.
-`arrsenal autostart --disable` retire tout.
+`plugarr autostart --disable` retire tout.
 
 ### En cas de problème
 
 Chaque installation écrit un journal complet à côté de `docker-compose.yml` :
 
 ```bash
-arrsenal.log
+plugarr.log
 ```
 
 Il contient la version, la plateforme, chaque étape, chaque avertissement et la trace
@@ -218,7 +218,7 @@ remplacés par leur nom avant écriture, pour qu'il puisse être joint à une is
 réfléchir.
 
 La version s'affiche aussi dans le bandeau de l'assistant, en pied de page d'accès, et
-par `arrsenal --version`.
+par `plugarr --version`.
 
 Toutes les captures de ce README sont **générées automatiquement** par
 `python scripts/screenshots.py`, sans terminal ni Docker. Elles sont versionnées : une
@@ -241,11 +241,11 @@ régression visuelle apparaît dans le diff d'une pull request.
 ## Vous avez déjà une stack ?
 
 `install` s'adresse à qui part de zéro. Si vos services tournent déjà, montés à la main
-au fil des années, `arrsenal` peut **les câbler sans rien recréer** :
+au fil des années, `plugarr` peut **les câbler sans rien recréer** :
 
 ```bash
-arrsenal scan     # ce qui est détecté sur cette machine, sans rien écrire
-arrsenal adopt --data-root /mnt/user/medias --config-root /mnt/user/appdata
+plugarr scan     # ce qui est détecté sur cette machine, sans rien écrire
+plugarr adopt --data-root /mnt/user/medias --config-root /mnt/user/appdata
 ```
 
 Il lit les clés API dans les `config.xml` de vos conteneurs, puis pose les mêmes liens
@@ -256,16 +256,16 @@ Trois principes, appris en le testant sur une vraie stack :
 
 - **Votre arborescence est la vôtre.** Les dossiers racine existants sont lus et
   respectés, jamais remplacés. Idem pour les catégories de votre client.
-- **Deux Sonarr ? arrsenal ne devine pas.** Il s'arrête et demande
+- **Deux Sonarr ? plugarr ne devine pas.** Il s'arrête et demande
   `--pick sonarr=<conteneur>`. Un choix silencieux serait pire qu'une question.
-- **Un nom de conteneur ne prouve rien.** arrsenal reconnaît ses propres services à un
+- **Un nom de conteneur ne prouve rien.** plugarr reconnaît ses propres services à un
   libellé qu'il pose, pas à leur nom : `mon-sonarr` est à vous, il n'y touche pas.
 
 ---
 
 ## La page d'accès
 
-À la fin de l'installation, `arrsenal` génère une page HTML locale et l'ouvre dans votre
+À la fin de l'installation, `plugarr` génère une page HTML locale et l'ouvre dans votre
 navigateur. Plus besoin de retrouver quel service écoute sur quel port : une carte par
 service, les dossiers de téléchargement et de médiathèque, les identifiants.
 
@@ -275,7 +275,7 @@ Trois détails qui comptent :
   fichier local en `chmod 600`, exclu du dépôt — mais on la montre parfois à quelqu'un,
   et elle ne doit pas afficher votre clé Sonarr d'entrée.
 - **Les liens n'utilisent pas `localhost`.** Installée sur un NAS, une URL en localhost
-  pointerait vers la machine qui consulte. `arrsenal` détecte l'adresse de la machine
+  pointerait vers la machine qui consulte. `plugarr` détecte l'adresse de la machine
   sur le réseau local et génère les liens avec.
 - **Les raccourcis vers les dossiers sont donnés en chemin copiable *et* en lien.**
   Un lien `file://` ne fonctionne que si le navigateur tourne sur la machine
@@ -286,7 +286,7 @@ Trois détails qui comptent :
 ### Piloter les services
 
 ```bash
-arrsenal serve
+plugarr serve
 ```
 
 La même page, mais **servie** : état de chaque service en direct, et des boutons pour
@@ -310,7 +310,7 @@ distinctes, présentées séparément parce qu'elles n'ont pas les mêmes consé
 - **l'image a été reconstruite** — même version, contenu republié en amont. LinuxServer
   le fait très souvent, pour les correctifs de sécurité de l'image de base.
 
-Le tag déployé vit dans `stack.yml`, pas dans le code d'`arrsenal` : vous pouvez donc
+Le tag déployé vit dans `stack.yml`, pas dans le code d'`plugarr` : vous pouvez donc
 mettre Sonarr à jour sans attendre une nouvelle version de l'outil, ou rester
 délibérément sur une version ancienne.
 
@@ -323,18 +323,18 @@ le tag est remis comme il était.
 ## Comment ça marche
 
 **Les clés API sont pré-semées, pas devinées.** Plutôt que de démarrer les conteneurs
-puis de courir après une clé générée aléatoirement, `arrsenal` écrit lui-même le
+puis de courir après une clé générée aléatoirement, `plugarr` écrit lui-même le
 `config.xml` avant le premier démarrage. Le câblage devient déterministe et rejouable.
 
 **Les payloads viennent des schémas.** Aucun JSON de client de téléchargement n'est codé
-en dur. `arrsenal` demande son gabarit à l'application (`/api/v3/downloadclient/schema`),
+en dur. `plugarr` demande son gabarit à l'application (`/api/v3/downloadclient/schema`),
 remplit les champs par nom, et renvoie l'objet. Quand une nouvelle version renomme un
 champ, le gabarit suit. Les champs qu'une version n'expose pas sont **signalés**, jamais
 perdus en silence.
 
 **Tout est idempotent.** Relancer `install` sur une stack existante ne crée pas de
 doublon et n'écrase aucun réglage manuel. Un `config.xml` déjà présent fait autorité :
-`arrsenal` adopte sa clé plutôt que d'imposer la sienne.
+`plugarr` adopte sa clé plutôt que d'imposer la sienne.
 
 **`stack.yml` est la source de vérité.** `docker-compose.yml` et `.env` en sont des
 artefacts générés, versionnables et diffables. Ne les éditez pas à la main.
@@ -350,7 +350,7 @@ automatique sans laisser Sonarr et Radarr ouverts à tout le réseau local.
 Les identifiants sont écrits dans `.env` en `chmod 600`, déjà couvert par le
 `.gitignore` généré, et masqués dans les journaux.
 
-L'identifiant est **le vôtre** : `arrsenal` n'est qu'un défaut, changeable dans
+L'identifiant est **le vôtre** : `plugarr` n'est qu'un défaut, changeable dans
 l'assistant ou par `--username`. Le même pour tous les services, ce qui garde la page
 d'accès lisible.
 
@@ -372,7 +372,7 @@ de variable, et un mot de passe contenant `$HOME` arriverait déformé dans le c
 Sont aussi exclus l'apostrophe, le guillemet, l'antislash, le backtick, `#` et tout
 métacaractère de shell. Les valeurs du `.env` sont en outre écrites entre apostrophes.
 
-**Sans VPN**, le trafic BitTorrent sort sur votre IP publique. `arrsenal` vous
+**Sans VPN**, le trafic BitTorrent sort sur votre IP publique. `plugarr` vous
 l'affiche au récapitulatif.
 
 L'assistant pose la question juste après les chemins, dès qu'un client de
@@ -380,18 +380,18 @@ téléchargement est coché. En ligne de commande, c'est `--vpn` : dans les deux
 cas le client passe par [Gluetun](https://github.com/passteque/gluetun).
 
 ```bash
-arrsenal install --vpn --vpn-provider nordvpn --vpn-key <votre-cle-wireguard>
+plugarr install --vpn --vpn-provider nordvpn --vpn-key <votre-cle-wireguard>
 ```
 
 ```bash
-arrsenal vpn-providers   # les 25 fournisseurs acceptes
+plugarr vpn-providers   # les 25 fournisseurs acceptes
 ```
 
 L'assistant propose ensuite les **serveurs que Gluetun connaît pour ce
 fournisseur**, en liste cliquable, plutôt qu'un champ libre où une valeur
 inventée ferait échouer le démarrage. Attention, tous ne se filtrent pas par
 pays : Windscribe, VyprVPN, Giganews et Private Internet Access classent leurs
-serveurs par **région**, Perfect Privacy par **ville**. `arrsenal` pose donc
+serveurs par **région**, Perfect Privacy par **ville**. `plugarr` pose donc
 `SERVER_COUNTRIES`, `SERVER_REGIONS` ou `SERVER_CITIES` selon le cas. Les listes
 sont extraites de l'image **épinglée** par `python scripts/vpn_countries.py`.
 
@@ -413,7 +413,7 @@ Une fois la stack en place, l'assistant propose une **étape optionnelle** pour 
 les indexeurs que vous utilisez déjà. Elle se passe d'un bouton.
 
 La liste proposée n'est pas la nôtre : ce sont les **626 définitions que votre propre
-Prowlarr embarque**. `arrsenal` n'est qu'un formulaire par-dessus, et n'en présélectionne
+Prowlarr embarque**. `plugarr` n'est qu'un formulaire par-dessus, et n'en présélectionne
 aucune. Il devine quels champs sont des identifiants (clé API, passkey, cookie, mot de
 passe) et n'affiche que ceux-là, plutôt que de vous noyer sous la douzaine d'options de
 réglage que chaque définition traîne.
@@ -421,9 +421,9 @@ réglage que chaque définition traîne.
 En ligne de commande, la même chose reste scriptable :
 
 ```bash
-arrsenal indexers search <terme>          # chercher dans les définitions de VOTRE Prowlarr
-arrsenal indexers add "<nom>" -f apiKey=… # ajouter avec VOS identifiants
-arrsenal indexers list                    # ce qui est déjà configuré
+plugarr indexers search <terme>          # chercher dans les définitions de VOTRE Prowlarr
+plugarr indexers add "<nom>" -f apiKey=… # ajouter avec VOS identifiants
+plugarr indexers list                    # ce qui est déjà configuré
 ```
 
 Un point à connaître : **ajouter un indexeur le contacte** pour valider vos identifiants.
@@ -437,7 +437,7 @@ identifiants sont bons.
 
 Sans profil de qualité, un *arr accepte **n'importe quel encodage** : le premier résultat
 venu, pas le meilleur. C'est le travail des [TRaSH Guides](https://trash-guides.info/),
-et `arrsenal` ne les réimplémente pas — il installe **Recyclarr**, lui demande de générer
+et `plugarr` ne les réimplémente pas — il installe **Recyclarr**, lui demande de générer
 sa configuration à partir d'un template officiel, et n'y écrit que les deux lignes qu'il
 est seul à connaître : l'adresse et la clé API.
 
@@ -449,8 +449,8 @@ service. La liste vient du manifeste officiel, pas d'une copie embarquée ici : 
 Sonarr, 35 pour Radarr, dont plusieurs profils français.
 
 ```bash
-arrsenal templates                                            # les noms acceptés
-arrsenal install --recyclarr-radarr french-multi-vf-hd-bluray-web
+plugarr templates                                            # les noms acceptés
+plugarr install --recyclarr-radarr french-multi-vf-hd-bluray-web
 ```
 
 Un nom inconnu est refusé **avant** que quoi que ce soit ne soit écrit. Sans cette
@@ -468,7 +468,7 @@ Résultat mesuré sur une installation neuve, lu dans l'API de chaque instance :
 
 ## Ce que ce projet ne fait pas
 
-`arrsenal` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
+`plugarr` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
 contenu**, et n'en préconfigure aucun. Aucune liste n'est livrée avec le code : celle de
 l'assistant vient de Prowlarr. C'est un outil d'automatisation de médiathèque personnelle.
 Ce que vous y branchez, et sa légalité, vous regardent.
@@ -485,7 +485,7 @@ Flood et qui *(UI optionnelles)*
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 **Deux piles sur une machine.** Docker identifie une pile par son *nom*, jamais
-par son répertoire : deux installations qui partagent le nom `arrsenal`
+par son répertoire : deux installations qui partagent le nom `plugarr`
 partagent leurs conteneurs, et la seconde recrée ceux de la première. Passez
 `--project-name` (ou remplissez le champ correspondant dans l'assistant) pour en
 installer une seconde à côté. Le préflight avertit si le cas se présente.
@@ -495,7 +495,7 @@ installer une seconde à côté. Le préflight avertit si le cas se présente.
 Le détail vit dans [ROADMAP.md](ROADMAP.md), tenue à jour : ce qui marche, ce
 qui est en cours, ce qu'on ne fera pas et pourquoi. Résumé ci-dessous.
 
-**La console arrsenal** est le prochain gros morceau, et le seul qui ne soit pas
+**La console plugarr** est le prochain gros morceau, et le seul qui ne soit pas
 un service de plus au catalogue. Aujourd'hui l'assistant installe puis s'efface :
 la page d'accès est un fichier HTML mort, et tout ce qui vient après se fait à la
 main, service par service. Une console web, dans son propre conteneur, tiendrait
@@ -507,7 +507,7 @@ la stack dans la durée :
 | Démarrer, arrêter, redémarrer | Sans passer par Docker Desktop ni la ligne de commande. |
 | Mises à jour | Voir qu'une image plus récente existe, et l'appliquer. Le catalogue épingle des versions exactes : c'est justement ce qui rend la comparaison fiable. |
 | Mots de passe et clés API | Changer en un clic, et **re-câbler dans la foulée** — c'est là que tout se joue. Une clé changée à la main casse aujourd'hui six liaisons en silence. |
-| Ajouter un service | Installer et câbler un service absent de l'installation initiale, sans tout reprendre. `arrsenal wire` sait déjà le faire ; il lui manque une interface. |
+| Ajouter un service | Installer et câbler un service absent de l'installation initiale, sans tout reprendre. `plugarr wire` sait déjà le faire ; il lui manque une interface. |
 
 Deux questions à trancher avant d'écrire quoi que ce soit : le conteneur doit
 piloter Docker, donc accéder au socket Docker — ce qui revient à donner les
@@ -523,7 +523,7 @@ Côté services, dans l'ordre où ils seront étudiés :
 | **Notifiarr** | Notifications centralisées pour toute la stack. Chaque *arr s'y déclare par une clé API. |
 | **Bazarr** | Sous-titres. Étudié, mais sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
 | **SABnzbd** | Client Usenet, à côté des deux clients torrent. |
-| **DroppedNeedle** | Musique. Anciennement *MusicSeerr*, renommé, et le nom de code compte : il **remplace Lidarr** plutôt que de le compléter — moteur de bibliothèque et de téléchargement intégré, catalogue MusicBrainz. Un seul conteneur, `PUID`/`PGID`/`UMASK` et un montage `/data` à parent commun : exactement les conventions d'arrsenal. Deux points à vérifier : il télécharge par **slskd** (Soulseek) ou SABnzbd, aucun des deux n'étant au catalogue, et son premier compte administrateur se crée par l'interface web, sans variable d'environnement pour le pré-semer. |
+| **DroppedNeedle** | Musique. Anciennement *MusicSeerr*, renommé, et le nom de code compte : il **remplace Lidarr** plutôt que de le compléter — moteur de bibliothèque et de téléchargement intégré, catalogue MusicBrainz. Un seul conteneur, `PUID`/`PGID`/`UMASK` et un montage `/data` à parent commun : exactement les conventions de plugarr. Deux points à vérifier : il télécharge par **slskd** (Soulseek) ou SABnzbd, aucun des deux n'étant au catalogue, et son premier compte administrateur se crée par l'interface web, sans variable d'environnement pour le pré-semer. |
 | **Wizarr** | Invitations et gestion des comptes pour Jellyfin, Plex et Emby. Le service le plus autonome de cette liste : un conteneur, et le câblage se réduit au serveur média et à sa clé. |
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut donc pas précéder Plex, qui figure déjà plus haut : sans jeton Plex, il n'a rien à observer. |
 | **Jellystat** | Statistiques Jellyfin. Obstacle connu : le service exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue actuel tient en un seul. `JS_USER` / `JS_PASSWORD` laissent en revanche espérer un pré-semis des identifiants. |
@@ -551,7 +551,7 @@ document le plus utile du dépôt.
 
 Le reste est dans [CONTRIBUTING.md](CONTRIBUTING.md) : mise en place, découpage du code,
 comment ajouter un service. Et [docs/PRIOR-ART.md](docs/PRIOR-ART.md) explique où
-`arrsenal` se situe par rapport à DockSTARTer, Saltbox et Recyclarr, et pourquoi il ne
+`plugarr` se situe par rapport à DockSTARTer, Saltbox et Recyclarr, et pourquoi il ne
 cherche pas à les remplacer.
 
 ## Remerciements

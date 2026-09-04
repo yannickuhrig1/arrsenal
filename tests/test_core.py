@@ -8,10 +8,10 @@ from xml.etree import ElementTree as ET
 import pytest
 import yaml
 
-from arrsenal import catalog, compose, seed
-from arrsenal.clients.arr import ArrClient
-from arrsenal.layout import hardlink_supported
-from arrsenal.models import PlatformProfile, ServiceInstance, StackConfig
+from plugarr import catalog, compose, seed
+from plugarr.clients.arr import ArrClient
+from plugarr.layout import hardlink_supported
+from plugarr.models import PlatformProfile, ServiceInstance, StackConfig
 
 
 def make_cfg(tmp_path, services=("prowlarr", "sonarr", "radarr", "transmission", "jellyfin")):
@@ -26,7 +26,7 @@ def make_cfg(tmp_path, services=("prowlarr", "sonarr", "radarr", "transmission",
             spec_id=sid,
             host_port=spec.default_host_port,
             api_key=seed.generate_api_key() if spec.api_family == "arr" else None,
-            username="arrsenal",
+            username="plugarr",
             password="pw",
         )
     return cfg
@@ -188,8 +188,8 @@ def test_hardlink_probe_actually_runs(tmp_path):
     ok, detail = hardlink_supported(tmp_path)
     assert isinstance(ok, bool) and detail
     # Aucun fichier temporaire ne doit survivre au test.
-    assert not list((tmp_path / "torrents").glob(".arrsenal-*"))
-    assert not list((tmp_path / "media").glob(".arrsenal-*"))
+    assert not list((tmp_path / "torrents").glob(".plugarr-*"))
+    assert not list((tmp_path / "media").glob(".plugarr-*"))
 
 
 # ------------------------------------------------------------------ validation
@@ -206,7 +206,7 @@ def test_bad_umask_is_rejected_with_a_readable_message(tmp_path):
 def test_unraid_uses_the_platform_constant_not_detection():
     """Unraid fait tourner ses conteneurs en nobody:users a l'echelle de la
     plateforme : detecter l'utilisateur courant y serait faux."""
-    from arrsenal.layout import PROFILE_DEFAULTS, resolve_ids
+    from plugarr.layout import PROFILE_DEFAULTS, resolve_ids
 
     uid, gid, source, certain = resolve_ids(PlatformProfile.UNRAID)
     assert (uid, gid) == (99, 100)
@@ -218,7 +218,7 @@ def test_unraid_uses_the_platform_constant_not_detection():
 def test_synology_detects_because_dsm_uids_vary():
     """Sur DSM l'UID depend de l'ordre de creation des utilisateurs : une
     constante serait fausse par conception."""
-    from arrsenal.layout import PROFILE_DEFAULTS
+    from plugarr.layout import PROFILE_DEFAULTS
 
     assert PROFILE_DEFAULTS[PlatformProfile.SYNOLOGY].prefer_detection
 
@@ -227,7 +227,7 @@ def test_detection_returns_none_rather_than_inventing_a_value(monkeypatch):
     """Renvoyer 1000:1000 en silence empecherait d'avertir l'utilisateur."""
     import os as _os
 
-    from arrsenal.layout import detect_ids
+    from plugarr.layout import detect_ids
 
     monkeypatch.delattr(_os, "getuid", raising=False)
     monkeypatch.delattr(_os, "getgid", raising=False)
@@ -237,7 +237,7 @@ def test_detection_returns_none_rather_than_inventing_a_value(monkeypatch):
 def test_undetectable_ids_are_flagged_as_uncertain(monkeypatch):
     import os as _os
 
-    from arrsenal.layout import resolve_ids
+    from plugarr.layout import resolve_ids
 
     monkeypatch.delattr(_os, "getuid", raising=False)
     monkeypatch.delattr(_os, "getgid", raising=False)
@@ -247,7 +247,7 @@ def test_undetectable_ids_are_flagged_as_uncertain(monkeypatch):
 
 
 def test_config_records_where_the_ids_came_from(tmp_path):
-    from arrsenal import orchestrator
+    from plugarr import orchestrator
 
     cfg = orchestrator.build_config(services=["sonarr"], data_root=str(tmp_path))
     assert cfg.ids_source and cfg.ids_source != "non renseigne"
@@ -260,10 +260,10 @@ def test_container_names_are_prefixed_by_the_project(tmp_path):
     """Beaucoup de NAS font deja tourner un conteneur nomme `sonarr`. Sans
     prefixe, `docker compose up` entre en collision avec la production."""
     cfg = make_cfg(tmp_path)
-    cfg.project_name = "arrsenal"
+    cfg.project_name = "plugarr"
     names = {b["container_name"] for b in compose.build_compose(cfg)["services"].values()}
     assert "sonarr" not in names
-    assert "arrsenal-sonarr" in names
+    assert "plugarr-sonarr" in names
 
 
 def test_two_stacks_can_coexist(tmp_path):
@@ -277,7 +277,7 @@ def test_two_stacks_can_coexist(tmp_path):
 def test_wiring_targets_service_names_not_container_names(tmp_path):
     """Verifie contre Docker Compose v5.3 : le nom de SERVICE resout meme quand
     container_name differe. Le cablage doit donc viser le service."""
-    from arrsenal.wiring import Wirer
+    from plugarr.wiring import Wirer
 
     cfg = make_cfg(tmp_path)
     cfg.project_name = "prefixe-quelconque"
@@ -293,12 +293,12 @@ def test_compose_service_keys_stay_bare(tmp_path):
 
 
 def test_running_as_root_is_flagged(monkeypatch):
-    """Constate sur Linux natif : `sudo arrsenal install` detecte 0:0 et faisait
+    """Constate sur Linux natif : `sudo plugarr install` detecte 0:0 et faisait
     tourner toute la stack en root sans le dire. Les medias telecharges
     appartiennent alors a root et l'utilisateur ne peut plus y toucher."""
     import os as _os
 
-    from arrsenal.layout import resolve_ids
+    from plugarr.layout import resolve_ids
 
     monkeypatch.setattr(_os, "getuid", lambda: 0, raising=False)
     monkeypatch.setattr(_os, "getgid", lambda: 0, raising=False)
@@ -311,7 +311,7 @@ def test_running_as_root_is_flagged(monkeypatch):
 def test_a_normal_user_is_not_flagged(monkeypatch):
     import os as _os
 
-    from arrsenal.layout import resolve_ids
+    from plugarr.layout import resolve_ids
 
     monkeypatch.setattr(_os, "getuid", lambda: 1000, raising=False)
     monkeypatch.setattr(_os, "getgid", lambda: 1000, raising=False)
@@ -408,7 +408,7 @@ def test_qui_gets_no_puid_pgid(tmp_path):
 
 
 def test_autobrr_step_appears_only_when_selected(tmp_path):
-    from arrsenal.wiring import Wirer
+    from plugarr.wiring import Wirer
 
     without = {s.name for s in Wirer(make_cfg(tmp_path, services=("sonarr",))).build_plan()}
     with_it = {
@@ -422,7 +422,7 @@ def test_autobrr_step_appears_only_when_selected(tmp_path):
 
 
 def _vpn(cfg, **kw):
-    from arrsenal.models import VpnConfig
+    from plugarr.models import VpnConfig
 
     defaults = {"enabled": True, "provider": "nordvpn", "wireguard_private_key": "cle="}
     cfg.vpn = VpnConfig(**{**defaults, **kw})
@@ -473,7 +473,7 @@ def test_an_incomplete_vpn_refuses_to_generate(tmp_path):
 
 
 def test_wireguard_and_openvpn_do_not_need_the_same_fields():
-    from arrsenal.models import VpnConfig
+    from plugarr.models import VpnConfig
 
     wg = VpnConfig(enabled=True, provider="mullvad", vpn_type="wireguard")
     assert "WireGuard" in wg.missing()[0]
@@ -487,7 +487,7 @@ def test_wireguard_and_openvpn_do_not_need_the_same_fields():
 
 
 def test_an_unknown_provider_is_refused_with_the_list():
-    from arrsenal.models import VpnConfig
+    from plugarr.models import VpnConfig
 
     with pytest.raises(ValueError, match="nordvpn"):
         VpnConfig(provider="fournisseur-invente")
@@ -496,7 +496,7 @@ def test_an_unknown_provider_is_refused_with_the_list():
 def test_the_provider_list_comes_from_gluetun():
     """Obtenue de Gluetun v3.41.3 en lui passant un nom invalide : il repond avec
     l'enumeration exacte."""
-    from arrsenal.models import VPN_PROVIDERS
+    from plugarr.models import VPN_PROVIDERS
 
     for expected in ("nordvpn", "mullvad", "protonvpn", "surfshark", "custom"):
         assert expected in VPN_PROVIDERS
@@ -505,7 +505,7 @@ def test_the_provider_list_comes_from_gluetun():
 def test_a_vpn_bound_client_is_reached_through_gluetun(tmp_path):
     """Sous network_mode: service:X, le conteneur perd son alias DNS. Verifie
     contre Docker : seul le nom du conteneur VPN resout."""
-    from arrsenal.wiring import Wirer
+    from plugarr.wiring import Wirer
 
     cfg = _vpn(make_cfg(tmp_path, services=("sonarr", "qbittorrent")))
     wirer = Wirer(cfg)

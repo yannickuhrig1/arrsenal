@@ -30,7 +30,7 @@ dites-le dans la pull request. Une lacune signalée vaut mieux qu'une invention.
 
 ```bash
 git clone <votre-fork>
-cd arrsenal
+cd plugarr
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
@@ -126,7 +126,7 @@ hexadécimale, et un masquage par motif le laisse passer.
 
 ## Indexeurs et contenu
 
-`arrsenal` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
+`plugarr` ne fournit, n'héberge et ne recommande **aucun indexeur, aucun tracker, aucun
 contenu**. La liste que voit l'utilisateur vient de son propre Prowlarr.
 
 Les pull requests qui ajouteraient une liste d'indexeurs, un tracker préconfiguré ou une

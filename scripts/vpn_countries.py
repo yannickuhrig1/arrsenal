@@ -2,7 +2,7 @@
 
     python scripts/vpn_countries.py
 
-Ecrit `src/arrsenal/data/vpn_countries.json`, embarque dans le paquet.
+Ecrit `src/plugarr/data/vpn_countries.json`, embarque dans le paquet.
 
 Tous les fournisseurs ne se filtrent PAS par pays, et c'est le piege. Cinq
 d'entre eux n'exposent aucun pays dans les donnees de Gluetun : Windscribe,
@@ -36,10 +36,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from arrsenal.compose import GLUETUN_TAG
-from arrsenal.models import VPN_PROVIDERS
+from plugarr.compose import GLUETUN_TAG
+from plugarr.models import VPN_PROVIDERS
 
-SORTIE = ROOT / "src" / "arrsenal" / "data" / "vpn_countries.json"
+SORTIE = ROOT / "src" / "plugarr" / "data" / "vpn_countries.json"
 
 #: Fournisseurs sans liste de serveurs embarquee.
 #: - `custom` : l'utilisateur fournit sa propre configuration, Gluetun ne connait

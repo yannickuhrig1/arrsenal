@@ -21,7 +21,7 @@ privees sans accord. Le mepris affiche envers les debutants.
 
 ## Sur les indexeurs et le contenu
 
-`arrsenal` ne fournit, n'heberge et ne recommande aucun indexeur, aucun tracker, aucun
+`plugarr` ne fournit, n'heberge et ne recommande aucun indexeur, aucun tracker, aucun
 contenu. **Ce n'est pas un lieu ou en demander, en partager ou en recommander.** Les
 messages qui le font seront fermes, sans debat. Ce n'est pas de la pudeur : c'est ce qui
 protege le projet et ses utilisateurs. Voir [DISCLAIMER.md](DISCLAIMER.md).

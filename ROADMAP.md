@@ -1,6 +1,6 @@
 # Feuille de route
 
-Où en est arrsenal, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
+Où en est plugarr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
 **Dernière mise à jour : 3 septembre 2026** — version publiée : **0.1.12**
@@ -38,10 +38,10 @@ d'application qui les pilote : elles rangent les téléchargements manuels, et
 attendent Audiobookshelf, Shelfarr et les autres.
 
 Le **lecteur RSS de qBittorrent** est activé, téléchargement automatique
-compris. arrsenal n'ajoute ni flux ni règle : ils dépendent de vos traqueurs,
+compris. plugarr n'ajoute ni flux ni règle : ils dépendent de vos traqueurs,
 exactement comme les indexeurs.
 
-La page d'administration (`arrsenal serve`) donne l'état des services, les
+La page d'administration (`plugarr serve`) donne l'état des services, les
 démarre, les arrête, les redémarre, signale les mises à jour et les applique,
 affiche les identifiants, **renouvelle un mot de passe ou une clé API en
 recâblant tout ce qui en dépend**, et **installe un service absent de
@@ -51,9 +51,9 @@ l'installation initiale**.
 
 ## Prochaine étape
 
-**Mise à jour du pack.** Aujourd'hui arrsenal sait dire qu'une image a une
+**Mise à jour du pack.** Aujourd'hui plugarr sait dire qu'une image a une
 version plus récente et l'appliquer. Il ne sait pas mettre à jour **sa propre
-installation** quand c'est arrsenal qui change.
+installation** quand c'est plugarr qui change.
 
 Le trou est concret et vérifiable : `stack.yml` porte un champ `version: 1`, et
 **rien ne le lit** — aucune occurrence dans le code. Cette semaine seule, quatre
@@ -69,7 +69,7 @@ sens, une installation faite en 0.1.7 se relira sans erreur et sera fausse.
 | Rejouer les étapes de câblage qui ont changé depuis la version installée | à faire |
 
 **Pas de fichier de secrets chiffré**, et la raison est mécanique plutôt que
-philosophique : c'est **Docker Compose** qui lit le `.env`, pas arrsenal.
+philosophique : c'est **Docker Compose** qui lit le `.env`, pas plugarr.
 `POSTGRES_PASSWORD`, `SILO_SECRET_KEY` et les identifiants VPN doivent être en
 clair sur le disque au moment du `up`, sinon la stack ne démarre pas. Chiffrer
 `stack.yml` pendant que `.env` est en clair à côté serait décoratif. Un vrai
@@ -87,7 +87,7 @@ supprime le démarrage automatique livré en 0.1.9. Ce qui protège aujourd'hui 
 | **Rotation des clés API** | ✅ livré en 0.1.8 | Sur les *arr. Piège vérifié contre Sonarr 4.0.19 : `PUT config/host` répond **202 Accepted** et ne change rien — la clé relue vaut toujours l'ancienne une minute plus tard. Seule la réécriture de `config.xml` suivie d'un redémarrage fonctionne. |
 | **Ajouter un service après coup** | ✅ livré en 0.1.8 | Section « Ajouter un service » sur la page d'administration. Vérifié en vrai : stack Sonarr seul, puis ajout de Prowlarr — 4 liaisons câblées, clé et mot de passe de Sonarr intacts. |
 | **Silo** | ✅ livré en 0.1.11 | Serveur média compatible API Jellyfin, **marqué expérimental**. Trois conteneurs — `pgvector/pgvector:pg18`, `redis:alpine` et `silo-server`, épinglés au digest ; Meilisearch est optionnel et n'est pas installé. Compte, **profil** et trois bibliothèques posés et relus. Deux pièges mesurés, pas supposés : sa base doit vivre dans un **volume Docker** (montage vers l'hôte : migrations en **2935 s** contre **5 s**), et son mot de passe de base doit être alphanumérique — un `?` dans une `postgres://` et le conteneur redémarre en boucle. |
-| **Langue des interfaces** | ✅ livré en 0.1.11 | Demandée une fois dans l'assistant, appliquée partout. Chaque application exprime la même idée autrement : Sonarr et Radarr veulent un entier, **Prowlarr veut le code** (`fr`), Jellyfin une culture et un pays, Silo un code **par bibliothèque**. La table des 29 langues des *arr n'est publiée nulle part : relevée valeur par valeur contre un Sonarr 4.0.19. Au passage, une incohérence corrigée — arrsenal imposait le français à Jellyfin, en dur, et laissait tout le reste en anglais. |
+| **Langue des interfaces** | ✅ livré en 0.1.11 | Demandée une fois dans l'assistant, appliquée partout. Chaque application exprime la même idée autrement : Sonarr et Radarr veulent un entier, **Prowlarr veut le code** (`fr`), Jellyfin une culture et un pays, Silo un code **par bibliothèque**. La table des 29 langues des *arr n'est publiée nulle part : relevée valeur par valeur contre un Sonarr 4.0.19. Au passage, une incohérence corrigée — plugarr imposait le français à Jellyfin, en dur, et laissait tout le reste en anglais. |
 | **Liste des pays du VPN** | ✅ livré en 0.1.8 | Liste cliquable, extraite de l'image **épinglée**. Piège trouvé au passage : cinq fournisseurs n'exposent aucun pays — quatre classent par région, un par ville. `SERVER_COUNTRIES` ne filtrait rien chez eux. |
 
 ---
@@ -117,10 +117,10 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 
 ---
 
-## La console arrsenal
+## La console plugarr
 
 Le seul chantier qui ne soit pas un service de plus. Aujourd'hui l'assistant
-installe puis s'efface ; `arrsenal serve` comble une partie du manque, mais
+installe puis s'efface ; `plugarr serve` comble une partie du manque, mais
 reste une commande à lancer.
 
 | | État |
@@ -144,9 +144,9 @@ rien. L'y enfermer reviendrait donc à exposer sur le réseau un service aux
 pleins pouvoirs, sans rien gagner.
 
 Elle tourne donc sur l'hôte, sous le compte de l'utilisateur, sur `127.0.0.1`,
-et démarre toute seule avec `arrsenal autostart`. Le confort recherché est le
+et démarre toute seule avec `plugarr autostart`. Le confort recherché est le
 même. Et parce qu'une console qui change des mots de passe doit s'authentifier
-sérieusement, `arrsenal admin-password` pose un mot de passe : empreinte seule
+sérieusement, `plugarr admin-password` pose un mot de passe : empreinte seule
 dans `stack.yml`, sessions expirables, tentatives limitées.
 
 ---
@@ -161,7 +161,7 @@ templates racine sont autonomes et ne se composent pas ; la seule voie serait de
 fusionner leur YAML nous-mêmes, exactement ce que le projet refuse — tout
 l'intérêt est que le contenu vienne des TRaSH Guides et pas de nous.
 
-arrsenal détecte désormais cette situation et n'en garde qu'un, en renommant les
+plugarr détecte désormais cette situation et n'en garde qu'un, en renommant les
 autres plutôt qu'en les effaçant.
 
 ---
@@ -171,16 +171,16 @@ autres plutôt qu'en les effaçant.
 | Version | |
 |---|---|
 | **0.1.12** | **Une bibliothèque ajoutée au catalogue n'atteignait pas les installations existantes.** `install` crée l'arborescence, `wire` non — et Sonarr refuse net un dossier racine absent : « Path '/data/media/anime' does not exist ». Trouvé en réparant une pile réelle juste après l'ajout de l'anime. `wire` garantit désormais les dossiers avant de câbler ; l'opération est idempotente et silencieuse sur une installation à jour. |
-| **0.1.12** | **`arrsenal wire` n'attendait pas que les services soient prêts, et répondait par une trace Python.** Un Sonarr neuf passe une minute ou plus dans ses migrations : son port est publié mais rien n'écoute derrière, et le câblage tombait sur « Server disconnected without sending a response » — un message qui envoie chercher une panne réseau là où il n'y a qu'une attente. Quand l'attente expirait, la commande finissait sur « Failed to execute script 'launcher' ». `install` traitait déjà les deux cas ; `wire`, qui est la commande qu'on lance justement pour réparer un câblage incomplet, non. |
+| **0.1.12** | **`plugarr wire` n'attendait pas que les services soient prêts, et répondait par une trace Python.** Un Sonarr neuf passe une minute ou plus dans ses migrations : son port est publié mais rien n'écoute derrière, et le câblage tombait sur « Server disconnected without sending a response » — un message qui envoie chercher une panne réseau là où il n'y a qu'une attente. Quand l'attente expirait, la commande finissait sur « Failed to execute script 'launcher' ». `install` traitait déjà les deux cas ; `wire`, qui est la commande qu'on lance justement pour réparer un câblage incomplet, non. |
 | **0.1.12** | **Flood ne pouvait pas joindre son client de téléchargement sous VPN.** Même cause que Prowlarr : Flood n'est pas dans le tunnel, le client y est et perd son alias DNS. Son mot de passe quitte au passage `docker-compose.yml`, où il était en clair — dernier secret à y rester après la clé WireGuard. |
 | **0.1.12** | **Un tunnel qui ressort chez vous est maintenant détecté.** Les deux premiers contrôles le déclaraient bon — le conteneur *est* dans le tunnel. Trouvé sur le banc d'essai : un serveur WireGuard local qui traduisait les adresses vers la sortie du domicile passait au vert. L'adresse du tunnel est donc comparée à celle de la machine. Aucune des deux n'est journalisée. |
-| **0.1.12** | **arrsenal vérifie désormais que le trafic torrent sort par le tunnel.** Il écrivait `network_mode: service:gluetun` et considérait l'affaire close ; or ce réglage se perd, et rien ne l'aurait signalé. Deux contrôles dans `doctor` et sur le bouton diagnostic : la structure du conteneur, puis la sortie réelle, demandée au serveur de contrôle de Gluetun **depuis l'intérieur du client**. Ce test ne peut pas réussir par accident — seul un conteneur partageant la pile réseau de Gluetun voit ce `127.0.0.1`, vérifié dans les deux sens. Aucun service extérieur n'est contacté, et l'adresse IP n'est jamais journalisée. |
+| **0.1.12** | **plugarr vérifie désormais que le trafic torrent sort par le tunnel.** Il écrivait `network_mode: service:gluetun` et considérait l'affaire close ; or ce réglage se perd, et rien ne l'aurait signalé. Deux contrôles dans `doctor` et sur le bouton diagnostic : la structure du conteneur, puis la sortie réelle, demandée au serveur de contrôle de Gluetun **depuis l'intérieur du client**. Ce test ne peut pas réussir par accident — seul un conteneur partageant la pile réseau de Gluetun voit ce `127.0.0.1`, vérifié dans les deux sens. Aucun service extérieur n'est contacté, et l'adresse IP n'est jamais journalisée. |
 | **0.1.12** | **Prowlarr ne pouvait pas joindre les clients de téléchargement quand le VPN était actif.** Un client torrent sous VPN passe en `network_mode: service:gluetun` et perd son nom sur le réseau : c'est `gluetun` qu'il faut viser. `step_download_client` le savait, `step_prowlarr_download_client` posait le nom du service en dur. Sonarr, Radarr et Lidarr se câblaient très bien sur les mêmes clients au même instant, ce qui rendait la panne illisible. **Troisième divergence** entre ces deux étapes après le mot de passe et la clé : elles lisent désormais la même fonction. |
 | **0.1.11** | **La console d'administration n'avait plus aucun JavaScript depuis la 0.1.8.** Le message de confirmation de « ajouter un service » contenait une chaine ouverte sur deux lignes et trois apostrophes francaises non echappees — du JavaScript invalide, qui emportait le script entier. Demarrer, arreter, redemarrer, faire tourner une cle, appliquer une mise a jour : rien ne repondait. Le HTML etait pourtant parfaitement bien forme, et tous les tests Python passaient. Trouve en ouvrant la page dans un vrai navigateur ; un test verifie desormais que chaque bloc `<script>` a ses apostrophes appariees. |
 | **0.1.11** | **Diagnostic et recherche de mises a jour depuis la console.** Deux boutons, demandes a l'usage. La verification des mises a jour tournait deja toutes les quinze minutes, mais en silence : impossible de la declencher ni de savoir quand elle avait eu lieu. Le diagnostic, lui, n'existait qu'en ligne de commande. |
-| **0.1.11** | **Une seconde installation ecrasait la premiere.** Docker identifie une pile par son nom, jamais par son repertoire, et ce nom etait fige a `arrsenal` : installer une pile d'essai a cote d'une pile en service recreait les six conteneurs de celle-ci en les pointant ailleurs. Le preflight rassurait meme — « port occupe par votre propre pile arrsenal » — ce qui etait vrai du nom et faux de l'installation. `--project-name` existe maintenant, l'assistant le demande, et le preflight avertit. |
+| **0.1.11** | **Une seconde installation ecrasait la premiere.** Docker identifie une pile par son nom, jamais par son repertoire, et ce nom etait fige a `plugarr` : installer une pile d'essai a cote d'une pile en service recreait les six conteneurs de celle-ci en les pointant ailleurs. Le preflight rassurait meme — « port occupe par votre propre pile plugarr » — ce qui etait vrai du nom et faux de l'installation. `--project-name` existe maintenant, l'assistant le demande, et le preflight avertit. |
 | **0.1.11** | **Le volume de la base de Silo survivait a une reinstallation.** PostgreSQL n'applique `POSTGRES_PASSWORD` qu'a la creation de sa base ; sur un volume deja rempli il l'ignore en silence. Reinstaller generait un nouveau mot de passe, le volume gardait l'ancien, et Silo redemarrait en boucle sur « password authentication failed ». La verification ne regardait que le disque. |
-| **0.1.11** | **arrsenal promettait un `.gitignore` qu'il n'ecrivait pas.** Le rapport et la page d'acces annoncaient que les identifiants etaient « deja dans .gitignore » ; aucun fichier n'etait depose. Il l'est desormais. |
+| **0.1.11** | **plugarr promettait un `.gitignore` qu'il n'ecrivait pas.** Le rapport et la page d'acces annoncaient que les identifiants etaient « deja dans .gitignore » ; aucun fichier n'etait depose. Il l'est desormais. |
 | **0.1.11** | **La cle privee WireGuard etait ecrite en clair dans `docker-compose.yml`**, seul secret a echapper au `.env` protege. Elle passe par le `.env` comme les autres. |
 | **0.1.11** | **Le conseil de fin citait Prowlarr meme absent.** « Ajoutez vos indexeurs dans Prowlarr, ils descendront vers Sonarr et Radarr » s'affichait apres une installation de Silo seul, ou aucune des trois applications n'existait. Il depend maintenant de ce qui est installe. |
 | **0.1.11** | La base de Silo passait par un montage vers le disque Windows : ses migrations de premier démarrage prenaient **49 minutes** au lieu de 5 secondes, et l'installation abandonnait au bout de 300 s alors que PostgreSQL fonctionnait très bien. Un volume Docker règle les deux. Au passage, `config/silo-redis` restait vide à côté du `config/silo/redis` que Docker fabriquait lui-même. |
@@ -193,4 +193,4 @@ autres plutôt qu'en les effaçant.
 | **0.1.4** | Identifiant au choix, page d'administration accessible. |
 | **0.1.3** | Choix explicite sur une configuration existante, page d'accès ouverte automatiquement. |
 
-Le détail complet est dans les [notes de version](https://github.com/yannickuhrig1/arrsenal/releases).
+Le détail complet est dans les [notes de version](https://github.com/yannickuhrig1/plugarr/releases).

@@ -18,7 +18,7 @@ casse un test plutot que l'installation de quelqu'un.
 
 from __future__ import annotations
 
-from arrsenal import catalog, compose, layout, orchestrator
+from plugarr import catalog, compose, layout, orchestrator
 
 
 def _cfg(*services: str):
@@ -77,7 +77,7 @@ def test_une_desinstallation_totale_emporte_le_volume():
     la promesse serait fausse depuis qu'elle a quitte CONFIG_ROOT."""
     import inspect
 
-    from arrsenal import cli
+    from plugarr import cli
 
     source = inspect.getsource(cli.uninstall)
     assert "down(volumes=True)" in source

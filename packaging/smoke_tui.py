@@ -18,7 +18,7 @@ D'ou la regle : ce controle doit PARCOURIR l'assistant, pas seulement l'ouvrir.
 
 Les modules importes tardivement — `clients/silo.py` ne l'est qu'au fond d'une
 etape de cablage — ne se verifient PAS ici : cet executable est construit a
-part, et ce qu'il embarque ne dit rien de ce qu'embarque `arrsenal.exe`. Cette
+part, et ce qu'il embarque ne dit rien de ce qu'embarque `plugarr.exe`. Cette
 verification-la se fait sur le vrai binaire, dans le workflow.
 
 Sortie non nulle si l'assistant ne se rend pas correctement.
@@ -37,11 +37,11 @@ MIN_REGLES = 50
 async def probe() -> int:
     from textual.widgets import Button, RadioButton, Select, SelectionList
 
-    from arrsenal import catalog
-    from arrsenal.tui.app import ArrsenalApp
-    from arrsenal.tui.screens import PathsScreen, ServicesScreen, VpnScreen
+    from plugarr import catalog
+    from plugarr.tui.app import PlugArrApp
+    from plugarr.tui.screens import PathsScreen, ServicesScreen, VpnScreen
 
-    app = ArrsenalApp()
+    app = PlugArrApp()
     app.auto_open_page = False
     lieux = -1
     async with app.run_test(size=(100, 30)) as pilot:

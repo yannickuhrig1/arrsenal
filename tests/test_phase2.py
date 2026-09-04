@@ -7,11 +7,11 @@ import hashlib
 
 import pytest
 
-from arrsenal import catalog, seed
-from arrsenal.downloadclients import ARR_FIELD_PREFIX, ARR_ROUTING, profile_for
-from arrsenal.layout import CONTAINER_PATHS
-from arrsenal.models import ServiceInstance, StackConfig
-from arrsenal.wiring import ROOT_FOLDERS, SYNC_CATEGORIES, Wirer
+from plugarr import catalog, seed
+from plugarr.downloadclients import ARR_FIELD_PREFIX, ARR_ROUTING, profile_for
+from plugarr.layout import CONTAINER_PATHS
+from plugarr.models import ServiceInstance, StackConfig
+from plugarr.wiring import ROOT_FOLDERS, SYNC_CATEGORIES, Wirer
 
 
 def make_cfg(tmp_path, services):
@@ -22,7 +22,7 @@ def make_cfg(tmp_path, services):
             spec_id=sid,
             host_port=spec.default_host_port,
             api_key=seed.generate_api_key() if spec.api_family == "arr" else None,
-            username="arrsenal",
+            username="plugarr",
             password="pw",
         )
     return cfg
@@ -126,7 +126,7 @@ def test_seed_qbittorrent_writes_to_the_linuxserver_path(tmp_path):
 
 
 def test_seed_qbittorrent_realigne_les_identifiants(tmp_path):
-    """Le second passage impose le mot de passe qu'arrsenal va ANNONCER.
+    """Le second passage impose le mot de passe que plugarr va ANNONCER.
 
     Conserver l'ancien laissait une stack ou le rapport affichait un mot de passe
     que qBittorrent refusait : tout le cablage repondait « Forbidden ». Le reste

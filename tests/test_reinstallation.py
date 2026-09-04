@@ -5,7 +5,7 @@ donnait une stack ou RIEN ne fonctionnait, avec des messages incomprehensibles :
 « reponse illisible sur les categories », « HTTP 401 », « l'API d'autobrr a
 peut-etre change de forme ».
 
-La cause tenait en une phrase : arrsenal gardait les configurations existantes
+La cause tenait en une phrase : plugarr gardait les configurations existantes
 mais generait de nouveaux mots de passe, qu'il annoncait dans son rapport. Les
 services refusaient donc les identifiants affiches a l'utilisateur.
 """
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from arrsenal import orchestrator, seed
+from plugarr import orchestrator, seed
 
 
 def _conf_qbittorrent(chemin: Path, mot_de_passe: str, extra: str = "") -> Path:
@@ -50,7 +50,7 @@ def test_le_mot_de_passe_annonce_devient_le_vrai(tmp_path):
     fichier = _conf_qbittorrent(tmp_path, "AncienMotDePasse1!")
     assert _hash_correspond(fichier, "AncienMotDePasse1!")
 
-    _ecrit, message = seed.seed_qbittorrent(tmp_path, username="arrsenal", password="Nouveau2@")
+    _ecrit, message = seed.seed_qbittorrent(tmp_path, username="plugarr", password="Nouveau2@")
 
     assert "mis a jour" in message
     assert _hash_correspond(fichier, "Nouveau2@")
@@ -63,11 +63,11 @@ def test_les_autres_reglages_sont_preserves(tmp_path):
     marqueur = "Preferences\\Downloads\\SavePath=D:/a-moi\n"
     fichier = _conf_qbittorrent(tmp_path, "Ancien1!", extra=marqueur)
 
-    seed.seed_qbittorrent(tmp_path, username="arrsenal", password="Nouveau2@")
+    seed.seed_qbittorrent(tmp_path, username="plugarr", password="Nouveau2@")
     apres = fichier.read_text(encoding="utf-8")
 
     assert marqueur.strip() in apres
-    assert "WebUI\\Username=arrsenal" in apres
+    assert "WebUI\\Username=plugarr" in apres
 
 
 def test_un_fichier_sans_ligne_de_mot_de_passe_recoit_la_cle(tmp_path):
@@ -75,7 +75,7 @@ def test_un_fichier_sans_ligne_de_mot_de_passe_recoit_la_cle(tmp_path):
     dossier.mkdir(parents=True)
     (dossier / "qBittorrent.conf").write_text("[Preferences]\nAutre=1\n", encoding="utf-8")
 
-    seed.seed_qbittorrent(tmp_path, username="arrsenal", password="Nouveau2@")
+    seed.seed_qbittorrent(tmp_path, username="plugarr", password="Nouveau2@")
 
     assert _hash_correspond(dossier / "qBittorrent.conf", "Nouveau2@")
 
@@ -93,12 +93,12 @@ def test_les_identifiants_rpc_sont_mis_a_jour(tmp_path):
     )
 
     _ecrit, message = seed.seed_transmission(
-        tmp_path, rpc_username="arrsenal", rpc_password="Nouveau2@"
+        tmp_path, rpc_username="plugarr", rpc_password="Nouveau2@"
     )
     reglages = json.loads(fichier.read_text(encoding="utf-8"))
 
     assert "mis a jour" in message
-    assert reglages["rpc-username"] == "arrsenal"
+    assert reglages["rpc-username"] == "plugarr"
     assert reglages["rpc-password"] == "Nouveau2@"
     assert reglages["rpc-authentication-required"] is True
     # Le reste du fichier appartient a l'utilisateur.

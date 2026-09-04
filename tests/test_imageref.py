@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import imageref, updates
+from plugarr import imageref, updates
 
 SHA = "sha256:" + "a" * 64
 

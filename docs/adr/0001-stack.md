@@ -25,7 +25,7 @@ sur le systeme hote. Le binaire statique de Go est l'argument evident.
 
 Deux chemins, aucun n'installe Python sur l'hote :
 
-- `uvx arrsenal` pour ceux qui ont `uv`
+- `uvx plugarr` pour ceux qui ont `uv`
 - une image installeur qui pilote le Docker de l'hote via le socket monte.
   C'est le chemin documente par defaut pour Unraid et Synology.
 

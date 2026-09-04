@@ -1,6 +1,6 @@
 """Tests du choix de l'identifiant.
 
-Demande a l'usage : « pas tout le monde veut mettre arrsenal comme username ».
+Demande a l'usage : « pas tout le monde veut mettre plugarr comme username ».
 
 Ce nom traverse cinq applications differentes — un XML, un INI, un JSON, un
 formulaire de connexion et une ligne de commande de conteneur — et ne peut plus
@@ -13,9 +13,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from arrsenal import seed
-from arrsenal.models import StackConfig
-from arrsenal.orchestrator import build_config
+from plugarr import seed
+from plugarr.models import StackConfig
+from plugarr.orchestrator import build_config
 
 
 def _cfg(tmp_path, **kw):
@@ -27,10 +27,10 @@ def _cfg(tmp_path, **kw):
     )
 
 
-def test_le_defaut_reste_arrsenal(tmp_path):
+def test_le_defaut_reste_plugarr(tmp_path):
     cfg = _cfg(tmp_path)
-    assert cfg.username == "arrsenal"
-    assert all(inst.username == "arrsenal" for inst in cfg.services.values())
+    assert cfg.username == "plugarr"
+    assert all(inst.username == "plugarr" for inst in cfg.services.values())
 
 
 def test_le_choix_atteint_tous_les_services(tmp_path):
@@ -93,7 +93,7 @@ def test_l_identifiant_choisi_arrive_dans_qbittorrent(tmp_path):
 
 
 def test_l_identifiant_choisi_arrive_dans_le_env(tmp_path):
-    from arrsenal import compose
+    from plugarr import compose
 
     env = compose.render_env(_cfg(tmp_path, username="yannick"))
 
@@ -105,7 +105,7 @@ def test_il_survit_a_un_aller_retour_par_stack_yml(tmp_path):
     """`wire` relit stack.yml : un identifiant perdu la casserait le cablage."""
     import yaml
 
-    from arrsenal import compose
+    from plugarr import compose
 
     cfg = _cfg(tmp_path, username="yannick")
     compose.write_artifacts(cfg, tmp_path)

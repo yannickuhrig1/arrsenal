@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import updates
+from plugarr import updates
 
 
 @pytest.mark.parametrize(
@@ -101,8 +101,8 @@ def test_update_info_reports_both_kinds():
 def test_adopted_services_are_never_offered_an_update():
     """Ces conteneurs ne nous appartiennent pas : proposer de les recreer
     reviendrait a toucher a la stack de quelqu'un d'autre."""
-    from arrsenal import adopt
-    from arrsenal.discovery import Found
+    from plugarr import adopt
+    from plugarr.discovery import Found
 
     entry = Found(
         service_id="sonarr", container="mon-sonarr", image="lscr.io/linuxserver/sonarr:4.0.19",

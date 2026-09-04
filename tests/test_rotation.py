@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import catalog, orchestrator, seed
-from arrsenal.clients.autobrr import AutobrrClient
+from plugarr import catalog, orchestrator, seed
+from plugarr.clients.autobrr import AutobrrClient
 
 # ------------------------------------------------------------- garde-fous
 
@@ -185,7 +185,7 @@ def test_un_changement_d_adresse_est_aussi_repris():
 
 def test_le_bouton_n_apparait_que_sur_la_page_pilotee():
     """La page statique n'execute rien : un bouton mort y serait pire que rien."""
-    from arrsenal import dashboard
+    from plugarr import dashboard
 
     cfg = orchestrator.build_config(
         services=["sonarr", "qbittorrent"], config_root="/c", data_root="/d"
@@ -196,7 +196,7 @@ def test_le_bouton_n_apparait_que_sur_la_page_pilotee():
 
 
 def test_le_bouton_ne_s_affiche_que_pour_les_familles_traitees():
-    from arrsenal import dashboard
+    from plugarr import dashboard
 
     cfg = orchestrator.build_config(
         services=["jellyfin", "qbittorrent"], config_root="/c", data_root="/d"
@@ -270,11 +270,11 @@ def test_un_fichier_sans_cle_est_signale(tmp_path):
 
 
 def test_seuls_les_arr_ont_une_cle_renouvelable(cfg, tmp_path):
-    """Celle de Jellyfin est emise par Jellyfin, pas choisie par arrsenal."""
+    """Celle de Jellyfin est emise par Jellyfin, pas choisie par plugarr."""
     ok, message, secret = orchestrator.rotate_api_key(cfg, tmp_path, "jellyfin")
 
     assert ok is False
-    assert "n'a pas de cle API geree par arrsenal" in message
+    assert "n'a pas de cle API geree par plugarr" in message
     assert secret == ""
 
 
@@ -289,7 +289,7 @@ def test_un_config_xml_introuvable_arrete_tout(cfg, tmp_path):
 
 
 def test_le_bouton_de_cle_ne_vise_que_les_arr():
-    from arrsenal import dashboard
+    from plugarr import dashboard
 
     config = orchestrator.build_config(
         services=["sonarr", "qbittorrent", "jellyfin"], config_root="/c", data_root="/d"

@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Button, Input, Label, Static
 
-from arrsenal.clients.prowlarr import IndexerDefinition
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.indexers import IndexersScreen
-from arrsenal.tui.screens import ReportScreen
+from plugarr.clients.prowlarr import IndexerDefinition
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.indexers import IndexersScreen
+from plugarr.tui.screens import ReportScreen
 
 DEFINITION = IndexerDefinition(
     name="Exemple",
@@ -32,14 +32,14 @@ DEFINITION = IndexerDefinition(
 @pytest.fixture
 def screen_app(tmp_path, monkeypatch):
     monkeypatch.setattr(IndexersScreen, "load_definitions", lambda self: None)
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     app.selection = ["prowlarr"]
     app.stack_config = app.build_config()
     return app
 
 
 @pytest.mark.asyncio
-async def test_intro_states_that_arrsenal_provides_no_indexer(screen_app):
+async def test_intro_states_that_plugarr_provides_no_indexer(screen_app):
     """La position juridique du projet doit etre lisible a l'ecran, pas seulement
     dans le README."""
     async with screen_app.run_test() as pilot:

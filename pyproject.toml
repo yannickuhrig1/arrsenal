@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "arrsenal"
+name = "plugarr"
 dynamic = ["version"]
 description = "Deploie ET cable automatiquement une stack media *arr complete"
 readme = "README.md"
@@ -22,13 +22,13 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-httpx>=0.30", "ruff>=0.5"]
 
 [project.scripts]
-arrsenal = "arrsenal.cli:app"
+plugarr = "plugarr.cli:app"
 
 [tool.hatch.version]
-path = "src/arrsenal/__init__.py"
+path = "src/plugarr/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/arrsenal"]
+packages = ["src/plugarr"]
 # TOUT fichier non-Python dont le code a besoin a l'execution. Un oubli ici ne
 # se voit pas au developpement — le fichier est la, dans l'arborescence source —
 # mais fait planter le paquet installe. Voir tests/test_empaquetage.py.
@@ -44,7 +44,7 @@ ignore = ["B008"]
 
 [tool.ruff.lint.per-file-ignores]
 # BINDINGS est un attribut de classe mutable impose par Textual.
-"src/arrsenal/tui/*.py" = ["RUF012"]
+"src/plugarr/tui/*.py" = ["RUF012"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

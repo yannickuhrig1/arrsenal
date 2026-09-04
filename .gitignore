@@ -11,7 +11,7 @@ build/
 
 # Artefacts generes par l'outil - ne JAMAIS commiter
 .env
-acces-arrsenal.html
+acces-plugarr.html
 docker-compose.yml
 stack.local.yml
 /config/
@@ -21,9 +21,14 @@ stack.local.yml
 # Sous-produits de PyInstaller
 dist-*/
 build-*/
-/arrsenal.spec
+/plugarr.spec
 
-# Journal produit par arrsenal lui-meme, dans le repertoire ou il tourne.
+# Journal produit par plugarr lui-meme, dans le repertoire ou il tourne.
 # On le demande aux utilisateurs pour les rapports de bug : il ne doit jamais
 # entrer au depot, meme si les secrets y sont masques.
-arrsenal.log
+plugarr.log
+
+# Les PNG derives sont engendres par scripts/icone.py. Seuls le .ico et le
+# SVG source entrent au depot : le reste se refabrique.
+assets/plugarr-*.png
+assets/plugarr.png

@@ -25,9 +25,9 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import orchestrator
-from arrsenal.models import VpnConfig
-from arrsenal.wiring import Wirer
+from plugarr import orchestrator
+from plugarr.models import VpnConfig
+from plugarr.wiring import Wirer
 
 
 def _wirer(*, vpn: bool = False, adopte: bool = False):
@@ -81,7 +81,7 @@ def test_prowlarr_et_les_arr_visent_la_meme_adresse():
     """Le coeur de la panne. Deux etapes distinctes, une seule verite."""
     import inspect
 
-    from arrsenal.wiring import Wirer as W
+    from plugarr.wiring import Wirer as W
 
     for etape in (W.step_download_client, W.step_prowlarr_download_client):
         source = inspect.getsource(etape)

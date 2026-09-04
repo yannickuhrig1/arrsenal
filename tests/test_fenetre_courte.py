@@ -18,8 +18,8 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Input, RadioButton, Select
 
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.screens import PathsScreen, VpnScreen
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.screens import PathsScreen, VpnScreen
 
 #: Hauteurs plausibles. 24 lignes est le minimum historique d'un terminal ;
 #: la fenetre par defaut de Windows Terminal en fait 30.
@@ -27,7 +27,7 @@ HAUTEURS = [24, 30, 40]
 
 
 def _app(tmp_path):
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     app.auto_open_page = False
     return app
 

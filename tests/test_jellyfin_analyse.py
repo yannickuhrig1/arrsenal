@@ -23,7 +23,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from arrsenal.clients.jellyfin import JellyfinClient
+from plugarr.clients.jellyfin import JellyfinClient
 
 
 def client_simule(handler) -> JellyfinClient:

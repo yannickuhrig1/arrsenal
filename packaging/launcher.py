@@ -1,6 +1,6 @@
 """Point d'entree de l'executable Windows.
 
-`src/arrsenal/__main__.py` ne convient pas : il fait un import RELATIF
+`src/plugarr/__main__.py` ne convient pas : il fait un import RELATIF
 (`from .cli import app`), et PyInstaller execute son script d'entree comme un
 module de premier niveau, sans paquet parent. L'executable s'arretait donc sur
 `attempted relative import with no known parent package`.
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import multiprocessing
 
-from arrsenal.cli import app
+from plugarr.cli import app
 
 if __name__ == "__main__":
     # Obligatoire dans un executable gele : sans cela, tout processus enfant

@@ -13,8 +13,8 @@ import string
 
 import pytest
 
-from arrsenal import compose, seed
-from arrsenal.orchestrator import build_config
+from plugarr import compose, seed
+from plugarr.orchestrator import build_config
 
 
 def test_le_mot_de_passe_change_a_chaque_appel():
@@ -146,7 +146,7 @@ def test_le_config_xml_echappe_ce_qu_il_faut():
         api_key="a" * 32,
         port=8989,
         instance_name="Sonarr",
-        username="arrsenal",
+        username="plugarr",
         password="Aa1" + seed.PASSWORD_SPECIALS,
     )
     root = ET.fromstring(xml)

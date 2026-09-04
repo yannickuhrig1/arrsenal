@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import inspect
 
-from arrsenal.cli import install, wizard
+from plugarr.cli import install, wizard
 
 #: Options qui decident du LANCEMENT et non de la stack. Elles vivent sur la
 #: commande `wizard` elle-meme, pas dans un ecran : demander « voulez-vous une
@@ -58,7 +58,7 @@ def test_aucune_option_d_install_n_echappe_a_l_assistant():
 
 
 def test_les_options_de_lancement_sont_sur_la_commande_wizard():
-    """Sans elles, `arrsenal wizard` ecrivait toujours dans le repertoire courant
+    """Sans elles, `plugarr wizard` ecrivait toujours dans le repertoire courant
     et ouvrait toujours un navigateur."""
     assert LANCEMENT <= set(inspect.signature(wizard).parameters)
 

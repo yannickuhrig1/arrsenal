@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import orchestrator
-from arrsenal.layout import BIBLIOTHEQUES, CONTAINER_PATHS, DATA_SUBDIRS, create_tree
-from arrsenal.wiring import ROOT_FOLDERS
+from plugarr import orchestrator
+from plugarr.layout import BIBLIOTHEQUES, CONTAINER_PATHS, DATA_SUBDIRS, create_tree
+from plugarr.wiring import ROOT_FOLDERS
 
 
 def _cfg(*services):
@@ -65,7 +65,7 @@ def test_les_autres_applications_gardent_un_seul_dossier():
 
 
 def test_le_plan_pose_les_deux_dossiers_de_sonarr():
-    from arrsenal.wiring import Wirer
+    from plugarr.wiring import Wirer
 
     noms = [e.name for e in Wirer(_cfg("sonarr")).build_plan()]
 
@@ -104,7 +104,7 @@ def test_wire_cree_l_arborescence_avant_de_cabler():
     """
     import inspect
 
-    from arrsenal import cli
+    from plugarr import cli
 
     source = inspect.getsource(cli.wire)
     assert "create_tree" in source, "wire cable sans garantir les dossiers"

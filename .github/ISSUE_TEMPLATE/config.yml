@@ -5,4 +5,4 @@ contact_links:
     about: Le wiki Servarr couvre le fonctionnement de Sonarr, Radarr et Prowlarr.
   - name: Profils de qualite et custom formats
     url: https://trash-guides.info/
-    about: Les TRaSH Guides sont la reference. arrsenal vise a les appliquer, pas a les remplacer.
+    about: Les TRaSH Guides sont la reference. plugarr vise a les appliquer, pas a les remplacer.

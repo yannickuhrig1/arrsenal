@@ -1,7 +1,7 @@
 # Compatibilité
 
 Tout ce qui figure ici a été **vérifié contre une instance réelle**, pas déduit de la
-documentation. Les tags d'image sont épinglés dans `src/arrsenal/catalog.py`.
+documentation. Les tags d'image sont épinglés dans `src/plugarr/catalog.py`.
 
 Dernière campagne de vérification : **2026-08-31**, Docker Engine 29.6.1,
 Docker Compose v5.3.0, Docker Desktop sous Windows 11 (backend WSL2).
@@ -59,7 +59,7 @@ HTTP 400 — propertyName: "TvCategory", errorMessage: "Cannot use Category and 
 déjà remplie** (`tv-sonarr` pour Sonarr, `radarr` pour Radarr). Il ne suffit pas
 d'omettre le champ, il faut le **vider explicitement**.
 
-`arrsenal` retient `Directory`, qui pointe vers un chemin explicite sous
+`plugarr` retient `Directory`, qui pointe vers un chemin explicite sous
 `/data/torrents` et garde les hardlinks possibles.
 
 ### La notification Jellyfin exige une clé API
@@ -70,7 +70,7 @@ L'implémentation `MediaBrowser` de Sonarr et Radarr refuse un `apiKey` vide :
 HTTP 400 — propertyName: "ApiKey", errorMessage: "'Api Key' must not be empty."
 ```
 
-`arrsenal` crée donc une clé Jellyfin via `POST /Auth/Keys?app=arrsenal` (répond `204`)
+`plugarr` crée donc une clé Jellyfin via `POST /Auth/Keys?app=plugarr` (répond `204`)
 pendant l'étape d'assistant, puis la relit par `GET /Auth/Keys`, et l'injecte dans les
 notifications. C'est ce qui impose l'ordre : Jellyfin avant les notifications.
 
@@ -207,11 +207,11 @@ Sources : [forums Unraid](https://forums.unraid.net/topic/117661-docker-user-pui
 
 Observation faite sur un Unraid réel faisant tourner 75 conteneurs, dont un
 `sonarr` sur le port 8989 avec `/mnt/user/appdata/sonarr` en configuration :
-**arrsenal codait `container_name` en dur**, donc il ne pouvait ni cohabiter avec une
+**plugarr codait `container_name` en dur**, donc il ne pouvait ni cohabiter avec une
 stack existante, ni être déployé deux fois sur la même machine.
 
 Les noms de conteneurs sont désormais préfixés par le nom de projet
-(`arrsenal-sonarr`). Vérifié contre Docker Compose v5.3 que cela ne casse rien :
+(`plugarr-sonarr`). Vérifié contre Docker Compose v5.3 que cela ne casse rien :
 
 ```
 depuis le service "sonarr" :
@@ -251,7 +251,7 @@ fonctionnent.
 
 ### Le bug que seul Linux pouvait révéler
 
-`sudo arrsenal install` détectait `0:0` et faisait tourner **toute la stack en root**,
+`sudo plugarr install` détectait `0:0` et faisait tourner **toute la stack en root**,
 en silence. Les médias téléchargés appartiennent alors à root, et l'utilisateur ne peut
 plus y toucher sans `sudo`.
 
@@ -343,7 +343,7 @@ Surtout : **`forceSave=true` ne saute pas la validation.** Vérifié sur deux ca
 | faux indexeur Torznab local renvoyant un résultat | enregistré |
 
 Il n'existe donc **aucun moyen d'enregistrer un indexeur hors ligne**. Ce n'est pas un
-choix d'arrsenal. La contrepartie est utile : la validation *est* le test, donc un ajout
+choix de plugarr. La contrepartie est utile : la validation *est* le test, donc un ajout
 réussi prouve que les identifiants fonctionnent.
 
 Vérification menée contre un **faux serveur Torznab local**, jamais contre un vrai
@@ -364,13 +364,13 @@ une **fusion des deux projets**, annoncée le 10 février 2026.
 Seerr couvre Jellyfin, Emby **et** Plex — les deux projets d'origine se partageaient
 ces cibles — et migre automatiquement les données au premier démarrage.
 
-Conséquence pour arrsenal : la feuille de route ne vise plus qu'un seul service de
+Conséquence pour plugarr : la feuille de route ne vise plus qu'un seul service de
 demandes utilisateurs. Prévoir la reprise d'une installation Jellyseerr ou Overseerr
 existante est inutile : Seerr le fait lui-même.
 
 ## Reprise d'une stack existante — vérifié le 2026-08-31
 
-Testé contre une stack **qu'arrsenal n'a pas créée** : quatre conteneurs aux noms
+Testé contre une stack **que plugarr n'a pas créée** : quatre conteneurs aux noms
 libres, répartis sur **deux réseaux Docker différents**, dont deux Sonarr.
 
 Résultat : `prowlarr → sonarr` établi et validé par le bouton Test, sur des conteneurs
@@ -380,12 +380,12 @@ Trois erreurs de conception que seul le test réel a révélées.
 
 ### Ne pas imposer son arborescence
 
-Le premier essai a échoué : `Path '/data/media/tv' does not exist`. arrsenal appliquait
+Le premier essai a échoué : `Path '/data/media/tv' does not exist`. plugarr appliquait
 sa propre arborescence à une stack qui a la sienne.
 
 **Adopter, c'est câbler des services entre eux, pas réorganiser les dossiers de
 quelqu'un.** Les dossiers racine existants sont désormais lus et respectés ; quand il
-n'y en a aucun, arrsenal le signale au lieu d'en inventer un. Même règle pour les
+n'y en a aucun, plugarr le signale au lieu d'en inventer un. Même règle pour les
 catégories qBittorrent : les écraser déplacerait des téléchargements en cours.
 
 ### `localhost` ne veut rien dire entre conteneurs
@@ -400,11 +400,11 @@ s'il n'y arrive pas plutôt que de câbler des URL mortes.
 
 ### Un nom de conteneur ne prouve rien
 
-`looks_like_arrsenal` reconnaissait ses propres conteneurs à leur nom
-(`<projet>-<service>`). Un test a montré que `mon-sonarr` correspondait : arrsenal
+`looks_like_plugarr` reconnaissait ses propres conteneurs à leur nom
+(`<projet>-<service>`). Un test a montré que `mon-sonarr` correspondait : plugarr
 **sautait en silence un conteneur qui ne lui appartenait pas**.
 
-Les services générés portent maintenant un libellé `arrsenal.managed=true`, et la
+Les services générés portent maintenant un libellé `plugarr.managed=true`, et la
 détection le lit au lieu de deviner.
 
 ### Ce qui reste hors de portée
@@ -472,7 +472,7 @@ hidemyass, ipvanish, ivpn, mullvad, nordvpn, perfect privacy, privado, private i
 access, privatevpn, protonvpn, purevpn, slickvpn, surfshark, torguard, vpnsecure, vpn
 unlimited, vyprvpn, windscribe, custom, pia`.
 
-C'est cette liste qui est dans `models.py`, et `arrsenal vpn-providers` l'affiche.
+C'est cette liste qui est dans `models.py`, et `plugarr vpn-providers` l'affiche.
 
 ### Les deux modes n'exigent pas les mêmes champs
 
@@ -508,7 +508,7 @@ Testé avec des identifiants volontairement faux :
 ```
 gluetun      running  Up 47 seconds (unhealthy)
 qbittorrent  created  Created
-dependency failed to start: container arrsenal-gluetun is unhealthy
+dependency failed to start: container plugarr-gluetun is unhealthy
 ```
 
 **Le client de téléchargement ne démarre pas tant que le tunnel n'est pas établi.** Ce
@@ -530,7 +530,7 @@ inutile.
 
 ### Le tag déployé devait sortir du code
 
-`arrsenal` épinglait ses tags dans `catalog.py`. Conséquence non voulue : **personne
+`plugarr` épinglait ses tags dans `catalog.py`. Conséquence non voulue : **personne
 n'aurait pu mettre Sonarr à jour sans attendre une nouvelle version de l'outil.**
 Le tag vit désormais dans `stack.yml` ; le catalogue ne fournit que la valeur initiale.
 
@@ -586,7 +586,7 @@ avec `WinError 10048`, et il ne reste qu'une écoute.
 ## Recyclarr 8.7.1 — vérifié le 2026-09-01
 
 Image `ghcr.io/recyclarr/recyclarr:8.7.1`. Recyclarr synchronise les profils de qualité
-et les *custom formats* des TRaSH Guides vers Sonarr et Radarr. `arrsenal` ne
+et les *custom formats* des TRaSH Guides vers Sonarr et Radarr. `plugarr` ne
 réimplémente rien : il demande à Recyclarr de générer sa configuration à partir d'un
 template **officiel**, puis n'y écrit que l'adresse et la clé API.
 
@@ -627,14 +627,14 @@ sonarr:
     api_key: Put your API key here
 ```
 
-Ce sont les deux seules lignes que `arrsenal` remplace. Tout le reste vient du guide et
+Ce sont les deux seules lignes que `plugarr` remplace. Tout le reste vient du guide et
 doit rester intact — c'est la garantie centrale du module.
 
 ### Deux défauts trouvés par les tests, pas par la lecture
 
 **`\s` matche aussi le retour à la ligne.** Le motif se terminait par `\s*$` : gourmand,
 il avalait les lignes vides qui suivaient le marqueur. Le fichier restait valide et la
-synchronisation réussissait, mais `arrsenal` reformatait au passage un fichier qu'il
+synchronisation réussissait, mais `plugarr` reformatait au passage un fichier qu'il
 s'était engagé à ne pas toucher. Les motifs sont désormais bornés à l'espace
 **horizontal**, `[^\S\n]`.
 
@@ -686,9 +686,9 @@ Vérifié de bout en bout avec un profil français : `french-multi-vf-hd-bluray-
 
 `config create` s'arrête sur `The file /config/configs/hd-bluray-web.yml already
 exists`. Le refus est légitime : le fichier a pu être modifié à la main. Mais
-`arrsenal wire` est documenté comme rejouable, et il échouait donc au second passage.
+`plugarr wire` est documenté comme rejouable, et il échouait donc au second passage.
 
-`arrsenal` ne demande désormais que les templates **absents**. `--force` existe, mais
+`plugarr` ne demande désormais que les templates **absents**. `--force` existe, mais
 l'employer détruirait les réglages de l'utilisateur à chaque câblage.
 
 Corollaire dans la lecture du résultat : un fichier déjà renseigné n'a plus de marqueur
@@ -704,7 +704,7 @@ foi.
 
 Un fichier laissé par une installation précédente — l'utilisateur avait Radarr, il l'a
 retiré — garde ses marqueurs et fait échouer `recyclarr sync` avec un message obscur.
-`arrsenal` le signale par son nom à la fin du câblage.
+`plugarr` le signale par son nom à la fin du câblage.
 
 ### Résultat, confirmé par Sonarr et Radarr eux-mêmes
 
@@ -761,7 +761,7 @@ Installation depuis GitHub dans un environnement neuf, comme le ferait un inconn
 est chargée. Sans cet artefact déclaré dans `pyproject.toml`, le wizard s'ouvrirait sans
 aucun style chez tous les utilisateurs.
 
-Le README indiquait `pipx install arrsenal`. Le paquet n'est pas sur PyPI (HTTP 404) :
+Le README indiquait `pipx install plugarr`. Le paquet n'est pas sur PyPI (HTTP 404) :
 la commande échouait pour tout le monde. Corrigé en `pipx install git+https://…`.
 
 ---
@@ -798,7 +798,7 @@ Les *arr n'ont pas ce problème : leur gabarit de client de téléchargement por
 
 Plus gênant, parce qu'invisible dans le rapport : `qui` était déployée avec un simple
 `depends_on: qbittorrent` et **aucune connexion**. L'utilisateur ouvrait une interface
-qui lui redemandait l'adresse et les identifiants qu'arrsenal venait de générer. Flood,
+qui lui redemandait l'adresse et les identifiants que plugarr venait de générer. Flood,
 lui, recevait bien son `--qburl` et ses identifiants au démarrage.
 
 Quatre relevés sur l'instance, aucun devinable :
@@ -817,7 +817,7 @@ Quatre relevés sur l'instance, aucun devinable :
   | URL complète | `http://qbittorrent:8080` | **true** | 200 |
 
 - **les doublons ne sont pas refusés.** Déclarer deux fois la même instance donne deux
-  entrées. Sans vérification préalable, chaque `arrsenal wire` en ajouterait une.
+  entrées. Sans vérification préalable, chaque `plugarr wire` en ajouterait une.
 
 `GET /api/instances` expose `connected` et `connectionStatus` : le lien est donc validé
 par qui elle-même, comme les *arr le sont par leur bouton *Test*.
@@ -871,7 +871,7 @@ jetable, configuration neuve :
 
 | | `Users` en base | `POST /login` |
 |---|---|---|
-| Sonarr, Radarr, Lidarr | `[('arrsenal', …)]` | 302 vers `/` |
+| Sonarr, Radarr, Lidarr | `[('plugarr', …)]` | 302 vers `/` |
 | Prowlarr | **`[]`** | 302 vers `/login?loginFailed=true` |
 
 Et sa page de connexion n'offre **aucune création de compte**. Avec
@@ -992,7 +992,7 @@ Python. PyInstaller 6.22.2, un seul fichier, mode console.
 
 ### Trois obstacles, aucun devinable
 
-**Le point d'entrée évident ne marche pas.** `src/arrsenal/__main__.py` fait un import
+**Le point d'entrée évident ne marche pas.** `src/plugarr/__main__.py` fait un import
 relatif (`from .cli import app`), et PyInstaller exécute son script d'entrée comme un
 module de premier niveau, sans paquet parent :
 
@@ -1040,7 +1040,7 @@ premier lancement, ce que le README annonce plutôt que de le laisser surprendre
 
 Signalé à l'usage, capture à l'appui : l'assistant, lancé depuis l'exécutable sur
 Windows, ne proposait que `generic-linux`, `unraid` et `synology`. L'utilisateur avait
-choisi **unraid**, et se retrouvait donc avec `/mnt/user/appdata/arrsenal` et
+choisi **unraid**, et se retrouvait donc avec `/mnt/user/appdata/plugarr` et
 `/mnt/user/data` sur une machine Windows.
 
 ### Ce que faisaient ces chemins
@@ -1055,7 +1055,7 @@ puisqu'il venait de créer ce dossier parasite.
 
 ### Trois corrections
 
-**Un profil `windows`**, avec `C:/arrsenal/config` et `C:/arrsenal/data`. Le profil
+**Un profil `windows`**, avec `C:/plugarr/config` et `C:/plugarr/data`. Le profil
 présélectionné est désormais celui de la machine, dans l'assistant comme en ligne de
 commande (`--platform` prend la même valeur par défaut).
 
@@ -1094,7 +1094,7 @@ Une seule cause de départ, et quatre défauts qu'elle a révélés.
 ### La cause : des mots de passe annoncés mais jamais appliqués
 
 Les dossiers de configuration dataient de la veille, l'installation était de l'heure.
-arrsenal conservait les configurations existantes **mais générait de nouveaux mots de
+plugarr conservait les configurations existantes **mais générait de nouveaux mots de
 passe**, qu'il affichait dans son rapport. Les services refusaient donc les identifiants
 montrés à l'utilisateur. Vérifié : l'empreinte PBKDF2 stockée dans `qBittorrent.conf` ne
 correspondait pas au mot de passe du `stack.yml`.
@@ -1139,7 +1139,7 @@ la panne suivante : le redémarrage invalidait l'adresse mise en cache par Sonar
 ### Ce qui reste impossible, et qui est maintenant dit
 
 Jellyfin, autobrr et qui ne stockent leur mot de passe que **haché**, et aucune API ne
-permet de le réinitialiser sans lui. arrsenal ne peut donc pas reprendre ces trois
+permet de le réinitialiser sans lui. plugarr ne peut donc pas reprendre ces trois
 services. Le préflight l'annonce avant de commencer, et chaque échec porte désormais la
 phrase utile : supprimez ce dossier, ou reprenez l'installation d'origine avec
 `--project-dir`.
@@ -1203,7 +1203,7 @@ pendant une CI n'aurait aucun sens.
 
 ## L'identifiant se choisit — 2026-09-01
 
-Demandé à l'usage : « pas tout le monde veut mettre arrsenal comme username ».
+Demandé à l'usage : « pas tout le monde veut mettre plugarr comme username ».
 
 Un seul endroit du code fixait ce nom ; tout le reste n'était qu'un repli. Il est
 maintenant porté par `StackConfig`, exposé par `--username` et par un champ de
@@ -1262,10 +1262,10 @@ for sid in catalog.STARTUP_ORDER: updates.newer_tags(catalog.get(sid).image)
 ### « La page ne me permet pas d'arrêter une instance »
 
 C'était exact, et voulu : la page d'accès est un fichier figé, sans serveur derrière.
-L'état des services, les boutons et les mises à jour viennent de `arrsenal serve`.
+L'état des services, les boutons et les mises à jour viennent de `plugarr serve`.
 
 Le défaut n'était donc pas dans la page, mais dans le chemin pour y arriver. Elle
-affichait « lancez `arrsenal serve` » — une commande inutile pour quelqu'un qui vient de
+affichait « lancez `plugarr serve` » — une commande inutile pour quelqu'un qui vient de
 double-cliquer un exécutable absent du PATH.
 
 Un lanceur `administration.cmd` (`administration.sh` ailleurs) est désormais déposé à

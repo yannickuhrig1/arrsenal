@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal.clients.autobrr import CLIENT_TYPES, AutobrrClient, client_host
-from arrsenal.clients.base import WiringError
+from plugarr.clients.autobrr import CLIENT_TYPES, AutobrrClient, client_host
+from plugarr.clients.base import WiringError
 
 
 class FakeResponse:
@@ -67,9 +67,9 @@ def test_onboarding_runs_on_a_fresh_instance():
             "POST /api/auth/onboard": FakeResponse(200, {"message": "user created"}),
         }
     )
-    assert client.onboard("arrsenal", "secret") is True
+    assert client.onboard("plugarr", "secret") is True
     posted = [kw for m, _p, kw in client.calls if m == "POST"]
-    assert posted[0] == {"username": "arrsenal", "password": "secret"}
+    assert posted[0] == {"username": "plugarr", "password": "secret"}
 
 
 def test_api_key_creation_always_sends_scopes():
@@ -77,19 +77,19 @@ def test_api_key_creation_always_sends_scopes():
     client = FakeClient(
         {
             "GET /api/keys": FakeResponse(200, []),
-            "POST /api/keys": FakeResponse(201, {"name": "arrsenal", "key": "abc123"}),
+            "POST /api/keys": FakeResponse(201, {"name": "plugarr", "key": "abc123"}),
         }
     )
-    assert client.ensure_api_key("arrsenal") == "abc123"
+    assert client.ensure_api_key("plugarr") == "abc123"
     payload = next(kw for m, p, kw in client.calls if p == "/api/keys" and m == "POST")
     assert payload["scopes"] == ["read", "write"]
 
 
 def test_an_existing_api_key_is_reused():
     client = FakeClient(
-        {"GET /api/keys": FakeResponse(200, [{"name": "arrsenal", "key": "deja-la"}])}
+        {"GET /api/keys": FakeResponse(200, [{"name": "plugarr", "key": "deja-la"}])}
     )
-    assert client.ensure_api_key("arrsenal") == "deja-la"
+    assert client.ensure_api_key("plugarr") == "deja-la"
     assert not any(m == "POST" for m, _p, _kw in client.calls)
 
 

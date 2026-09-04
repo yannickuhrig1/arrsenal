@@ -1,6 +1,6 @@
 """Diagnostic et recherche de mises a jour, depuis la console.
 
-Deux demandes a l'usage : « un bouton pour lancer arrsenal doctor », et « un
+Deux demandes a l'usage : « un bouton pour lancer plugarr doctor », et « un
 bouton de recherche de mise a jour ».
 
 Le second existait a moitie. La console interrogeait deja les registres au
@@ -8,8 +8,8 @@ chargement puis toutes les quinze minutes, mais en silence : impossible de la
 declencher, impossible de savoir quand elle avait eu lieu. Le bouton n'ajoute
 pas la verification, il la rend demandable et datee.
 
-Le premier n'existait pas du tout : `arrsenal doctor` etait reserve a la ligne
-de commande, ce qui allait contre la regle du projet — tout ce qu'arrsenal sait
+Le premier n'existait pas du tout : `plugarr doctor` etait reserve a la ligne
+de commande, ce qui allait contre la regle du projet — tout ce que plugarr sait
 faire doit etre atteignable sans ouvrir un terminal.
 """
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from arrsenal import admin, dashboard, orchestrator
+from plugarr import admin, dashboard, orchestrator
 
 
 def _cfg():

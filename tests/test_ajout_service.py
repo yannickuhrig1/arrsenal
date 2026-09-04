@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import catalog, dashboard, orchestrator
+from plugarr import catalog, dashboard, orchestrator
 
 
 @pytest.fixture

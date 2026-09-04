@@ -20,11 +20,11 @@ import json
 import pytest
 from textual.widgets import Label, RadioButton, Select, SelectionList
 
-from arrsenal import vpnservers
-from arrsenal.compose import GLUETUN_TAG
-from arrsenal.models import VPN_PROVIDERS, VpnConfig
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.screens import VpnScreen
+from plugarr import vpnservers
+from plugarr.compose import GLUETUN_TAG
+from plugarr.models import VPN_PROVIDERS, VpnConfig
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.screens import VpnScreen
 
 # ------------------------------------------------------------------ donnees
 
@@ -124,7 +124,7 @@ async def _ecran(pilot) -> VpnScreen:
 
 @pytest.fixture
 def app(tmp_path):
-    application = ArrsenalApp(project_dir=tmp_path)
+    application = PlugArrApp(project_dir=tmp_path)
     application.auto_open_page = False
     return application
 

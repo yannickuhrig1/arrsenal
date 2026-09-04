@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal.clients.base import WiringError
-from arrsenal.clients.qui import QuiClient
+from plugarr.clients.base import WiringError
+from plugarr.clients.qui import QuiClient
 
 
 class FakeResponse:
@@ -51,27 +51,27 @@ def test_428_signifie_installation_a_terminer():
 def test_setup_rejoue_ne_casse_pas_le_cablage():
     """`POST /api/auth/setup` repond 400 « Setup already completed » une fois joue.
 
-    C'est ce qui rend l'etape rejouable : `arrsenal wire` doit pouvoir repasser.
+    C'est ce qui rend l'etape rejouable : `plugarr wire` doit pouvoir repasser.
     """
     created = FakeClient({"POST /api/auth/setup": FakeResponse(201)})
-    assert created.setup("arrsenal", "x") is True
+    assert created.setup("plugarr", "x") is True
 
     again = FakeClient(
         {"POST /api/auth/setup": FakeResponse(400, text='{"error":"Setup already completed"}')}
     )
-    assert again.setup("arrsenal", "x") is False
+    assert again.setup("plugarr", "x") is False
 
 
 def test_un_echec_de_setup_inattendu_est_signale():
     client = FakeClient({"POST /api/auth/setup": FakeResponse(500, text="boom")})
     with pytest.raises(WiringError):
-        client.setup("arrsenal", "x")
+        client.setup("plugarr", "x")
 
 
 def test_un_mot_de_passe_refuse_est_dit_clairement():
     client = FakeClient({"POST /api/auth/login": FakeResponse(401, text="unauthorized")})
     with pytest.raises(WiringError) as exc:
-        client.login("arrsenal", "faux")
+        client.login("plugarr", "faux")
     assert "connexion refusee" in str(exc.value)
 
 
@@ -98,7 +98,7 @@ def test_l_instance_est_declaree_avec_son_port():
 def test_une_instance_deja_declaree_n_est_pas_recreee():
     """qui n'interdit PAS les doublons : declarer deux fois donne deux entrees.
 
-    Sans cette verification, chaque `arrsenal wire` ajouterait une instance.
+    Sans cette verification, chaque `plugarr wire` ajouterait une instance.
     """
     client = FakeClient(
         {"GET /api/instances": FakeResponse(200, [{"host": "http://qbittorrent:8080"}])}
@@ -169,8 +169,8 @@ def test_aucune_instance_a_cette_adresse():
 
 
 def test_l_etape_est_prevue_quand_qui_et_qbittorrent_sont_installes(tmp_path):
-    from arrsenal.orchestrator import build_config
-    from arrsenal.wiring import Wirer
+    from plugarr.orchestrator import build_config
+    from plugarr.wiring import Wirer
 
     cfg = build_config(
         services=["qui", "qbittorrent"],
@@ -184,12 +184,12 @@ def test_l_etape_est_prevue_quand_qui_et_qbittorrent_sont_installes(tmp_path):
 
 def test_qui_recoit_bien_des_identifiants(tmp_path):
     """Sans compte genere, l'etape ne pourrait pas creer le premier utilisateur."""
-    from arrsenal.orchestrator import build_config
+    from plugarr.orchestrator import build_config
 
     cfg = build_config(
         services=["qui"], config_root=str(tmp_path / "c"), data_root=str(tmp_path / "d")
     )
     inst = cfg.services["qui"]
 
-    assert inst.username == "arrsenal"
+    assert inst.username == "plugarr"
     assert inst.password

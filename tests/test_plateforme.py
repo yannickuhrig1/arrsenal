@@ -13,8 +13,8 @@ import sys
 
 import pytest
 
-from arrsenal.layout import PROFILE_DEFAULTS, default_profile, path_warning, resolve_ids
-from arrsenal.models import PlatformProfile
+from plugarr.layout import PROFILE_DEFAULTS, default_profile, path_warning, resolve_ids
+from plugarr.models import PlatformProfile
 
 
 def test_chaque_profil_a_ses_valeurs_par_defaut():
@@ -61,14 +61,14 @@ def test_un_chemin_linux_est_signale_sous_windows():
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="comportement propre a Windows")
-@pytest.mark.parametrize("chemin", ["C:/arrsenal/data", "D:\\medias", "c:/minuscule"])
+@pytest.mark.parametrize("chemin", ["C:/plugarr/data", "D:\\medias", "c:/minuscule"])
 def test_un_chemin_windows_ne_declenche_rien(chemin):
     assert path_warning(chemin) is None
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="comportement propre a Linux")
 def test_un_chemin_windows_est_signale_ailleurs():
-    assert path_warning("C:/arrsenal/data") is not None
+    assert path_warning("C:/plugarr/data") is not None
     assert path_warning("/srv/data") is None
 
 
@@ -85,10 +85,10 @@ def test_un_chemin_vide_ne_declenche_rien():
 async def test_l_assistant_preselectionne_le_profil_de_la_machine(tmp_path):
     from textual.widgets import Input, RadioSet
 
-    from arrsenal.tui.app import ArrsenalApp
-    from arrsenal.tui.screens import PathsScreen
+    from plugarr.tui.app import PlugArrApp
+    from plugarr.tui.screens import PathsScreen
 
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     async with app.run_test() as pilot:
         app.push_screen(PathsScreen())
         await pilot.pause()
@@ -108,10 +108,10 @@ async def test_la_verification_dit_ou_le_dossier_atterrit(tmp_path):
     `/mnt/user/data` sous Windows sans signaler qu'il creait `C:\\mnt\\user\\data`."""
     from textual.widgets import Button, Input, Static
 
-    from arrsenal.tui.app import ArrsenalApp
-    from arrsenal.tui.screens import PathsScreen
+    from plugarr.tui.app import PlugArrApp
+    from plugarr.tui.screens import PathsScreen
 
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     async with app.run_test() as pilot:
         app.push_screen(PathsScreen())
         await pilot.pause()
@@ -134,10 +134,10 @@ async def test_la_note_explique_ce_que_sont_puid_et_pgid(tmp_path):
     """« 1000:1000 » ne dit rien a qui n'a jamais administre un systeme Unix."""
     from textual.widgets import Static
 
-    from arrsenal.tui.app import ArrsenalApp
-    from arrsenal.tui.screens import PathsScreen
+    from plugarr.tui.app import PlugArrApp
+    from plugarr.tui.screens import PathsScreen
 
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     async with app.run_test() as pilot:
         app.push_screen(PathsScreen())
         await pilot.pause()

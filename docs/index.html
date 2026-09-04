@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>arrsenal</title>
-<meta name="description" content="arrsenal deploie et cable une stack media complete : Prowlarr, Sonarr, Radarr, Lidarr, qBittorrent, Jellyfin. Une commande, zero clic dans huit interfaces web.">
-<meta property="og:title" content="arrsenal">
+<title>plugarr</title>
+<meta name="description" content="plugarr deploie et cable une stack media complete : Prowlarr, Sonarr, Radarr, Lidarr, qBittorrent, Jellyfin. Une commande, zero clic dans huit interfaces web.">
+<meta property="og:title" content="plugarr">
 <meta property="og:description" content="Deploie et cable une stack media complete. Une commande, zero clic dans huit interfaces web.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -231,22 +231,22 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
 <header class="hero">
   <div class="wrap stack gap-l">
     <p class="eyebrow">Stack media &middot; Docker &middot; une seule commande</p>
-    <h1 class="wordmark">arrsenal<span class="caret" aria-hidden="true"></span></h1>
+    <h1 class="wordmark">plugarr<span class="caret" aria-hidden="true"></span></h1>
     <p class="lead hero-lead">Deploie <em>et cable</em> une stack media complete. Une commande, zero clic dans huit interfaces web.</p>
 
     <div class="term">
       <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>terminal</span></div>
-<pre><code><span class="p">$</span> arrsenal
+<pre><code><span class="p">$</span> plugarr
 <span class="c"># ou, pour un script ou une CI :</span>
-<span class="p">$</span> arrsenal install <span class="f">--yes</span> <span class="f">--data-root</span> /srv/data</code></pre>
+<span class="p">$</span> plugarr install <span class="f">--yes</span> <span class="f">--data-root</span> /srv/data</code></pre>
     </div>
 
     <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/yannickuhrig1/arrsenal">
+      <a class="btn btn-primary" href="https://github.com/yannickuhrig1/plugarr">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         Le depot GitHub
       </a>
-      <a class="btn" href="https://github.com/yannickuhrig1/arrsenal/releases">Telecharger arrsenal.exe</a>
+      <a class="btn" href="https://github.com/yannickuhrig1/plugarr/releases">Telecharger plugarr.exe</a>
       <!-- Discord : renseigner DISCORD_URL dans le script en bas de ce fichier. -->
       <a class="btn" id="discord-cta" href="#" aria-disabled="true">Discord &mdash; bientot</a>
     </div>
@@ -267,7 +267,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       <h2>Poser six conteneurs, tout le monde sait faire. C'est l'apres qui prend trois heures.</h2>
       <p class="muted">Ouvrir chaque interface, copier une cle API, la coller dans une autre, recommencer,
       se tromper de port, et decouvrir trois jours plus tard que les imports recopient 40 Go au lieu
-      de faire un lien. <strong>arrsenal automatise cette partie-la.</strong></p>
+      de faire un lien. <strong>plugarr automatise cette partie-la.</strong></p>
     </div>
 
     <div class="patch">
@@ -322,7 +322,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
           <tr><td>DockSTARTer</td><td class="yes">oui</td><td class="no">non</td><td class="no">non</td></tr>
           <tr><td>Saltbox</td><td class="yes">oui</td><td class="no">partiel</td><td class="no">non</td></tr>
           <tr><td>Recyclarr / Configarr</td><td class="no">non</td><td class="no">non</td><td class="yes">oui</td></tr>
-          <tr class="self"><td>arrsenal</td><td class="yes">oui</td><td class="yes">oui</td><td class="yes">oui <span class="muted">(via Recyclarr)</span></td></tr>
+          <tr class="self"><td>plugarr</td><td class="yes">oui</td><td class="yes">oui</td><td class="yes">oui <span class="muted">(via Recyclarr)</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -348,7 +348,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       <div><span class="link">Toutes les interfaces</span><span class="what">Langue choisie une fois, appliquee partout ou c'est possible.</span></div>
     </div>
     <p class="note">La liste complete, ligne par ligne, vit dans le
-      <a href="https://github.com/yannickuhrig1/arrsenal#ce-qui-est-c%C3%A2bl%C3%A9-automatiquement">README</a>.
+      <a href="https://github.com/yannickuhrig1/plugarr#ce-qui-est-c%C3%A2bl%C3%A9-automatiquement">README</a>.
       Les deux clients de telechargement peuvent coexister&nbsp;: chaque *arr est rattache aux deux,
       et le routage s'adapte tout seul &mdash; qBittorrent a des categories natives, Transmission n'en a pas.</p>
   </div>
@@ -361,7 +361,7 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       <h2>Un seul montage <span class="mono">/data</span>, sinon chaque import recopie le fichier</h2>
       <p class="muted">Monter <span class="mono">/downloads</span> et <span class="mono">/media</span> separement
       donne deux systemes de fichiers vus depuis le conteneur. Les hardlinks deviennent impossibles.
-      arrsenal impose un montage unique dans tous les conteneurs.</p>
+      plugarr impose un montage unique dans tous les conteneurs.</p>
     </div>
 <pre class="tree">${DATA_ROOT}/                    <i>-&gt;  /data   (dans TOUS les conteneurs)</i>
 &#9500;&#9472;&#9472; torrents/
@@ -402,14 +402,14 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
     <div class="stack gap-m prose">
       <p class="eyebrow">Installation</p>
       <h2>Windows&nbsp;: un seul fichier, sans Python</h2>
-      <p class="muted">Telechargez <span class="mono">arrsenal.exe</span>, ouvrez un terminal dans le dossier
+      <p class="muted">Telechargez <span class="mono">plugarr.exe</span>, ouvrez un terminal dans le dossier
       de telechargement, et lancez-le. Seul Docker Desktop est necessaire&nbsp;: l'executable embarque
       son propre interpreteur. 20&nbsp;Mo, environ une seconde et demie au demarrage.</p>
     </div>
 
     <div class="term">
       <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>windows</span></div>
-<pre><code><span class="p">&gt;</span> .\arrsenal.exe</code></pre>
+<pre><code><span class="p">&gt;</span> .\plugarr.exe</code></pre>
     </div>
     <p class="note prose">Windows SmartScreen peut afficher un avertissement au premier lancement&nbsp;:
     le binaire n'est pas signe, une signature de code coutant plusieurs centaines d'euros par an.
@@ -425,14 +425,14 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
 
     <div class="term">
       <div class="term-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>bash</span></div>
-<pre><code><span class="p">$</span> pipx install git+https://github.com/yannickuhrig1/arrsenal
+<pre><code><span class="p">$</span> pipx install git+https://github.com/yannickuhrig1/plugarr
 
-<span class="p">$</span> arrsenal              <span class="c"># assistant interactif</span>
-<span class="p">$</span> arrsenal scan         <span class="c"># detecte une stack existante</span>
-<span class="p">$</span> arrsenal adopt        <span class="c"># la cable sans rien recreer</span>
-<span class="p">$</span> arrsenal serve        <span class="c"># page d'administration</span>
-<span class="p">$</span> arrsenal doctor       <span class="c"># diagnostique une installation</span>
-<span class="p">$</span> arrsenal uninstall    <span class="c"># ne touche jamais a vos medias</span></code></pre>
+<span class="p">$</span> plugarr              <span class="c"># assistant interactif</span>
+<span class="p">$</span> plugarr scan         <span class="c"># detecte une stack existante</span>
+<span class="p">$</span> plugarr adopt        <span class="c"># la cable sans rien recreer</span>
+<span class="p">$</span> plugarr serve        <span class="c"># page d'administration</span>
+<span class="p">$</span> plugarr doctor       <span class="c"># diagnostique une installation</span>
+<span class="p">$</span> plugarr uninstall    <span class="c"># ne touche jamais a vos medias</span></code></pre>
     </div>
     <p class="note">Le paquet n'est pas encore publie sur PyPI.</p>
   </div>
@@ -473,12 +473,12 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
       </div>
       <div class="card">
         <h3>Un journal joignable a une issue</h3>
-        <p><span class="mono">arrsenal.log</span> contient chaque etape et la trace complete d'une erreur.
+        <p><span class="mono">plugarr.log</span> contient chaque etape et la trace complete d'une erreur.
         Les mots de passe et cles API y sont remplaces par leur nom avant ecriture.</p>
       </div>
       <div class="card">
         <h3>Vos profils de qualite</h3>
-        <p>arrsenal ne reimplemente pas les TRaSH Guides&nbsp;: il installe Recyclarr, choisit un
+        <p>plugarr ne reimplemente pas les TRaSH Guides&nbsp;: il installe Recyclarr, choisit un
         template officiel, et lance la premiere synchronisation.</p>
       </div>
     </div>
@@ -490,11 +490,11 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
    <div class="stack gap-m prose">
     <p class="eyebrow">A lire avant de commencer</p>
     <h2>Ce que ce projet ne fait pas</h2>
-    <p class="muted">arrsenal ne fournit, n'heberge et ne recommande <strong>aucun indexeur, aucun tracker,
+    <p class="muted">plugarr ne fournit, n'heberge et ne recommande <strong>aucun indexeur, aucun tracker,
     aucun contenu</strong>, et n'en preconfigure aucun. Aucune liste n'est livree avec le code&nbsp;:
     celle de l'assistant vient de votre propre Prowlarr. C'est un outil d'automatisation de mediatheque
     personnelle. Ce que vous y branchez, et sa legalite, vous regardent.</p>
-    <p><a href="https://github.com/yannickuhrig1/arrsenal/blob/main/DISCLAIMER.md">Lire l'avertissement complet</a></p>
+    <p><a href="https://github.com/yannickuhrig1/plugarr/blob/main/DISCLAIMER.md">Lire l'avertissement complet</a></p>
    </div>
   </div>
 </section>
@@ -502,12 +502,12 @@ footer{border-top:1px solid var(--line);padding-block:2.5rem 3.5rem;background:v
 <footer>
   <div class="wrap footer-grid">
     <div class="stack gap-s">
-      <p class="mono" style="font-size:1.25rem;letter-spacing:-.03em">arrsenal</p>
+      <p class="mono" style="font-size:1.25rem;letter-spacing:-.03em">plugarr</p>
       <p class="footer-links">
-        <a href="https://github.com/yannickuhrig1/arrsenal">GitHub</a>
-        <a href="https://github.com/yannickuhrig1/arrsenal/releases">Telechargements</a>
-        <a href="https://github.com/yannickuhrig1/arrsenal/blob/main/ROADMAP.md">Feuille de route</a>
-        <a href="https://github.com/yannickuhrig1/arrsenal/issues">Signaler un probleme</a>
+        <a href="https://github.com/yannickuhrig1/plugarr">GitHub</a>
+        <a href="https://github.com/yannickuhrig1/plugarr/releases">Telechargements</a>
+        <a href="https://github.com/yannickuhrig1/plugarr/blob/main/ROADMAP.md">Feuille de route</a>
+        <a href="https://github.com/yannickuhrig1/plugarr/issues">Signaler un probleme</a>
         <a id="discord-footer" href="#" aria-disabled="true">Discord (bientot)</a>
       </p>
     </div>

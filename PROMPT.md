@@ -357,7 +357,7 @@ Wizard web, presets communautaires, support Podman / Docker Swarm / Unraid / Syn
 - **Releases sémantiques** + changelog automatique.
 - **`docs/` sérieux**, avec une page de dépannage nourrie par les vraies erreurs
   rencontrées pendant le développement.
-- **Nom** : à trancher. Pistes — `Arrsenal`, `Orchestrarr`, `Nestarr`, `Arrsembly`,
+- **Nom** : à trancher. Pistes — `PlugArr`, `Orchestrarr`, `Nestarr`, `Arrsembly`,
   `Stackarr`. Vérifier la disponibilité sur GitHub, PyPI et Docker Hub avant de choisir.
 - Créditer explicitement TRaSH Guides, Servarr et LinuxServer.io. La communauté le rend bien.
 

@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from arrsenal import catalog, compose
-from arrsenal.clients import recyclarr
-from arrsenal.orchestrator import build_config
-from arrsenal.wiring import Wirer
+from plugarr import catalog, compose
+from plugarr.clients import recyclarr
+from plugarr.orchestrator import build_config
+from plugarr.wiring import Wirer
 
 TEMPLATE = """\
 # yaml-language-server: $schema=https://schemas.recyclarr.dev/v8/config-schema.json
@@ -70,7 +70,7 @@ def test_fill_ecrit_adresse_et_cle(tmp_path):
 def test_fill_ne_touche_a_rien_d_autre(tmp_path):
     """Tout le contenu vient des TRaSH Guides et doit rester intact.
 
-    C'est la garantie centrale du module : arrsenal cable, il ne redige pas les
+    C'est la garantie centrale du module : plugarr cable, il ne redige pas les
     profils. Une seule ligne modifiee ailleurs serait une reimplementation
     silencieuse du guide.
     """
@@ -275,7 +275,7 @@ class FakeCompose:
 
 
 def _patch_compose(monkeypatch, fake):
-    monkeypatch.setattr("arrsenal.runner.Compose", fake)
+    monkeypatch.setattr("plugarr.runner.Compose", fake)
 
 
 def test_step_recyclarr_remplit_chaque_fichier(tmp_path, monkeypatch):
@@ -323,7 +323,7 @@ def test_step_recyclarr_signale_un_fichier_orphelin(tmp_path, monkeypatch):
     """Un template laisse par une installation precedente garde ses marqueurs.
 
     Cas reel : l'utilisateur avait Radarr, il l'a retire. Le fichier reste dans
-    `configs/`, arrsenal ne le remplit pas puisque le service n'existe plus, et
+    `configs/`, plugarr ne le remplit pas puisque le service n'existe plus, et
     `recyclarr sync` echoue dessus avec un message obscur. On le dit ici, avec le
     nom du fichier.
     """
@@ -398,7 +398,7 @@ def test_la_page_d_acces_ne_propose_pas_de_lien_vers_le_port_0(tmp_path):
     l'installation a echoue, alors qu'elle a reussi. Constate sur une vraie page
     generee : le lien etait la, sous une note disant « Aucune interface web ».
     """
-    from arrsenal import dashboard
+    from plugarr import dashboard
 
     cfg = _cfg(tmp_path)
     cfg.host = "192.168.1.10"
@@ -422,7 +422,7 @@ def test_step_recyclarr_rejoue_ne_redemande_rien(tmp_path, monkeypatch):
     Constate en conditions reelles : rejouer le cablage apres une installation
     echouait sur « The file /config/configs/hd-bluray-web.yml already exists ».
     Le refus de Recyclarr est legitime, le fichier a pu etre modifie a la main.
-    C'est a arrsenal de ne demander que ce qui manque.
+    C'est a plugarr de ne demander que ce qui manque.
     """
     cfg = _cfg(tmp_path)
     fake = FakeCompose(Path(cfg.config_path("recyclarr")))
@@ -458,7 +458,7 @@ def test_le_rapport_n_affiche_pas_d_url_pour_un_service_sans_interface(tmp_path)
     """`http://hote:0` dans le tableau final se lit comme une adresse a ouvrir."""
     from rich.console import Console
 
-    from arrsenal import report
+    from plugarr import report
 
     cfg = _cfg(tmp_path)
     cfg.host = "192.168.1.10"

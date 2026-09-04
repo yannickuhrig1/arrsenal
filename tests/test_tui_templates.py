@@ -9,9 +9,9 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Button, Select, Static
 
-from arrsenal.clients import recyclarr
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.screens import PathsScreen, SummaryScreen, TemplatesScreen
+from plugarr.clients import recyclarr
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.screens import PathsScreen, SummaryScreen, TemplatesScreen
 
 AVAILABLE = {
     "sonarr": ["sonarr-german-hd-bluray-web", "web-1080p", "web-2160p"],
@@ -21,7 +21,7 @@ AVAILABLE = {
 
 @pytest.fixture
 def app(tmp_path):
-    return ArrsenalApp(project_dir=tmp_path)
+    return PlugArrApp(project_dir=tmp_path)
 
 
 @pytest.fixture(autouse=True)

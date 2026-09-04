@@ -6,7 +6,7 @@ tracker reel, l'ajout d'un indexeur avec une mauvaise cle produit :
     HTTP request failed: [401:Unauthorized] [GET] at
     [https://exemple.org/api/torznab?apikey=<la cle>&t=search&l
 
-Cette cle est celle que l'utilisateur vient de taper. arrsenal ne la stocke
+Cette cle est celle que l'utilisateur vient de taper. plugarr ne la stocke
 jamais, donc le masquage par valeur connue ne pouvait rien pour elle : elle
 s'affichait a l'ecran et partait dans le fichier qu'on demande aux gens de
 joindre a un rapport de bug.
@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import journal
-from arrsenal.clients.prowlarr import IndexerDefinition, is_secret, redact
+from plugarr import journal
+from plugarr.clients.prowlarr import IndexerDefinition, is_secret, redact
 
 CLE = "71e0869061f6f8452024f6fc2d8c35ca"
 MESSAGE = (

@@ -23,7 +23,7 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from arrsenal.clients.prowlarr import (
+from plugarr.clients.prowlarr import (
     CREDENTIAL_NAMES,
     IndexerDefinition,
     is_credential,

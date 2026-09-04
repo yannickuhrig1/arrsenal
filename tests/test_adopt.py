@@ -9,9 +9,9 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from arrsenal import adopt, catalog, discovery
-from arrsenal.discovery import Found
-from arrsenal.models import StackConfig
+from plugarr import adopt, catalog, discovery
+from plugarr.discovery import Found
+from plugarr.models import StackConfig
 
 
 def found(service_id="sonarr", container="mon-sonarr", port=8991, key="a" * 32, **kw):
@@ -65,7 +65,7 @@ def test_an_arr_without_an_api_key_is_not_usable():
 
 
 def test_a_service_without_a_published_port_is_not_usable():
-    """Sans port publie, arrsenal ne peut pas le joindre depuis l'hote."""
+    """Sans port publie, plugarr ne peut pas le joindre depuis l'hote."""
     assert not found(port=None).usable
 
 
@@ -78,7 +78,7 @@ def test_a_download_client_needs_no_api_key():
 
 def test_two_sonarr_are_reported_as_ambiguous():
     """Cas courant et legitime : un Sonarr pour les series, un pour l'animation.
-    arrsenal ne peut pas deviner lequel recevra les indexeurs."""
+    plugarr ne peut pas deviner lequel recevra les indexeurs."""
     entries = [found(container="sonarr"), found(container="sonarr-anime", port=8992)]
     assert set(discovery.duplicates(entries)) == {"sonarr"}
 
@@ -110,21 +110,21 @@ def test_a_single_instance_needs_no_pick():
 # ---------------------------------------------------------------- exclusions
 
 
-def test_arrsenal_does_not_adopt_its_own_containers():
+def test_plugarr_does_not_adopt_its_own_containers():
     """Inutile de proposer d'adopter la stack qu'on vient d'installer."""
-    mine = found(container="arrsenal-sonarr")
+    mine = found(container="plugarr-sonarr")
     mine.managed_by_us = True
-    assert discovery.looks_like_arrsenal(mine)
+    assert discovery.looks_like_plugarr(mine)
     plan = adopt.build_plan([mine])
     assert plan.chosen == {}
-    assert plan.skipped[0][1] == "deja gere par arrsenal"
+    assert plan.skipped[0][1] == "deja gere par plugarr"
 
 
-@pytest.mark.parametrize("name", ["mon-sonarr", "media-sonarr", "sonarr", "arrsenal-sonarr"])
+@pytest.mark.parametrize("name", ["mon-sonarr", "media-sonarr", "sonarr", "plugarr-sonarr"])
 def test_a_foreign_container_is_never_mistaken_for_ours(name):
     """Un nom ne prouve rien. Une heuristique de nom sautait "mon-sonarr" en
-    silence : arrsenal ignorait un conteneur qui ne lui appartenait pas."""
-    assert not discovery.looks_like_arrsenal(found(container=name))
+    silence : plugarr ignorait un conteneur qui ne lui appartenait pas."""
+    assert not discovery.looks_like_plugarr(found(container=name))
 
 
 def test_an_unusable_service_is_skipped_with_its_reason():
@@ -178,7 +178,7 @@ def test_an_adopted_service_is_reached_through_the_host():
 
 
 def test_a_managed_service_keeps_the_compose_service_name():
-    from arrsenal import orchestrator
+    from plugarr import orchestrator
 
     cfg = orchestrator.build_config(services=["sonarr"], data_root="/d", config_root="/c")
     spec = catalog.get("sonarr")
@@ -190,7 +190,7 @@ def test_a_managed_service_keeps_the_compose_service_name():
 
 def test_adopting_writes_stack_yml_but_never_a_compose_file(tmp_path):
     """Generer un docker-compose.yml donnerait a `uninstall` le pouvoir de
-    detruire une stack qui n'appartient pas a arrsenal."""
+    detruire une stack qui n'appartient pas a plugarr."""
     cfg = adopt.config_from_plan(
         adopt.build_plan([found()]), data_root="/srv/d", config_root="/opt/c"
     )

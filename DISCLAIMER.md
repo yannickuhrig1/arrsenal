@@ -1,6 +1,6 @@
 # Avertissement
 
-`arrsenal` est un outil d'automatisation d'installation. Il deploie des logiciels
+`plugarr` est un outil d'automatisation d'installation. Il deploie des logiciels
 libres et open source, largement utilises, et ecrit leur configuration.
 
 **Ce projet ne fournit, n'heberge, ne recommande et ne preconfigure aucun indexeur,
@@ -29,5 +29,5 @@ change rien a ce qui precede :
 ## Sur les services tiers
 
 Certains services du catalogue integrent des sources dont le statut juridique est
-conteste. `arrsenal` peut les deployer, car deployer un logiciel libre est neutre,
+conteste. `plugarr` peut les deployer, car deployer un logiciel libre est neutre,
 mais **ne preactive jamais ces sources**. Le choix reste explicite et vous revient.

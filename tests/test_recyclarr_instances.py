@@ -2,7 +2,7 @@
 
 Recyclarr groupe ses instances par `base_url` et **ecarte tout groupe qui en
 compte plus d'une** — c'est `SplitInstancesFilter`, lu dans son code source.
-arrsenal ecrit toujours la meme URL interne pour un service donne : deux
+plugarr ecrit toujours la meme URL interne pour un service donne : deux
 fichiers visant Sonarr sont donc deux instances sur la meme URL, et Recyclarr
 n'en synchronise AUCUNE. Pas « la derniere gagne » : plus rien.
 
@@ -13,7 +13,7 @@ profils differents avaient laisse quatre fichiers :
                              "InstanceNames":["web-1080p","web-2160p"]}]
     [INF] Found 0 config files with 0 Radarr and 0 Sonarr instances
 
-Recyclarr sortait en code 0, arrsenal annoncait « synchronise », et aucun profil
+Recyclarr sortait en code 0, plugarr annoncait « synchronise », et aucun profil
 TRaSH n'etait pose.
 """
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from arrsenal.clients import recyclarr
+from plugarr.clients import recyclarr
 
 MODELE = "sonarr:\n  {nom}:\n    base_url: http://sonarr:8989\n    api_key: {cle}\n"
 

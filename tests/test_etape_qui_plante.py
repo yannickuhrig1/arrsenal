@@ -7,14 +7,14 @@ entierement cablee et fonctionnelle. Le message se resumait a
 `AttributeError : 'NoneType' object has no attribute 'status_code'`.
 
 `execute` n'attrapait que `WiringError`, c'est-a-dire les pannes prevues.
-Un defaut d'arrsenal lui-meme passait au travers.
+Un defaut de plugarr lui-meme passait au travers.
 """
 
 from __future__ import annotations
 
-from arrsenal.clients.base import WiringError
-from arrsenal.models import StackConfig
-from arrsenal.wiring import StepResult, Wirer, WiringStep
+from plugarr.clients.base import WiringError
+from plugarr.models import StackConfig
+from plugarr.wiring import StepResult, Wirer, WiringStep
 
 
 def _wirer(steps: list[WiringStep]) -> Wirer:
@@ -59,8 +59,8 @@ def test_le_rapport_nomme_l_etape_et_le_type_d_erreur():
     assert "pas de status_code" in result.detail
 
 
-def test_la_faute_est_attribuee_a_arrsenal():
-    """Une erreur inattendue vient d'arrsenal, pas de la machine de qui l'utilise.
+def test_la_faute_est_attribuee_a_plugarr():
+    """Une erreur inattendue vient de plugarr, pas de la machine de qui l'utilise.
     Le dire evite d'envoyer quelqu'un chercher une panne qui n'existe pas."""
 
     def plante() -> StepResult:
@@ -68,7 +68,7 @@ def test_la_faute_est_attribuee_a_arrsenal():
 
     result = _wirer([WiringStep("x", plante)]).execute()[0]
 
-    assert any("defaut d'arrsenal" in w for w in result.warnings)
+    assert any("defaut de plugarr" in w for w in result.warnings)
 
 
 def test_une_panne_prevue_garde_son_message():

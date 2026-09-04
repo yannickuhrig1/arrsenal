@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import catalog, compose, dashboard, orchestrator
-from arrsenal.models import Category, ServiceSpec
+from plugarr import catalog, compose, dashboard, orchestrator
+from plugarr.models import Category, ServiceSpec
 
 
 @pytest.fixture

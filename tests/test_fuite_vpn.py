@@ -3,7 +3,7 @@
 Deux demandes le meme jour, meme racine.
 
 « C'est le coup a lancer un torrent et ne pas etre protege par le VPN. » La
-crainte est fondee : arrsenal ecrivait `network_mode: service:gluetun` et
+crainte est fondee : plugarr ecrivait `network_mode: service:gluetun` et
 considerait l'affaire close. Or ce reglage se perd — une installation lancee
 par-dessus une pile existante, depuis une configuration sans VPN, a recree les
 clients torrent sur le reseau nu, sans un mot.
@@ -19,8 +19,8 @@ import json
 
 import pytest
 
-from arrsenal import compose, orchestrator, vpncheck
-from arrsenal.models import Category, VpnConfig
+from plugarr import compose, orchestrator, vpncheck
+from plugarr.models import Category, VpnConfig
 
 
 def _cfg(*services, vpn=False):
@@ -90,7 +90,7 @@ def test_un_client_hors_du_tunnel_est_un_echec_bloquant(monkeypatch):
     """Le scenario redoute, mot pour mot : le conteneur a ete recree sur le
     reseau nu et tout torrent lance sortirait par la connexion de la maison."""
     monkeypatch.setattr(vpncheck, "container_id", lambda n: "abc123")
-    monkeypatch.setattr(vpncheck, "network_mode", lambda n: "arrsenal_arrsenal")
+    monkeypatch.setattr(vpncheck, "network_mode", lambda n: "plugarr_plugarr")
 
     controle = vpncheck.verifier(_cfg("qbittorrent", vpn=True))[0]
 
@@ -167,7 +167,7 @@ def test_seuls_les_clients_torrent_comptent():
 
     assert vpncheck.clients_torrent(cfg) == ["qbittorrent"]
     for sid in vpncheck.clients_torrent(cfg):
-        from arrsenal import catalog
+        from plugarr import catalog
 
         assert catalog.get(sid).category is Category.DOWNLOAD
 

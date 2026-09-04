@@ -40,10 +40,10 @@ from textual.widgets import (
     Static,
 )
 
-from arrsenal.clients.prowlarr import IndexerDefinition
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.indexers import IndexersScreen
-from arrsenal.tui.screens import (
+from plugarr.clients.prowlarr import IndexerDefinition
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.indexers import IndexersScreen
+from plugarr.tui.screens import (
     InstallScreen,
     PathsScreen,
     ReportScreen,
@@ -52,14 +52,14 @@ from arrsenal.tui.screens import (
     TemplatesScreen,
     VpnScreen,
 )
-from arrsenal.wiring import StepResult
+from plugarr.wiring import StepResult
 
 OUT = ROOT / "docs" / "screenshots"
 SIZE = (104, 34)
 
 #: Repertoire affiche dans les captures. Surtout PAS celui d'ou l'on lance le
 #: script : le chemin personnel de l'auteur finirait dans une image publiee.
-SHOWN_PROJECT_DIR = PurePosixPath("/opt/arrsenal")
+SHOWN_PROJECT_DIR = PurePosixPath("/opt/plugarr")
 
 #: Secrets d'illustration. Les vrais sont tires au hasard a chaque execution :
 #: sans cela, deux captures ne seraient jamais identiques.
@@ -67,7 +67,7 @@ SHOWN_API_KEY = "0123456789abcdef0123456789abcdef"
 SHOWN_PASSWORD = "MotDePasseGenere42"
 
 #: Fournisseur montre dans la capture VPN : le premier de la liste par ordre
-#: alphabetique, choisi pour cette seule raison. arrsenal n'en recommande aucun.
+#: alphabetique, choisi pour cette seule raison. plugarr n'en recommande aucun.
 SHOWN_VPN_PROVIDER = "airvpn"
 SHOWN_VPN_KEY = "cle-privee-wireguard"
 #: Deux lieux coches, pour montrer que la liste se selectionne au clic.
@@ -110,9 +110,9 @@ SHOWN_DOCKER = (
 
 def freeze_environment() -> None:
     """Rend la capture independante de la machine qui la produit."""
-    from arrsenal import orchestrator, runner, seed
-    from arrsenal.models import PlatformProfile
-    from arrsenal.tui import screens
+    from plugarr import orchestrator, runner, seed
+    from plugarr.models import PlatformProfile
+    from plugarr.tui import screens
 
     runner.check_docker = lambda: [  # type: ignore[assignment]
         runner.Check(name, True, detail) for name, detail in SHOWN_DOCKER
@@ -133,7 +133,7 @@ def freeze_environment() -> None:
     )
 
     # Le recapitulatif LIT LE DISQUE pour avertir d'une configuration heritee.
-    # La capture dependait donc du contenu de /opt/arrsenal/config sur la machine
+    # La capture dependait donc du contenu de /opt/plugarr/config sur la machine
     # qui la produit : ici un avertissement qBittorrent laisse par un essai
     # precedent, sur la CI rien du tout. On montre le cas nominal, une machine
     # vierge — c'est celui que decrit le depot.
@@ -153,14 +153,14 @@ FAKE_STEPS = [
 ]
 
 
-#: Definition fictive : arrsenal ne nomme et ne recommande aucun indexeur reel.
+#: Definition fictive : plugarr ne nomme et ne recommande aucun indexeur reel.
 FAKE_DEFINITION = IndexerDefinition(
     name="Votre indexeur",
     implementation="Torznab",
     privacy="private",
     protocol="torrent",
     language="fr-FR",
-    description="La liste vient de votre Prowlarr. arrsenal n'en fournit aucun.",
+    description="La liste vient de votre Prowlarr. plugarr n'en fournit aucun.",
     raw={
         "indexerUrls": ["https://exemple.invalid/"],
         "fields": [
@@ -175,7 +175,7 @@ async def capture() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     freeze_environment()
 
-    async def shot(app: ArrsenalApp, pilot, name: str) -> None:
+    async def shot(app: PlugArrApp, pilot, name: str) -> None:
         # Le `Footer` monte ses raccourcis de facon asynchrone. Attendre que ses
         # ENFANTS existent ne suffit pas : le premier apparait avant que le texte
         # ne soit rendu, et la capture partait parfois sans pied de page. On
@@ -195,7 +195,7 @@ async def capture() -> None:
             handle.write(contenu)
         print(f"  {path.relative_to(ROOT)}")
 
-    app = ArrsenalApp(project_dir=SHOWN_PROJECT_DIR)
+    app = PlugArrApp(project_dir=SHOWN_PROJECT_DIR)
     app.auto_open_page = False
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
@@ -210,7 +210,7 @@ async def capture() -> None:
         await pilot.pause()
         await shot(app, pilot, "3-chemins")
 
-        app.data_root, app.config_root = "/srv/data", "/opt/arrsenal/config"
+        app.data_root, app.config_root = "/srv/data", "/opt/plugarr/config"
         app.push_screen(VpnScreen())
         await pilot.pause()
         screen = app.screen
@@ -269,7 +269,7 @@ async def capture() -> None:
 
         # Etape indexeurs : rendue hors ligne. Le chargement des definitions est
         # neutralise, on injecte des exemples representatifs de ce que Prowlarr
-        # renvoie. Aucun indexeur reel n'est nomme : arrsenal n'en recommande aucun.
+        # renvoie. Aucun indexeur reel n'est nomme : plugarr n'en recommande aucun.
         IndexersScreen.load_definitions = lambda self: None  # type: ignore[method-assign]
         app.push_screen(IndexersScreen())
         await pilot.pause()

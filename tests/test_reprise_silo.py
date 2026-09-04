@@ -3,7 +3,7 @@
 Panne reelle, trouvee en installant deux fois de suite depuis l'executable :
 
     docker compose down          -> les conteneurs partent, le VOLUME reste
-    arrsenal install             -> un nouveau SILO_POSTGRES_PASS est genere
+    plugarr install             -> un nouveau SILO_POSTGRES_PASS est genere
     PostgreSQL demarre           -> il IGNORE POSTGRES_PASSWORD, sa base existe
     Silo                         -> « password authentication failed for user
                                      "silo" », redemarrage en boucle, sans fin
@@ -12,16 +12,16 @@ Panne reelle, trouvee en installant deux fois de suite depuis l'executable :
 la base. Sur un volume deja rempli, l'image ne s'en sert pas et ne dit rien.
 
 C'est le meme piege que les mots de passe haches de qBittorrent ou Jellyfin — un
-secret qu'arrsenal ne peut pas relire — sous une forme que la verification
+secret que plugarr ne peut pas relire — sous une forme que la verification
 d'origine ne voyait pas, parce qu'elle ne regardait que le disque.
 """
 
 from __future__ import annotations
 
-from arrsenal import compose, orchestrator, runner
+from plugarr import compose, orchestrator, runner
 
 
-def _cfg(nom="arrsenal"):
+def _cfg(nom="plugarr"):
     cfg = orchestrator.build_config(services=["silo"], config_root="/c", data_root="/d")
     cfg.project_name = nom
     return cfg
@@ -30,7 +30,7 @@ def _cfg(nom="arrsenal"):
 def test_le_nom_du_volume_suit_celui_du_projet():
     """Compose prefixe par le nom du projet : chercher `silo-pgdata` tout court
     ne trouverait jamais rien."""
-    assert runner.volume_name("arrsenal", compose.PG_VOLUME) == "arrsenal_silo-pgdata"
+    assert runner.volume_name("plugarr", compose.PG_VOLUME) == "plugarr_silo-pgdata"
 
 
 def test_le_nom_du_projet_est_nettoye_comme_par_compose():
@@ -67,7 +67,7 @@ def test_la_remise_a_zero_supprime_le_volume(monkeypatch):
 
     efface = orchestrator.reset_configs(_cfg(), ["silo-postgres"])
 
-    assert supprimes == ["arrsenal_silo-pgdata"]
+    assert supprimes == ["plugarr_silo-pgdata"]
     assert efface, "la remise a zero doit rendre compte de ce qu'elle a supprime"
 
 
@@ -87,10 +87,10 @@ def test_l_emplacement_annonce_est_le_vrai():
     """Le message disait « C:/config/silo-postgres », un dossier qui n'existe
     pas : l'utilisateur allait y chercher, ne trouvait rien, et doutait de
     l'avertissement entier."""
-    cfg = _cfg("arrsenal-essai")
+    cfg = _cfg("plugarr-essai")
 
     assert orchestrator.emplacement_etat(cfg, "silo-postgres") == (
-        "volume Docker arrsenal-essai_silo-pgdata"
+        "volume Docker plugarr-essai_silo-pgdata"
     )
 
 

@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from arrsenal import dashboard
-from arrsenal.orchestrator import build_config
+from plugarr import dashboard
+from plugarr.orchestrator import build_config
 
 
 def _cfg(tmp_path):
@@ -45,7 +45,7 @@ def test_il_vise_le_bon_repertoire(tmp_path):
 
 
 def test_il_nomme_l_executable_reellement_utilise(tmp_path):
-    """« lancez arrsenal serve » n'aide pas quelqu'un qui n'a pas arrsenal dans
+    """« lancez plugarr serve » n'aide pas quelqu'un qui n'a pas plugarr dans
     son PATH. On note le chemin de cette installation-la."""
     contenu = dashboard.write_admin_launcher(tmp_path).read_text(encoding="utf-8")
 
@@ -70,7 +70,7 @@ def test_le_lanceur_posix_est_executable(tmp_path):
 
 
 def test_la_page_figee_renvoie_vers_le_lanceur(tmp_path):
-    """Elle disait « lancez arrsenal serve » : une commande, pas un fichier."""
+    """Elle disait « lancez plugarr serve » : une commande, pas un fichier."""
     page = dashboard.render(_cfg(tmp_path))
 
     assert dashboard.LAUNCHER_NAME in page

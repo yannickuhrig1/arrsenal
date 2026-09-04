@@ -6,15 +6,15 @@ import re
 
 import pytest
 
-from arrsenal import dashboard, orchestrator
-from arrsenal.models import PlatformProfile
+from plugarr import dashboard, orchestrator
+from plugarr.models import PlatformProfile
 
 
 def make(services=("prowlarr", "sonarr", "radarr", "qbittorrent", "jellyfin"), **kw):
     return orchestrator.build_config(
         services=list(services),
         data_root=kw.get("data_root", "/srv/data"),
-        config_root=kw.get("config_root", "/opt/arrsenal/config"),
+        config_root=kw.get("config_root", "/opt/plugarr/config"),
         platform=PlatformProfile.GENERIC_LINUX,
     )
 
@@ -154,11 +154,11 @@ def test_lan_detection_never_returns_loopback(monkeypatch):
 def test_failed_links_are_surfaced_on_the_page():
     page = dashboard.render(make(), failed=3)
     assert "3 lien(s)" in page
-    assert "arrsenal doctor" in page
+    assert "plugarr doctor" in page
 
 
 def test_a_clean_install_shows_no_failure_banner():
-    assert "arrsenal doctor" not in dashboard.render(make())
+    assert "plugarr doctor" not in dashboard.render(make())
 
 
 def test_the_vpn_warning_follows_the_config():

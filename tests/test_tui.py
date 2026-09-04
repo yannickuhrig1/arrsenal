@@ -9,15 +9,15 @@ from __future__ import annotations
 import pytest
 from textual.widgets import Button, Checkbox, Input, RadioButton, Static
 
-from arrsenal import catalog
-from arrsenal.models import PlatformProfile
-from arrsenal.tui.app import ArrsenalApp
-from arrsenal.tui.screens import PathsScreen, ServicesScreen, SummaryScreen
+from plugarr import catalog
+from plugarr.models import PlatformProfile
+from plugarr.tui.app import PlugArrApp
+from plugarr.tui.screens import PathsScreen, ServicesScreen, SummaryScreen
 
 
 @pytest.fixture
 def app(tmp_path):
-    return ArrsenalApp(project_dir=tmp_path)
+    return PlugArrApp(project_dir=tmp_path)
 
 
 async def _goto_services(pilot) -> ServicesScreen:
@@ -64,7 +64,7 @@ async def test_summary_counts_the_links_that_will_be_wired(app):
         assert "liens" in text
         # Le nombre exact bouge a chaque etape ajoutee au plan ; ce qui compte
         # est qu'il reflete la SELECTION et non le catalogue entier.
-        from arrsenal import catalog, orchestrator
+        from plugarr import catalog, orchestrator
 
         tout = orchestrator.build_config(
             services=[s.id for s in catalog.selectable()], config_root="/c", data_root="/d"
@@ -116,7 +116,7 @@ async def test_switching_platform_rewrites_the_default_paths(app):
     Proposer des chemins Linux a un utilisateur Windows le menait droit dans le
     piege : Docker Desktop les cree alors a la racine du disque courant.
     """
-    from arrsenal.layout import PROFILE_DEFAULTS, default_profile
+    from plugarr.layout import PROFILE_DEFAULTS, default_profile
 
     async with app.run_test() as pilot:
         pilot.app.push_screen(PathsScreen())
@@ -193,7 +193,7 @@ async def test_summary_shows_the_single_data_mount(app):
 
 def test_app_build_config_matches_the_collected_state(tmp_path):
     """Le TUI ne doit pas reimplementer la construction de config."""
-    app = ArrsenalApp(project_dir=tmp_path)
+    app = PlugArrApp(project_dir=tmp_path)
     app.selection = ["sonarr", "qbittorrent"]
     app.config_root, app.data_root = "/c", "/d"
     app.timezone = "Europe/Paris"
@@ -211,8 +211,8 @@ async def test_la_page_d_acces_s_ouvre_toute_seule(app, tmp_path, monkeypatch):
     C'est pourtant la que la page sert : elle porte les adresses et les
     identifiants que l'utilisateur vient de se voir annoncer.
     """
-    from arrsenal import dashboard
-    from arrsenal.tui.screens import ReportScreen
+    from plugarr import dashboard
+    from plugarr.tui.screens import ReportScreen
 
     ouvertes = []
     monkeypatch.setattr(dashboard, "open_in_browser", lambda p: ouvertes.append(p) or True)
@@ -230,8 +230,8 @@ async def test_la_page_d_acces_s_ouvre_toute_seule(app, tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_aucune_ouverture_si_la_page_manque(app, tmp_path, monkeypatch):
-    from arrsenal import dashboard
-    from arrsenal.tui.screens import ReportScreen
+    from plugarr import dashboard
+    from plugarr.tui.screens import ReportScreen
 
     ouvertes = []
     monkeypatch.setattr(dashboard, "open_in_browser", lambda p: ouvertes.append(p) or True)
@@ -247,14 +247,14 @@ async def test_aucune_ouverture_si_la_page_manque(app, tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_l_identifiant_se_choisit_dans_l_assistant(app, appuyer):
-    """Demande a l'usage : tout le monde ne veut pas s'appeler « arrsenal »."""
+    """Demande a l'usage : tout le monde ne veut pas s'appeler « plugarr »."""
     async with app.run_test() as pilot:
         pilot.app.selection = ["sonarr"]
         pilot.app.push_screen(PathsScreen())
         await pilot.pause()
         screen = pilot.app.screen
 
-        assert screen.query_one("#username", Input).value == "arrsenal"
+        assert screen.query_one("#username", Input).value == "plugarr"
         screen.query_one("#username", Input).value = "yannick"
         await pilot.pause()
         assert await appuyer(pilot, "#next", lambda: pilot.app.username == "yannick")
@@ -272,6 +272,6 @@ async def test_un_identifiant_vide_retombe_sur_le_defaut(app, appuyer):
         screen = pilot.app.screen
         screen.query_one("#username", Input).value = "   "
         await pilot.pause()
-        assert await appuyer(pilot, "#next", lambda: pilot.app.username == "arrsenal")
+        assert await appuyer(pilot, "#next", lambda: pilot.app.username == "plugarr")
 
-        assert pilot.app.username == "arrsenal"
+        assert pilot.app.username == "plugarr"

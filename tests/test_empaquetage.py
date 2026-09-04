@@ -8,14 +8,14 @@ ET de la roue :
     [tool.hatch.build.targets.wheel]
     artifacts = ["*.tcss"]          # le .json manquait
 
-    datas=[(app.tcss, "arrsenal/tui")]   # le .json manquait aussi
+    datas=[(app.tcss, "plugarr/tui")]   # le .json manquait aussi
 
 Resultat : `FileNotFoundError` sur l'ecran VPN de l'assistant, c'est-a-dire des
 qu'un client de telechargement etait coche. La CI ne l'a pas vu : elle teste que
 l'executable repond a `--help` et que l'assistant s'ouvre, pas qu'on peut aller
 jusqu'au bout.
 
-Ce test regarde ce qui existe REELLEMENT sous `src/arrsenal`, et non une liste
+Ce test regarde ce qui existe REELLEMENT sous `src/plugarr`, et non une liste
 qu'il faudrait penser a tenir a jour.
 """
 
@@ -28,8 +28,8 @@ from pathlib import Path
 import pytest
 
 RACINE = Path(__file__).resolve().parent.parent
-PAQUET = RACINE / "src" / "arrsenal"
-SPEC = RACINE / "packaging" / "arrsenal.spec"
+PAQUET = RACINE / "src" / "plugarr"
+SPEC = RACINE / "packaging" / "plugarr.spec"
 
 #: Ce qui n'a rien a faire dans un paquet installe.
 IGNORES = {".pyc", ".pyo"}
@@ -37,7 +37,7 @@ DOSSIERS_IGNORES = {"__pycache__"}
 
 
 def fichiers_de_donnees() -> list[Path]:
-    """Fichiers non-Python vivant dans le paquet, relatifs a `src/arrsenal`."""
+    """Fichiers non-Python vivant dans le paquet, relatifs a `src/plugarr`."""
     trouves = []
     for chemin in PAQUET.rglob("*"):
         if not chemin.is_file() or chemin.suffix == ".py" or chemin.suffix in IGNORES:
@@ -84,7 +84,7 @@ def test_le_fichier_entre_dans_l_executable(fichier):
 
 def test_le_fichier_des_pays_est_lisible_depuis_le_paquet():
     """Le chemin calcule par le module doit exister, pas seulement le fichier."""
-    from arrsenal import vpnservers
+    from plugarr import vpnservers
 
     assert vpnservers.DATA.is_file(), vpnservers.DATA
     assert vpnservers.choices("mullvad"), "le fichier est la mais ne dit rien"

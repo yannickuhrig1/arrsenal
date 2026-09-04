@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal.clients.prowlarr import (
+from plugarr.clients.prowlarr import (
     CREDENTIAL_NAMES,
     IndexerDefinition,
     ProwlarrIndexers,
@@ -58,7 +58,7 @@ class FakeClient:
         return []
 
     def post(self, resource, payload):
-        from arrsenal.clients.base import WiringError
+        from plugarr.clients.base import WiringError
 
         self.posted.append((resource, payload))
         if self._fail:
@@ -66,7 +66,7 @@ class FakeClient:
         return {"id": 1, **payload}
 
     def profile_id(self, resource, preferred):
-        from arrsenal.clients.arr import ArrClient
+        from plugarr.clients.arr import ArrClient
 
         return ArrClient.profile_id(self, resource, preferred)  # type: ignore[arg-type]
 
@@ -285,13 +285,13 @@ def test_known_free_text_fields_are_not_treated_as_credentials(name):
 
 def test_no_credential_name_is_also_listed_as_a_credential():
     """Les deux listes doivent rester disjointes, sinon l'ordre des regles decide."""
-    from arrsenal.clients.prowlarr import NON_CREDENTIAL_NAMES
+    from plugarr.clients.prowlarr import NON_CREDENTIAL_NAMES
 
     assert not (CREDENTIAL_NAMES & NON_CREDENTIAL_NAMES)
 
 
 def test_non_credential_names_are_lowercase():
-    from arrsenal.clients.prowlarr import NON_CREDENTIAL_NAMES
+    from plugarr.clients.prowlarr import NON_CREDENTIAL_NAMES
 
     assert all(n == n.lower() for n in NON_CREDENTIAL_NAMES)
 

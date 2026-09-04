@@ -3,7 +3,7 @@
 Demande a l'usage : « on pourrait aussi demander la langue voulue dans les
 applications et les passer directement en fr ».
 
-La demande a mis au jour une incoherence deja presente : arrsenal imposait le
+La demande a mis au jour une incoherence deja presente : plugarr imposait le
 francais a Jellyfin — code EN DUR dans la signature de son client — et laissait
 Sonarr, Radarr et Prowlarr en anglais. Personne n'avait choisi ce melange.
 
@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import pytest
 
-from arrsenal import langues, orchestrator
-from arrsenal.clients.arr import ArrClient
-from arrsenal.wiring import Wirer
+from plugarr import langues, orchestrator
+from plugarr.clients.arr import ArrClient
+from plugarr.wiring import Wirer
 
 # ------------------------------------------------------------------- table
 
@@ -165,7 +165,7 @@ def test_jellyfin_n_impose_plus_le_francais():
     """Le defaut etait code en dur dans la signature du client."""
     import inspect
 
-    from arrsenal.clients.jellyfin import JellyfinClient
+    from plugarr.clients.jellyfin import JellyfinClient
 
     signature = inspect.signature(JellyfinClient.run_startup_wizard)
     assert signature.parameters["ui_culture"].default == "en"
