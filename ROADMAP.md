@@ -3,7 +3,7 @@
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 4 septembre 2026** — version publiée : **0.2.0**
+**Dernière mise à jour : 4 septembre 2026** — version publiée : **0.2.1**
 
 ---
 
@@ -36,6 +36,14 @@ l'un vers l'autre. Sonarr reçoit un dossier racine séparé pour l'anime, comme
 recommandent les TRaSH Guides. Les quatre dernières n'ont pas encore
 d'application qui les pilote : elles rangent les téléchargements manuels, et
 attendent Audiobookshelf, Shelfarr et les autres.
+
+**La configuration complète se sauvegarde et se restaure.** `plugarr backup`
+archive le répertoire du projet, `CONFIG_ROOT` et **les volumes Docker** — la
+base de Silo n'est pas sous `CONFIG_ROOT` et une sauvegarde qui n'archive que
+des dossiers la manquerait en silence. Les conteneurs sont arrêtés pendant la
+copie : une base SQLite copiée à chaud donne un fichier valide en apparence et
+inutilisable en pratique. `DATA_ROOT` n'est jamais touché. `plugarr restore`
+repose le tout, y compris ailleurs, en réécrivant les chemins.
 
 Le **lecteur RSS de qBittorrent** est activé, téléchargement automatique
 compris. PlugArr n'ajoute ni flux ni règle : ils dépendent de vos traqueurs,
@@ -186,6 +194,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.2.1** | **Sauvegarde et restauration complètes.** Vérifié sur une pile réelle et non simulé : un témoin posé dans Sonarr, sauvegarde, **destruction totale** — conteneurs, volumes, dossiers — puis restauration ailleurs. Le témoin est revenu, Silo est reparti *healthy* du premier coup, et le recâblage a compté **12 liaisons sur 12, zéro créée** : tout existait déjà. Un bouton sur la console ; la restauration reste en ligne de commande, car elle écrase une configuration en place. |
 | **0.2.0** | **arrsenal devient PlugArr.** Le nom disait « un tas d'outils », ce que propose n'importe quel dépôt de compose *arr ; ce qui distingue ce projet est qu'il les **branche ensemble**. 125 fichiers. Le point dur n'était aucun des noms visibles : `discovery.py` reconnaît les piles installées par un **label**, jamais par leur nom, et renommer ce label aurait rendu invisible chaque installation existante — donc candidate à être recréée par-dessus. Les deux marqueurs sont lus, `plugarr.managed` et `arrsenal.managed` ; seul le premier est écrit. Le renommage mécanique avait aussi cassé vingt-cinq élisions françaises : « qu'arrsenal sait faire » devenait « qu'PlugArr sait faire ». |
 | **0.2.0** | **L'exécutable n'avait aucune icône** — Windows lui collait celle, générique, de tout binaire console. Sept tailles de 16 à 256 px, engendrées par `scripts/icone.py` plutôt que commitées en binaire opaque : fond transparent, car une tuile sombre gravée devient une tache noire sur une barre des tâches claire ; canal alpha tiré de la **chroma** et non de la luminosité, qui mangeait le bas du jambage violet. L'assistant porte les couleurs de la marque. |
 | **0.1.12** | **Une bibliothèque ajoutée au catalogue n'atteignait pas les installations existantes.** `install` crée l'arborescence, `wire` non — et Sonarr refuse net un dossier racine absent : « Path '/data/media/anime' does not exist ». Trouvé en réparant une pile réelle juste après l'ajout de l'anime. `wire` garantit désormais les dossiers avant de câbler ; l'opération est idempotente et silencieuse sur une installation à jour. |

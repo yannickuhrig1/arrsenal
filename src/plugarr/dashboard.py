@@ -533,6 +533,7 @@ _TEMPLATE = """<!doctype html>
 _OUTILS = """<div class="outils">
       <button class="outil" id="btn-doctor">diagnostic</button>
       <button class="outil" id="btn-maj">chercher les mises a jour</button>
+      <button class="outil" id="btn-sauvegarde">sauvegarder la configuration</button>
       <span class="outil-etat" id="outil-etat"></span>
     </div>
     <pre class="rapport" id="rapport-doctor" hidden></pre>"""
@@ -761,6 +762,27 @@ _LIVE_SCRIPT = """<script>
         })
         .catch(function () { etat.textContent = 'serveur injoignable'; })
         .then(function () { btnMaj.disabled = false; });
+    });
+  }
+
+  var btnSauv = document.getElementById('btn-sauvegarde');
+  if (btnSauv) {
+    btnSauv.addEventListener('click', function () {
+      if (!confirm('Sauvegarder la configuration complete ?'
+          + '\\n\\nLes conteneurs seront ARRETES le temps de la copie, puis redemarres. '
+          + 'Une base copiee a chaud est corrompue. Vos medias ne sont pas touches.')) return;
+      btnSauv.disabled = true;
+      etat.textContent = 'conteneurs arretes, copie en cours…';
+      fetch('/api/backup', {method: 'POST', credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          etat.textContent = d.ok
+            ? d.fichiers + ' fichiers, ' + d.mega + ' Mo — ' + d.archive
+            : 'echec : ' + (d.error || 'inconnu');
+          if (d.ok) { rafraichir(); }
+        })
+        .catch(function () { etat.textContent = 'serveur injoignable'; })
+        .then(function () { btnSauv.disabled = false; });
     });
   }
 

@@ -39,7 +39,9 @@ from . import (
     compose,
     dashboard,
     imageref,
+    journal,
     orchestrator,
+    sauvegarde,
     updates,
     vpncheck,
 )
@@ -429,6 +431,25 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(
                 {"ok": ok, "service": service, "message": message, "added": ajoutes},
                 HTTPStatus.OK if ok else HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            return
+
+        if route == "/api/backup":
+            chemin = self.project_dir / sauvegarde.nom_par_defaut(self.cfg)
+            try:
+                rapport = sauvegarde.sauvegarder(self.cfg, self.project_dir, chemin)
+            except Exception as exc:  # noqa: BLE001
+                journal.LOGGER.exception("sauvegarde")
+                self._json({"ok": False, "error": str(exc)[:200]})
+                return
+            self._json(
+                {
+                    "ok": True,
+                    "archive": str(rapport.archive),
+                    "mega": round(rapport.archive.stat().st_size / 1_048_576, 1),
+                    "fichiers": rapport.fichiers,
+                    "volumes": rapport.volumes,
+                }
             )
             return
 

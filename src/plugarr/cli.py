@@ -24,6 +24,7 @@ from . import (
     journal,
     orchestrator,
     report,
+    sauvegarde,
     vpncheck,
 )
 from . import adopt as adopt_mod
@@ -686,6 +687,110 @@ def autostart(
             "survive :[/dim]"
         )
         console.print("  loginctl enable-linger $USER")
+
+
+@app.command()
+def backup(
+    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
+    out: Path | None = typer.Option(None, "--out", "-o", help="Fichier d'archive a ecrire."),
+    live: bool = typer.Option(
+        False,
+        "--live",
+        help="Ne PAS arreter les conteneurs. Plus rapide, et la sauvegarde peut etre corrompue.",
+    ),
+) -> None:
+    """Archive la configuration complete : projet, CONFIG_ROOT et volumes."""
+    cfg = _load_config(project_dir)
+    destination = Path(out) if out else project_dir / sauvegarde.nom_par_defaut(cfg)
+
+    if live:
+        console.print(
+            "[yellow]Sauvegarde a chaud.[/yellow] Une base SQLite copiee pendant qu'on "
+            "ecrit dedans donne un fichier valide en apparence et inutilisable en "
+            "pratique. Sans --live, PlugArr arrete les conteneurs le temps de la copie."
+        )
+
+    rapport = sauvegarde.sauvegarder(
+        cfg,
+        project_dir,
+        destination,
+        live=live,
+        on_progress=lambda m: console.print(f"  [dim]{m}[/dim]"),
+    )
+
+    from rich.table import Table
+
+    table = Table(title="Sauvegarde")
+    for col in ("", ""):
+        table.add_column(col, overflow="fold")
+    table.add_row("Archive", str(rapport.archive))
+    table.add_row("Taille", f"{rapport.archive.stat().st_size / 1_048_576:.1f} Mo")
+    table.add_row("Fichiers", str(rapport.fichiers))
+    table.add_row("Services", ", ".join(rapport.services))
+    table.add_row("Volumes", ", ".join(rapport.volumes) or "aucun")
+    console.print(table)
+    console.print(
+        "[yellow]Cette archive contient vos mots de passe et vos cles API en clair.[/yellow]\n"
+        "[dim]Elle est en lecture seule pour vous (chmod 600). Rangez-la comme un secret.[/dim]"
+    )
+    console.print(f"[dim]Vos medias dans {cfg.data_root} ne sont PAS dedans, et c'est voulu.[/dim]")
+
+
+@app.command()
+def restore(
+    archive: Path = typer.Argument(..., help="Archive produite par `plugarr backup`."),
+    project_dir: Path = typer.Option(Path("."), help="Ou reposer le projet."),
+    config_root: str | None = typer.Option(
+        None, help="Restaurer AILLEURS que l'origine. Les chemins sont reecrits."
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Ne pas demander confirmation."),
+) -> None:
+    """Repose une sauvegarde. N'ecrit RIEN dans DATA_ROOT."""
+    archive = Path(archive)
+    if not archive.is_file():
+        console.print(f"[red]{archive} introuvable.[/red]")
+        raise typer.Exit(1)
+    try:
+        manifeste = sauvegarde.lire_manifeste(archive)
+    except (ValueError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    cible = config_root or manifeste["config_root"]
+    from rich.table import Table
+
+    table = Table(title="Contenu de l'archive")
+    for col in ("", ""):
+        table.add_column(col, overflow="fold")
+    table.add_row("Date", manifeste["date"])
+    table.add_row("Pile", manifeste["project_name"])
+    table.add_row("Services", ", ".join(manifeste["services"]))
+    table.add_row("Volumes", ", ".join(manifeste["volumes"]) or "aucun")
+    table.add_row("Configuration vers", cible)
+    console.print(table)
+    if manifeste.get("a_chaud"):
+        console.print(
+            "[yellow]Cette archive a ete prise A CHAUD, conteneurs en marche.[/yellow] "
+            "Ses bases peuvent etre corrompues."
+        )
+
+    if not yes and not typer.confirm(
+        f"Ecraser la configuration dans {cible} et le projet dans {project_dir} ?",
+        default=False,
+    ):
+        raise typer.Exit(0)
+
+    sauvegarde.restaurer(
+        archive,
+        project_dir,
+        config_root=config_root,
+        on_progress=lambda m: console.print(f"  [dim]{m}[/dim]"),
+    )
+    console.print("[green]Restauration terminee.[/green]")
+    console.print(
+        f"[dim]Demarrez la pile, puis `plugarr wire --project-dir {project_dir}` "
+        f"pour verifier que tout repond.[/dim]"
+    )
 
 
 @app.command()
