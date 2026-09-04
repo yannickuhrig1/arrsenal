@@ -57,6 +57,13 @@ class DownloadClientProfile:
         }
         if self.service_id == "transmission":
             values["urlBase"] = "/transmission/"
+        if self.service_id == "sabnzbd":
+            # SABnzbd s'authentifie par CLE API. Son identifiant et son mot de
+            # passe restent vides : les poser ferait echouer le test de
+            # connexion, l'interface n'en demandant pas.
+            values["apiKey"] = password
+            values["username"] = ""
+            values["password"] = ""
         if self.routes_by_category:
             values[f"{prefix}Category"] = category
             values[f"{prefix}Directory"] = ""
@@ -76,6 +83,10 @@ class DownloadClientProfile:
         }
         if self.service_id == "transmission":
             values["urlBase"] = "/transmission/"
+        if self.service_id == "sabnzbd":
+            values["apiKey"] = password
+            values["username"] = ""
+            values["password"] = ""
         return values
 
 
@@ -90,6 +101,15 @@ PROFILES: dict[str, DownloadClientProfile] = {
         service_id="qbittorrent",
         implementation="QBittorrent",
         protocol="torrent",
+        routes_by_category=True,
+    ),
+    "sabnzbd": DownloadClientProfile(
+        service_id="sabnzbd",
+        implementation="Sabnzbd",
+        # USENET, pas torrent. Ce n'est pas un detail d'etiquette : les *arr
+        # rangent leurs clients par protocole et ne proposent un client Usenet
+        # que pour les publications Usenet.
+        protocol="usenet",
         routes_by_category=True,
     ),
 }

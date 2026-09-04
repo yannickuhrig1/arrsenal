@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import catalog, compose, dashboard, seed
 from .clients.arr import ArrClient
-from .layout import PROFILE_DEFAULTS, create_tree, resolve_ids
+from .layout import CONTAINER_PATHS, PROFILE_DEFAULTS, create_tree, resolve_ids
 from .models import PlatformProfile, ServiceInstance, StackConfig
 from .runner import (
     Check,
@@ -121,6 +121,19 @@ def new_instance(cfg: StackConfig, service_id: str) -> ServiceInstance:
     )
     if spec.api_family == "arr":
         inst.api_key = seed.generate_api_key()
+    if spec.api_family == "sabnzbd":
+        # SABnzbd n'a ni identifiant ni mot de passe : sa CLE API tient lieu des
+        # deux. On la range dans `api_key`, comme pour les *arr, et le rapport
+        # l'affiche donc au bon endroit plutot que dans une colonne « mot de
+        # passe » qui n'aurait aucun sens.
+        #
+        # Elle est aussi copiee dans `password` : c'est ce champ que le .env
+        # publie sous SABNZBD_PASS et que le profil de client repose dans
+        # `apiKey`. Sans cette copie, le pre-semis ecrivait une cle VIDE,
+        # SABnzbd en generait une a lui, et tout le cablage repondait « API Key
+        # Required ». Constate au premier essai reel.
+        inst.api_key = seed.generate_api_key()
+        inst.password = inst.api_key
     if spec.api_family in _AVEC_COMPTE:
         inst.username = cfg.username
         inst.password = seed.generate_password()
@@ -472,6 +485,23 @@ def seed_all(cfg: StackConfig) -> list[str]:
                 port=spec.internal_port,
             )
             actions.append(f"{sid} : {message}")
+        elif spec.api_family == "sabnzbd":
+            # SABnzbd n'a ni identifiant ni mot de passe : sa cle API tient
+            # lieu des deux. On la range dans le champ `password` de
+            # l'instance, faute de champ dedie, et le profil de client la
+            # repose ensuite dans `apiKey`.
+            _written, message = seed.seed_sabnzbd(
+                cfg_dir,
+                api_key=inst.password or "",
+                port=spec.internal_port,
+                # Les DEUX noms sous lesquels un autre conteneur peut l'appeler.
+                # Sans eux : « Access denied - Hostname verification failed »,
+                # message qui ne nomme ni l'appelant ni le reglage en cause.
+                hotes_autorises=[sid, f"{cfg.project_name}-{sid}", "localhost"],
+                incomplet=CONTAINER_PATHS["usenet_incomplete"],
+                complet=CONTAINER_PATHS["usenet_root"],
+            )
+            actions.append(f"{sid} : {message}")
         elif spec.api_family == "transmission":
             _written, message = seed.seed_transmission(
                 cfg_dir,
@@ -687,6 +717,16 @@ def planned_links(cfg: StackConfig) -> int:
 _FIXED_EVENTS = 6
 
 
+#: Familles d'API dont la configuration se pre-seme sur le disque avant le
+#: premier demarrage. Une SEULE liste, lue par `seeded_services` et par les
+#: tests : la recopier ailleurs revenait a la laisser deriver, ce qui s'est
+#: produit des l'ajout de SABnzbd.
+#:
+#: Ce qui n'y figure pas n'a rien a pre-semer : Jellyfin s'accueille par son
+#: API, Recyclarr lit un fichier que PlugArr ecrit plus tard.
+FAMILLES_PRE_SEMEES = ("arr", "qbittorrent", "transmission", "sabnzbd")
+
+
 def seeded_services(cfg: StackConfig) -> list[str]:
     """Services pour lesquels seed_all emet une action.
 
@@ -697,7 +737,7 @@ def seeded_services(cfg: StackConfig) -> list[str]:
         sid
         for sid in catalog.STARTUP_ORDER
         if cfg.enabled(sid)
-        and catalog.get(sid).api_family in ("arr", "qbittorrent", "transmission")
+        and catalog.get(sid).api_family in FAMILLES_PRE_SEMEES
     ]
 
 

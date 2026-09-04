@@ -35,6 +35,12 @@ _TAGS = {
 #: Ses deux appoints sont epingles de la meme facon : `redis:alpine` et
 #: `pgvector:pg18` sont des tags FLOTTANTS, qui designent un nom et non un
 #: contenu. Sans digest, deux installations du meme jour peuvent differer.
+#: SABnzbd. Image LinuxServer : nos conventions exactes.
+_SABNZBD = (
+    "lscr.io/linuxserver/sabnzbd:5.1.2"
+    "@sha256:64c4c2b6ed546237451cbfec33aa8bac1396865c1a266dd247c02b36ffe27c62"
+)
+
 #: Seerr, successeur commun de Jellyseerr et d'Overseerr.
 _SEERR = (
     "ghcr.io/seerr-team/seerr:v3.4.1"
@@ -165,6 +171,19 @@ CATALOG: dict[str, ServiceSpec] = {
         requires=("jellyfin",),
         notes="Demandes de medias. Successeur de Jellyseerr et d'Overseerr.",
     ),
+    "sabnzbd": ServiceSpec(
+        id="sabnzbd",
+        display_name="SABnzbd",
+        category=Category.DOWNLOAD,
+        image=_SABNZBD,
+        internal_port=8080,
+        # 8080 est deja le port hote de qBittorrent. SABnzbd ecoute lui aussi
+        # sur 8080 dans son conteneur : c'est cote hote qu'il faut decaler.
+        default_host_port=8085,
+        config_dir="sabnzbd",
+        api_family="sabnzbd",
+        notes="Client Usenet. Complete les torrents, il ne les remplace pas.",
+    ),
     "audiobookshelf": ServiceSpec(
         id="audiobookshelf",
         display_name="Audiobookshelf",
@@ -286,6 +305,8 @@ CATALOG: dict[str, ServiceSpec] = {
 STARTUP_ORDER = (
     "transmission",
     "qbittorrent",
+    # SABnzbd avec les autres clients : les *arr le declarent au meme moment.
+    "sabnzbd",
     "sonarr",
     "radarr",
     "lidarr",
@@ -315,7 +336,12 @@ STARTUP_ORDER = (
 MANAGED_ARRS = ("sonarr", "radarr", "lidarr")
 
 #: Services jouant le role de client de telechargement.
-DOWNLOAD_CLIENTS = ("transmission", "qbittorrent")
+#: Les clients de telechargement. SABnzbd y figure alors qu'il parle Usenet et
+#: non BitTorrent : il est declare aux *arr de la meme facon, il est attendu au
+#: demarrage de la meme facon, et il passe par le VPN de la meme facon. Ce qui
+#: change — protocole, cle API au lieu d'un mot de passe — est isole dans
+#: downloadclients.py.
+DOWNLOAD_CLIENTS = ("transmission", "qbittorrent", "sabnzbd")
 
 #: Selection par defaut du profil "Debutant tout-en-un" en Phase 1.
 #: Coches par defaut dans l'assistant. Recyclarr en fait partie : il ne coute

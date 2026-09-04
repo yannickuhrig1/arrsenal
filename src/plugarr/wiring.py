@@ -779,6 +779,68 @@ class Wirer:
             created=not deja or bool(declares),
         )
 
+    def step_sabnzbd_categories(self) -> StepResult:
+        """Pose les categories de SABnzbd, avec leur repertoire.
+
+        Ce sont elles qui font atterrir un telechargement de Sonarr dans
+        `/data/usenet/tv` : les *arr n'envoient qu'un NOM de categorie, jamais
+        un chemin.
+
+        SABnzbd en livre d'usine — `movies`, `tv`, `audio`, `software` — avec un
+        repertoire VIDE. Se contenter de les creer si absentes les laisserait
+        inutilisables : le nom existe, Sonarr l'accepte, et tout atterrit dans
+        le repertoire par defaut. Voir `ensure_category`.
+        """
+        from .clients.sabnzbd import SabnzbdClient
+
+        inst = self.cfg.services["sabnzbd"]
+        if inst.adopted:
+            return StepResult(
+                "sabnzbd: categories",
+                ok=True,
+                detail="client existant, categories laissees telles quelles",
+            )
+
+        url = f"http://{self.cfg.host}:{inst.host_port}"
+        with SabnzbdClient(url, inst.password or "") as sab:
+            sab.wait_ready()
+            voulues = {
+                b.id: b.usenet
+                for b in BIBLIOTHEQUES
+                if b.arr is None or self.cfg.enabled(b.arr)
+            }
+            if self.cfg.enabled("prowlarr"):
+                # Prowlarr envoie sa propre categorie et REFUSE de se declarer
+                # si elle n'existe pas cote client : « The category you entered
+                # doesn't exist in Sabnzbd. Go to Sabnzbd to create it. » Meme
+                # exigence que pour qBittorrent, et meme remede.
+                voulues["prowlarr"] = CONTAINER_PATHS["usenet_root"]
+
+            posees = [nom for nom, chemin in voulues.items() if sab.ensure_category(nom, chemin)]
+
+            # SABnzbd reecrit tout son fichier de configuration a chaque
+            # `set_config`. Une pose peut se perdre quand elles s'enchainent —
+            # constate sur la premiere de la serie, restee sans repertoire
+            # pendant que les six suivantes passaient. On relit et on repose ce
+            # qui manque, une fois : c'est moins couteux qu'une temporisation
+            # posee au juge.
+            for nom, chemin in voulues.items():
+                if sab.categories().get(nom) != chemin and sab.ensure_category(nom, chemin):
+                    posees.append(nom)
+            relues = sab.categories()
+
+        manquantes = [n for n, c in voulues.items() if relues.get(n) != c]
+        return StepResult(
+            "sabnzbd: categories avec repertoire",
+            # Relu depuis l'application : un `set_config` accepte ne prouve rien.
+            ok=not manquantes,
+            detail=f"posees: {', '.join(posees) or 'aucune (deja completes)'}",
+            created=bool(posees),
+            warnings=(
+                [] if not manquantes else [f"categories sans repertoire : {', '.join(manquantes)}"]
+            ),
+        )
+
     def step_audiobookshelf_setup(self) -> StepResult:
         """Accueil d'Audiobookshelf et creation de ses deux bibliotheques.
 
@@ -1226,6 +1288,11 @@ class Wirer:
                         lambda a=arr_id, c=chemin: self.step_root_folder(a, c),
                     )
                 )
+
+        if cfg.enabled("sabnzbd"):
+            # Avant que les *arr ne le declarent : ils n'envoient qu'un nom de
+            # categorie, qui doit deja porter son repertoire.
+            steps.append(WiringStep("sabnzbd/categories", self.step_sabnzbd_categories))
 
         if cfg.enabled("qbittorrent"):
             steps.append(WiringStep("qbittorrent/rss", self.step_qbittorrent_rss))

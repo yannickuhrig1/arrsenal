@@ -36,6 +36,10 @@ class Bibliotheque:
         return f"/data/torrents/{self.id}"
 
     @property
+    def usenet(self) -> str:
+        return f"/data/usenet/{self.id}"
+
+    @property
     def mediatheque(self) -> str:
         return f"/data/media/{self.id}"
 
@@ -72,10 +76,19 @@ BIBLIOTHEQUES: tuple[Bibliotheque, ...] = (
 )
 
 #: Sous-dossiers a creer sous DATA_ROOT. Deduit de la table ci-dessus.
+#:
+#: Torrent et Usenet ont leur propre arborescence. Ce n'est pas une coquetterie :
+#: les deux protocoles ont des durees de vie differentes — un torrent doit rester
+#: en partage apres l'import, un NZB non — et melanger les deux fait effacer par
+#: l'un ce que l'autre partage encore. Les TRaSH Guides recommandent la meme
+#: separation. Les deux restent sous `/data`, condition des liens physiques.
 DATA_SUBDIRS = (
     "torrents",
     "torrents/.incomplete",
     *(f"torrents/{b.id}" for b in BIBLIOTHEQUES),
+    "usenet",
+    "usenet/.incomplete",
+    *(f"usenet/{b.id}" for b in BIBLIOTHEQUES),
     "media",
     *(f"media/{b.id}" for b in BIBLIOTHEQUES if b.media),
 )
@@ -85,6 +98,9 @@ CONTAINER_PATHS = {
     "torrents_root": "/data/torrents",
     "torrents_incomplete": "/data/torrents/.incomplete",
     **{f"torrents_{b.id}": f"/data/torrents/{b.id}" for b in BIBLIOTHEQUES},
+    "usenet_root": "/data/usenet",
+    "usenet_incomplete": "/data/usenet/.incomplete",
+    **{f"usenet_{b.id}": f"/data/usenet/{b.id}" for b in BIBLIOTHEQUES},
     **{f"media_{b.id}": f"/data/media/{b.id}" for b in BIBLIOTHEQUES if b.media},
 }
 

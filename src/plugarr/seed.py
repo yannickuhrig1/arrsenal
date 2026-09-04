@@ -431,3 +431,91 @@ def replace_arr_api_key(config_dir: Path, api_key: str) -> bool:
         return False
     target.write_text(remplace, encoding="utf-8")
     return True
+
+
+def seed_sabnzbd(
+    config_dir: Path,
+    *,
+    api_key: str,
+    port: int,
+    hotes_autorises: list[str],
+    incomplet: str,
+    complet: str,
+) -> tuple[bool, str]:
+    """Pre-seme `sabnzbd.ini`. Renvoie (ecrit, message).
+
+    Trois reglages, et le deuxieme est celui qui fait perdre une soiree.
+
+    **La cle API.** SABnzbd en genere une au premier demarrage, comme les *arr.
+    La poser d'avance evite d'avoir a la relire ensuite, et permet aux *arr
+    d'etre cables avant meme qu'il ait fini de demarrer.
+
+    **La liste blanche d'hotes.** SABnzbd refuse toute requete dont l'en-tete
+    `Host` ne figure pas dans `host_whitelist`, et n'y met par defaut QUE
+    l'identifiant du conteneur. Sonarr appelant `http://sabnzbd:8080` recoit
+    donc :
+
+        Access denied - Hostname verification failed
+
+    Verifie contre la 5.1.2. Le message ne mentionne ni Sonarr ni le reglage en
+    cause, et renvoie vers une page d'aide generale.
+
+    **Les repertoires.** Par defaut relatifs et sous `/config`, ce qui met les
+    telechargements hors de `/data` : les liens physiques deviennent impossibles
+    et chaque import recopie le fichier.
+
+    Un fichier existant fait autorite : on ne fait qu'y AJOUTER les hotes
+    manquants, sans toucher au reste. Quelqu'un a pu regler son serveur Usenet,
+    ses categories et ses scripts.
+    """
+    config_dir.mkdir(parents=True, exist_ok=True)
+    ini = config_dir / "sabnzbd.ini"
+    hotes = ",".join(hotes_autorises) + ","
+
+    if ini.exists():
+        texte = ini.read_text(encoding="utf-8", errors="replace")
+        manquants = [h for h in hotes_autorises if h and h not in texte]
+        if not manquants:
+            return False, "sabnzbd.ini existant, liste d'hotes deja complete"
+        lignes = []
+        for ligne in texte.splitlines():
+            if ligne.startswith("host_whitelist"):
+                actuels = ligne.split("=", 1)[1].strip().rstrip(",")
+                ligne = "host_whitelist = " + ",".join(
+                    filter(None, [actuels, *manquants])
+                ) + ","
+            lignes.append(ligne)
+        ini.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+        return False, f"sabnzbd.ini existant, hotes ajoutes : {', '.join(manquants)}"
+
+    ini.write_text(
+        "\n".join(
+            [
+                "__version__ = 19",
+                "[misc]",
+                'host = "0.0.0.0"',
+                f"port = {port}",
+                f"api_key = {api_key}",
+                f"nzb_key = {api_key}",
+                f"host_whitelist = {hotes}",
+                # `inet_exposure = 0` garde l'interface accessible sans mot de
+                # passe depuis le reseau local, comme les autres services de la
+                # pile. Le rendre public serait un autre sujet, et un choix.
+                "inet_exposure = 0",
+                f'download_dir = "{incomplet}"',
+                f'complete_dir = "{complet}"',
+                "permissions = 775",
+                "auto_browser = 0",
+                "check_new_rel = 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    # chmod 600 : le fichier porte la cle API. Sans effet utile sous Windows,
+    # silencieux plutot que bruyant, comme partout ailleurs dans le projet.
+    try:
+        ini.chmod(0o600)
+    except (OSError, NotImplementedError):
+        pass
+    return True, "sabnzbd.ini pre-seme (cle API et liste d'hotes)"

@@ -103,7 +103,7 @@ def test_le_pre_semis_et_le_total_decrivent_les_memes_services(tmp_path):
         sid
         for sid in catalog.STARTUP_ORDER
         if cfg.enabled(sid)
-        and catalog.get(sid).api_family in ("arr", "qbittorrent", "transmission")
+        and catalog.get(sid).api_family in orchestrator.FAMILLES_PRE_SEMEES
     ]
     # Recyclarr n'a pas de configuration a pre-semer : il ne doit pas etre compte.
     assert "recyclarr" not in seeded

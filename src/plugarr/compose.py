@@ -183,6 +183,21 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # Il transmet des demandes aux *arr, qui telechargent.
         block["environment"] = {"TZ": cfg.timezone, "LOG_LEVEL": "info"}
         block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/app/config"]
+    elif service_id == "sabnzbd":
+        block["environment"] = {
+            "PUID": str(cfg.puid),
+            "PGID": str(cfg.pgid),
+            "TZ": cfg.timezone,
+            "UMASK": cfg.umask,
+        }
+        block["volumes"] = [
+            f"${{CONFIG_ROOT}}/{spec.config_dir}:/config",
+            # `/data` ENTIER, comme les clients torrent : c'est ce qui rend les
+            # liens physiques possibles entre le telechargement et la
+            # mediatheque. Monter seulement `/data/usenet` obligerait chaque
+            # import a recopier le fichier.
+            "${DATA_ROOT}:/data",
+        ]
     elif service_id == "audiobookshelf":
         # Ni PUID ni PGID : ce n'est pas une image LinuxServer.
         block["environment"] = {"TZ": cfg.timezone}
