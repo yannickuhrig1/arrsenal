@@ -63,7 +63,8 @@ jobs:
           $toc = Get-Content build\plugarr\Analysis-00.toc -Raw
           foreach ($m in @('plugarr.clients.silo','plugarr.langues',
                            'plugarr.clients.jellyfin','plugarr.wiring','plugarr.vpncheck',
-                           'plugarr.sauvegarde')) {
+                           'plugarr.sauvegarde','plugarr.clients.audiobookshelf',
+                           'plugarr.clients.seerr')) {
             if ($toc -notmatch [regex]::Escape("'$m'")) {
               throw "$m absent de l'executable"
             }
