@@ -3,13 +3,13 @@
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 4 septembre 2026** — version publiée : **0.2.1**
+**Dernière mise à jour : 4 septembre 2026** — version publiée : **0.3.0**
 
 ---
 
 ## Ce qui marche aujourd'hui
 
-Douze services installés et **câblés** en une passe, vérifiés contre des
+Treize services installés et **câblés** en une passe, vérifiés contre des
 instances réelles à chaque livraison.
 
 | | |
@@ -18,6 +18,7 @@ instances réelles à chaque livraison.
 | **Bibliothèque** | Sonarr, Radarr, Lidarr |
 | **Indexeurs** | Prowlarr |
 | **Média** | Jellyfin, Silo *(expérimental)* |
+| **Livres** | Audiobookshelf |
 | **Automatisation** | autobrr, Recyclarr |
 | **Interfaces** | Flood, qui |
 | **Réseau** | Gluetun *(VPN optionnel)* |
@@ -133,7 +134,6 @@ une instance réelle. L'ordre ci-dessous est celui de l'étude.
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut pas précéder Plex. |
 | **Jellystat** | Statistiques Jellyfin. Exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue tient en un seul. |
 | **Tracearr** | Suivi des lectures et détection de partage de comptes. L'image `latest` réclame une base et un Redis externes ; le tag `supervised` réunit le tout en un conteneur. |
-| **Audiobookshelf** | `ghcr.io/advplyr/audiobookshelf:2.36.0`, épinglé au digest. Les répertoires `books` et `audiobooks` l'attendent déjà. **Obstacle relevé contre une instance réelle, non résolu :** sur une installation neuve, `/status` répond `isInit: true` alors que la table `users` de sa base est **vide**, et `POST /init` — la voie documentée pour créer le premier compte — répond **405**. L'interface web n'est pas servie non plus (`/` en 404), avec ou sans le volume `/metadata`. L'API vit pourtant (`/api/libraries` répond 401). Tant que la création du premier compte n'est pas comprise, le câblage est impossible. À noter : l'image taguée `2.36.0` rapporte `serverVersion: 2.35.0`. |
 | **Shelfarr** | `ghcr.io/pedro-revez-silva/shelfarr`, **2026.08.31.1**. Demandes de livres pour l'écosystème *arr — un Seerr des livres. Cherche dans Prowlarr, télécharge par qBittorrent, livre à Audiobookshelf. Comble le trou laissé par Readarr, archivé depuis le 27 juin 2025. |
 | **Shelfmark** | `ghcr.io/calibrain/shelfmark`, **v1.3.15**, 60 versions. Interface de recherche et de demande de livres, sources et clients apportés par vous. |
 
@@ -194,6 +194,7 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.3.0** | **Audiobookshelf entre au catalogue.** Il remplit `books` et `audiobooks`, les deux bibliothèques que PlugArr rangeait depuis la 0.1.12 sans que personne ne les lise. Trois pièges relevés contre une instance réelle : il met **quarante secondes** à démarrer et répond 404 avant, ce qui fait croire à une image cassée ; sa base SQLite se lit **avec son journal `-wal`** ou pas du tout, sans quoi la table `users` paraît vide pendant que `/status` annonce `isInit: true` ; et `POST /init` répond 200 **avec un corps vide**, sans jeton — là où l'accueil de Silo en renvoie deux. Ce dernier a donné 0 liaison sur 1 au premier essai réel. |
 | **0.2.1** | **La restauration se fait depuis l'assistant.** Elle avait d'abord été laissée en ligne de commande, au motif qu'un bouton serait dangereux — argument faible, la ligne de commande a le même pouvoir. La vraie raison désigne le bon endroit : la console d'administration commence par lire un `stack.yml`, et sur une machine fraîchement formatée il n'y en a pas, puisque c'est ce que l'archive contient. Un bouton là-bas aurait été inutilisable dans le seul cas où il sert. L'assistant, lui, démarre sans rien. Un bouton **Examiner l'archive** montre ce qu'elle contient avant d'écraser quoi que ce soit, et remplace la confirmation. |
 | **0.2.1** | **Sauvegarde et restauration complètes.** Vérifié sur une pile réelle et non simulé : un témoin posé dans Sonarr, sauvegarde, **destruction totale** — conteneurs, volumes, dossiers — puis restauration ailleurs. Le témoin est revenu, Silo est reparti *healthy* du premier coup, et le recâblage a compté **12 liaisons sur 12, zéro créée** : tout existait déjà. Un bouton sur la console ; la restauration reste en ligne de commande, car elle écrase une configuration en place. |
 | **0.2.0** | **arrsenal devient PlugArr.** Le nom disait « un tas d'outils », ce que propose n'importe quel dépôt de compose *arr ; ce qui distingue ce projet est qu'il les **branche ensemble**. 125 fichiers. Le point dur n'était aucun des noms visibles : `discovery.py` reconnaît les piles installées par un **label**, jamais par leur nom, et renommer ce label aurait rendu invisible chaque installation existante — donc candidate à être recréée par-dessus. Les deux marqueurs sont lus, `plugarr.managed` et `arrsenal.managed` ; seul le premier est écrit. Le renommage mécanique avait aussi cassé vingt-cinq élisions françaises : « qu'arrsenal sait faire » devenait « qu'PlugArr sait faire ». |

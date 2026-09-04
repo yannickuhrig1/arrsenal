@@ -35,6 +35,12 @@ _TAGS = {
 #: Ses deux appoints sont epingles de la meme facon : `redis:alpine` et
 #: `pgvector:pg18` sont des tags FLOTTANTS, qui designent un nom et non un
 #: contenu. Sans digest, deux installations du meme jour peuvent differer.
+#: Audiobookshelf. 128 versions publiees : il s'epingle sans exception.
+_AUDIOBOOKSHELF = (
+    "ghcr.io/advplyr/audiobookshelf:2.36.0"
+    "@sha256:180acad33d69c99ed208676465d8edcb268fa46967735579a7810859885b1a8e"
+)
+
 _SILO = {
     "silo": (
         "ghcr.io/silo-server/silo-server:build-522"
@@ -139,6 +145,19 @@ CATALOG: dict[str, ServiceSpec] = {
         config_dir="jellyfin",
         api_family="jellyfin",
         notes="Serveur media. Bibliotheques creees pour vous.",
+    ),
+    "audiobookshelf": ServiceSpec(
+        id="audiobookshelf",
+        display_name="Audiobookshelf",
+        category=Category.MEDIA,
+        image=_AUDIOBOOKSHELF,
+        internal_port=80,
+        # 13378 est le port que son projet documente. Il ne sert a rien dans le
+        # conteneur, qui ecoute sur 80 : c'est une convention cote hote.
+        default_host_port=13378,
+        config_dir="audiobookshelf",
+        api_family="audiobookshelf",
+        notes="Livres et livres audio. Remplit les bibliotheques books et audiobooks.",
     ),
     "silo-postgres": ServiceSpec(
         id="silo-postgres",
@@ -263,6 +282,9 @@ STARTUP_ORDER = (
     "silo-postgres",
     "silo-redis",
     "silo",
+    # Audiobookshelf ne depend de personne : il lit des dossiers. Sa place ici
+    # est celle de l'affichage, a cote des autres serveurs media.
+    "audiobookshelf",
     "flood",
     "qui",
 )

@@ -675,6 +675,58 @@ class Wirer:
             created=change,
         )
 
+    def step_audiobookshelf_setup(self) -> StepResult:
+        """Accueil d'Audiobookshelf et creation de ses deux bibliotheques.
+
+        Il ne se cable a personne : il lit des dossiers. Ce sont justement les
+        deux bibliotheques `books` et `audiobooks` que PlugArr cree depuis la
+        0.1.12 et que rien ne pilotait encore.
+
+        Deux fausses pistes consignees dans le client, parce qu'elles coutent
+        cher : il met QUARANTE SECONDES a demarrer, et sa base SQLite se lit
+        avec son journal `-wal` ou pas du tout.
+        """
+        from .clients.audiobookshelf import PROVIDERS, AudiobookshelfClient
+
+        inst = self.cfg.services["audiobookshelf"]
+        identifiant = inst.username or self.cfg.username
+        with AudiobookshelfClient(inst.url(self.cfg.host)) as abs_client:
+            abs_client.wait_ready()
+            cree = abs_client.setup(username=identifiant, password=inst.password or "")
+            # TOUJOURS se connecter, meme apres avoir cree le compte a l'instant.
+            # `POST /init` repond 200 avec un corps VIDE : il ne rend aucun
+            # jeton, contrairement a Silo dont l'accueil en renvoie deux. Sans
+            # cette connexion, l'appel suivant repond « HTTP 401 Unauthorized »
+            # et le message d'aide envoie chercher un accueil deja fait qui
+            # n'existe pas. Constate au premier essai reel.
+            abs_client.login(identifiant, inst.password or "")
+
+            faites = [
+                nom
+                for nom, chemin, genre in (
+                    ("Livres audio", "/audiobooks", "audiobooks"),
+                    ("Livres", "/books", "books"),
+                )
+                if abs_client.ensure_library(nom, chemin, provider=PROVIDERS[genre])
+            ]
+            existantes = abs_client.libraries()
+            # Une bibliotheque creee ne s'analyse pas toute seule : sans cela
+            # elle reste vide jusqu'a la prochaine analyse planifiee, et
+            # l'utilisateur croit que rien n'a fonctionne.
+            analyses = sum(1 for b in existantes if abs_client.scan(b["id"]))
+
+        detail = "accueil execute" if cree else "accueil deja termine"
+        if faites:
+            detail += f", bibliotheques creees: {', '.join(faites)}"
+        detail += f", {analyses} analyse(s) lancee(s)"
+        return StepResult(
+            "audiobookshelf: accueil + bibliotheques",
+            # Relu depuis l'application : deux bibliotheques doivent exister.
+            ok=len(existantes) >= 2,
+            detail=detail,
+            created=cree or bool(faites),
+        )
+
     def step_silo_setup(self) -> StepResult:
         """Accueil de Silo et creation de ses bibliotheques.
 
@@ -1106,6 +1158,11 @@ class Wirer:
 
         if cfg.enabled("silo"):
             steps.append(WiringStep("silo/setup", self.step_silo_setup))
+
+        if cfg.enabled("audiobookshelf"):
+            steps.append(
+                WiringStep("audiobookshelf/setup", self.step_audiobookshelf_setup)
+            )
         return steps
 
     def execute(self, *, on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:

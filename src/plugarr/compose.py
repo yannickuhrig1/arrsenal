@@ -178,6 +178,22 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
         # des *arr. `CRON_SCHEDULE` est sa planification, pas un reglage de plugarr.
         block["environment"] = {"TZ": cfg.timezone, "CRON_SCHEDULE": "@daily"}
         block["volumes"] = [f"${{CONFIG_ROOT}}/{spec.config_dir}:/config"]
+    elif service_id == "audiobookshelf":
+        # Ni PUID ni PGID : ce n'est pas une image LinuxServer.
+        block["environment"] = {"TZ": cfg.timezone}
+        block["volumes"] = [
+            f"${{CONFIG_ROOT}}/{spec.config_dir}/config:/config",
+            # `/metadata` est un SECOND volume, distinct de la configuration :
+            # il porte les couvertures et les donnees extraites. Le confondre
+            # avec /config gonfle les sauvegardes de plusieurs centaines de Mo
+            # pour rien.
+            f"${{CONFIG_ROOT}}/{spec.config_dir}/metadata:/metadata",
+            # Les deux bibliotheques qu'il pilote, montees a l'endroit ou le
+            # cablage ira les declarer. En LECTURE SEULE : Audiobookshelf lit,
+            # il n'organise pas.
+            "${DATA_ROOT}/media/books:/books:ro",
+            "${DATA_ROOT}/media/audiobooks:/audiobooks:ro",
+        ]
     elif service_id == "silo-postgres":
         # `POSTGRES_PASSWORD` vient du .env comme tout secret genere. Le
         # healthcheck n'est pas decoratif : Silo refuse de demarrer si sa base

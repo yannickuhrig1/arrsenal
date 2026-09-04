@@ -96,7 +96,10 @@ def build_config(
 
 
 #: Familles qui recoivent un identifiant et un mot de passe.
-_AVEC_COMPTE = ("arr", "transmission", "qbittorrent", "jellyfin", "autobrr", "qui", "silo")
+_AVEC_COMPTE = (
+    "arr", "transmission", "qbittorrent", "jellyfin", "autobrr", "qui", "silo",
+    "audiobookshelf",
+)
 
 
 def new_instance(cfg: StackConfig, service_id: str) -> ServiceInstance:
