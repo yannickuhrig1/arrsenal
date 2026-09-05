@@ -5,7 +5,7 @@
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.7.0**
+**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.7.1**
 
 ---
 
@@ -229,6 +229,9 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.7.1** | **PlugArr ne savait pas qu'une version plus recente de LUI-MEME existait.** Signale a l'usage : « je viens de lancer la 0.6 et elle ne detecte pas la 0.7 ». C'etait juste, et le trou etait beant : la 0.6.0 a livre `plugarr upgrade`, qui aligne les IMAGES des services sur le catalogue **du binaire en cours** — elle supposait donc qu'on avait deja telecharge le dernier, et rien nulle part ne le disait. `__version__` n'etait qu'affiche. `upgrade`, `doctor` et le bouton « chercher les mises a jour » de la console interrogent desormais la derniere release, en **une** requete. |
+| **0.7.1** | **La verification est un CONFORT, et se comporte comme tel.** Elle ne leve jamais : PlugArr marche parfaitement hors ligne, et un NAS derriere un pare-feu ne doit pas voir une erreur parce qu'il ne joint pas GitHub. Nuance qui compte : un echec rend « on ne sait pas », **jamais** « pas de mise a jour » — les confondre laisserait quelqu'un sur une version perimee en croyant etre a jour. Le quota horaire epuise a son propre message. |
+| **0.7.1** | Le message annoncait « vous avez la 0.7.0 » a quelqu'un en 0.6.0 : `cli` et `autoupdate` lisaient chacun leur propre `__version__`. Le resultat porte maintenant la version a laquelle la comparaison a ete faite, et c'est elle qu'on affiche. **Trouve en lisant le message produit**, pas en relisant le code. |
 | **0.7.0** | **Reinstaller par-dessus une installation existante ne perd plus tout.** Demande a l'usage — « il faudrait proposer de garder les parametres deja existants ». C'etait pire que « pas propose » : `install` construisait sa configuration de zero et **ne lisait jamais le `stack.yml` present**. Mesure : identifiant `yannick` -> `plugarr`, profils Recyclarr vides, mot de passe de console perdu, et surtout **VPN desactive en silence** — l'installation affichait meme « Aucun VPN n'est configure ». Quelqu'un qui reinstalle pour reparer autre chose se retrouvait avec son trafic torrent en clair. |
 | **0.7.0** | **La reprise repare un defaut bien plus ancien.** qBittorrent, Jellyfin, autobrr et les autres ne stockent leur mot de passe que HACHE : PlugArr ne pouvait pas le relire, en generait un nouveau, l'annoncait, et le service le refusait — c'est la panne aux messages incomprehensibles de la 0.1.11. Mais quand c'est PlugArr qui a installe, le mot de passe est dans SON `stack.yml`, et il n'a jamais eu besoin de le relire ailleurs. Reprendre les identifiants precedents fait donc coincider ce qui est annonce et ce qui est en place. Les ports decales a la main suivent aussi. |
 | **0.7.0** | Reprise **active par defaut** — perdre un VPN en silence est pire que reprendre sans demander — mais jamais silencieuse : le recapitulatif liste ce qui a ete repris, service par service, et un choix « Repartir de zero » le refuse. Une option donnee a la main prime toujours sur l'heritage, sinon elle serait sans effet. `--repartir-de-zero` en ligne de commande. |

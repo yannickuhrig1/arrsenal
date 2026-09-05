@@ -778,4 +778,13 @@ EN: dict[str, str] = {
     'Reprendre ces reglages': 'Reuse these settings',
     'Repartir de zero': 'Start over',
     '[cyan]Une installation existe deja ici : ses reglages sont repris.[/cyan]': '[cyan]An installation already exists here: its settings are reused.[/cyan]',
+    # -- une nouvelle version de PlugArr lui-meme ------------------------------------
+    '[yellow]PlugArr {disponible} est disponible[/yellow] [dim](vous avez la {courante})[/dim]': '[yellow]PlugArr {disponible} is available[/yellow] [dim](you have {courante})[/dim]',
+    "[dim]Cette commande aligne les services sur le catalogue de la version que VOUS lancez : telechargez la nouvelle d'abord.[/dim]": '[dim]This command aligns the services on the catalogue of the version YOU are running: download the new one first.[/dim]',
+    '[dim]Version de PlugArr non verifiee : {cause}[/dim]': '[dim]PlugArr version not checked: {cause}[/dim]',
+    'GitHub injoignable : {erreur}': 'GitHub unreachable: {erreur}',
+    'GitHub a repondu HTTP {code}': 'GitHub answered HTTP {code}',
+    "quota de l'API GitHub epuise, reessayez plus tard": 'GitHub API quota exhausted, try again later',
+    'reponse illisible de GitHub': 'unreadable response from GitHub',
+    'versions incomparables : {tag} et {courante}': 'incomparable versions: {tag} and {courante}',
 }

@@ -15,6 +15,7 @@ from . import (
     __version__,
     admin,
     adminauth,
+    autoupdate,
     catalog,
     compose,
     dashboard,
@@ -114,6 +115,43 @@ def main(
     from .tui.app import run_wizard
 
     raise typer.Exit(run_wizard())
+
+
+def _annoncer_nouvelle_version() -> None:
+    """Dit qu'une version plus recente de PlugArr existe, si c'est le cas.
+
+    Signale a l'usage : « je viens de lancer la 0.6 et elle ne detecte pas la
+    0.7 pour se mettre a jour ». `upgrade` alignait les images des services sur
+    le catalogue du BINAIRE EN COURS, et supposait donc qu'on avait deja
+    telecharge le dernier — sans jamais le dire.
+
+    Ne bloque jamais : un NAS derriere un pare-feu ne doit pas voir une erreur
+    parce qu'il ne joint pas GitHub.
+    """
+    sortie = autoupdate.derniere()
+    if sortie.disponible:
+        console.print(
+            t(
+                "[yellow]PlugArr {disponible} est disponible[/yellow] "
+                "[dim](vous avez la {courante})[/dim]",
+                disponible=sortie.disponible,
+                # La version que la VERIFICATION a comparee, pas celle que ce
+                # module a importee : deux lectures separees pourraient
+                # diverger, et le message afficherait deux numeros incoherents.
+                courante=sortie.courante,
+            )
+        )
+        console.print(f"[dim]{sortie.url}[/dim]")
+        console.print(
+            t(
+                "[dim]Cette commande aligne les services sur le catalogue de la "
+                "version que VOUS lancez : telechargez la nouvelle d'abord.[/dim]"
+            )
+        )
+    elif sortie.probleme:
+        console.print(
+            t("[dim]Version de PlugArr non verifiee : {cause}[/dim]", cause=sortie.probleme)
+        )
 
 
 def _load_config(project_dir: Path) -> StackConfig:
@@ -737,6 +775,11 @@ def upgrade(
     cfg = _load_config(project_dir)
     cfg.project_dir = project_dir
 
+    # En premier, avant meme de parler des images : aligner les services sur le
+    # catalogue d'un binaire perime n'a qu'un interet limite, et l'utilisateur
+    # doit le savoir avant de lire le reste.
+    _annoncer_nouvelle_version()
+
     retenus, ecartes = pack.ecarts(cfg)
 
     from rich.table import Table
@@ -1101,6 +1144,7 @@ def restore(
 def doctor(project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml."))) -> None:
     """Diagnostique une installation existante."""
     cfg = _load_config(project_dir)
+    _annoncer_nouvelle_version()
     if not report.print_checks(orchestrator.preflight(cfg, project_dir)):
         console.print("[red]Des controles bloquants ont echoue.[/red]")
 

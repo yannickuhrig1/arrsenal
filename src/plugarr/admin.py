@@ -35,6 +35,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import (
     adminauth,
+    autoupdate,
     catalog,
     compose,
     dashboard,
@@ -123,7 +124,20 @@ def updates_payload(cfg: StackConfig) -> dict:
                 "problems": info.problems,
             }
         )
-    return {"services": entries}
+    # PlugArr lui-meme : le bouton « chercher les mises a jour » ne regardait
+    # que les images des services. Quelqu'un pouvait donc tout avoir a jour
+    # sauf l'outil qui lui dit que tout est a jour.
+    sortie = autoupdate.derniere()
+    return {
+        "services": entries,
+        "plugarr": {
+            "current": sortie.courante,
+            "latest": sortie.disponible,
+            "available": bool(sortie.disponible),
+            "url": sortie.url,
+            "problem": sortie.probleme,
+        },
+    }
 
 
 #: Controles qui n'ont de sens qu'AVANT d'installer, et qu'un diagnostic ne

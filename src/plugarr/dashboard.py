@@ -890,9 +890,23 @@ _LIVE_SCRIPT = """<script>
           peindreMaj(liste);
           var n = liste.filter(function (s) { return s.available; }).length;
           var soucis = liste.filter(function (s) { return (s.problems || []).length; }).length;
-          etat.textContent = (n ? n + ' mise(s) a jour disponible(s)' : 'tout est a jour')
+          // PlugArr lui-meme. Le bouton ne regardait que les images des
+          // services : on pouvait tout avoir a jour sauf l'outil qui le dit.
+          var moi = d.plugarr || {};
+          var mien = moi.available
+            ? 'PlugArr ' + moi.latest + ' disponible (vous avez la ' + moi.current + '). '
+            : '';
+          etat.textContent = mien
+            + (n ? n + ' mise(s) a jour disponible(s)' : 'tout est a jour')
             + (soucis ? ', ' + soucis + ' service(s) non verifiable(s)' : '')
             + ' — ' + heure();
+          if (moi.available && moi.url) {
+            etat.innerHTML = etat.textContent.replace(
+              'PlugArr ' + moi.latest,
+              '<a href="' + moi.url + '" target="_blank" rel="noopener">PlugArr '
+                + moi.latest + '</a>'
+            );
+          }
         })
         .catch(function () { etat.textContent = 'serveur injoignable'; })
         .then(function () { btnMaj.disabled = false; });

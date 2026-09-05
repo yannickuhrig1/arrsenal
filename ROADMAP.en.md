@@ -5,7 +5,7 @@
 Where PlugArr stands, what comes next, and why. Kept up to date after every
 working session.
 
-**Last updated: 5 September 2026** — published version: **0.7.0**
+**Last updated: 5 September 2026** — published version: **0.7.1**
 
 ---
 
@@ -229,6 +229,9 @@ than deleting them.
 
 | Version | |
 |---|---|
+| **0.7.1** | **PlugArr did not know a newer version of ITSELF existed.** Reported from use: "I have just run 0.6 and it does not detect 0.7". That was right, and the gap was wide open: 0.6.0 shipped `plugarr upgrade`, which aligns the services' IMAGES on the catalogue **of the running binary** — so it assumed the latest binary had already been downloaded, and nothing anywhere said so. `__version__` was only ever displayed. `upgrade`, `doctor` and the console's "check for updates" button now query the latest release, in **one** request. |
+| **0.7.1** | **The check is a CONVENIENCE, and behaves like one.** It never raises: PlugArr works perfectly offline, and a NAS behind a firewall must not see an error because it cannot reach GitHub. The nuance that matters: a failure yields "we do not know", **never** "no update" — confusing the two would leave someone on a stale version believing they were current. An exhausted hourly quota gets its own message. |
+| **0.7.1** | The message announced "you have 0.7.0" to someone on 0.6.0: `cli` and `autoupdate` each read their own `__version__`. The result now carries the version the comparison was made against, and that is what gets displayed. **Found by reading the message produced**, not by re-reading the code. |
 | **0.7.0** | **Reinstalling over an existing installation no longer loses everything.** Asked from use — "it should offer to keep the settings already there". It was worse than "not offered": `install` built its configuration from scratch and **never read the `stack.yml` present**. Measured: username `yannick` -> `plugarr`, Recyclarr profiles emptied, console password lost, and above all **the VPN silently disabled** — the install even displayed "No VPN is configured". Someone reinstalling to fix something else ended up with their torrent traffic in the clear. |
 | **0.7.0** | **The carry-over fixes a much older defect.** qBittorrent, Jellyfin, autobrr and the others store their password HASHED only: PlugArr could not read it back, generated a new one, announced it, and the service refused it — that is the failure with incomprehensible messages from 0.1.11. But when PlugArr did the installing, the password is in ITS OWN `stack.yml`, and it never needed to read it elsewhere. Carrying the previous credentials over makes what is announced match what is in place. Hand-shifted ports follow too. |
 | **0.7.0** | Carry-over **on by default** — losing a VPN in silence is worse than reusing without asking — but never silent: the summary lists what was carried over, service by service, and a "Start over" choice refuses it. An option given by hand always wins over inheritance, otherwise it would have no effect. `--repartir-de-zero` on the command line. |
