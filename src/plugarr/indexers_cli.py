@@ -12,14 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-import yaml
 from rich.table import Table
 
-from . import catalog, report
+from . import catalog, migrations, report
 from .clients.arr import ArrClient
 from .clients.prowlarr import ProwlarrIndexers
 from .i18n import t
-from .models import StackConfig
 
 app = typer.Typer(help=t("Gerer vos indexeurs dans Prowlarr."), no_args_is_help=True)
 console = report.console
@@ -29,7 +27,7 @@ def _open(project_dir: Path) -> tuple[ArrClient, ProwlarrIndexers]:
     path = project_dir / "stack.yml"
     if not path.exists():
         raise typer.BadParameter(f"{path} introuvable. Lancez d'abord `plugarr install`.")
-    cfg = StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    cfg, _notes = migrations.lire(path)
     if not cfg.enabled("prowlarr"):
         raise typer.BadParameter(t("Prowlarr n'est pas installe dans cette stack."))
     spec, inst = catalog.get("prowlarr"), cfg.services["prowlarr"]

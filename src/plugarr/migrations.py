@@ -1,0 +1,116 @@
+"""Lecture versionnee de `stack.yml`.
+
+`StackConfig` porte un champ `version` depuis la premiere ligne du projet, et
+**rien ne le lisait** — aucune occurrence dans le code. Ce module le lit enfin,
+et repare au passage un chemin de perte de donnees mesure plutot que suppose.
+
+**Le probleme, en une experience.** On ecrit un `stack.yml` marque
+`version: 2`, portant un champ qu'une version future aurait ajoute, et on le
+donne a lire a la version courante :
+
+    version lue          : 2
+    champ futur garde ?  : False
+    champ futur reecrit ?: False
+
+Pydantic ignore les champs qu'il ne connait pas — c'est son comportement par
+defaut. La version ancienne lit donc le fichier sans broncher, en jette une
+partie, et **la premiere ecriture la detruit definitivement** : `install`,
+`generate` et la rotation d'un mot de passe reecrivent tous `stack.yml`.
+
+Le cas se produit des qu'on revient en arriere : on essaie une nouvelle
+version, quelque chose deplait, on relance l'ancien binaire. Rien ne signale
+la perte.
+
+**Les migrations tournent sur le dictionnaire BRUT**, avant validation. C'est
+la seule facon de distinguer « ce champ etait absent » de « ce champ valait sa
+valeur par defaut » : apres pydantic, les deux sont identiques, et une
+migration qui a besoin de cette difference ne peut plus la voir.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from .i18n import t
+from .models import StackConfig
+
+#: Version de schema que cette version de PlugArr sait ecrire. A augmenter
+#: UNIQUEMENT en ajoutant une entree a `MIGRATIONS` : le test
+#: `test_migrations.py` verifie que les deux avancent ensemble.
+#:
+#: Ajouter un champ neuf avec une valeur par defaut ne demande PAS de
+#: migration — pydantic l'absorbe, et c'est le cas courant. Ce qui en demande
+#: une : un champ qui change de sens, de type, ou qui disparait.
+VERSION_COURANTE = 1
+
+#: `version depuis` -> transformation du dictionnaire brut. Chaque fonction
+#: recoit le contenu du fichier tel qu'il a ete lu et rend la forme attendue
+#: par la version suivante. Elle ne doit rien supposer de valide : le fichier
+#: peut venir de n'importe quelle version passee.
+MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {}
+
+
+class VersionFuture(ValueError):
+    """`stack.yml` vient d'une version plus recente de PlugArr.
+
+    Continuer detruirait ce qu'on ne sait pas lire, en silence. On s'arrete.
+    """
+
+
+def migrer(donnees: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Amene un `stack.yml` brut a la version courante.
+
+    Renvoie le dictionnaire et le journal de ce qui a ete fait, pour que
+    l'appelant puisse le montrer : une migration silencieuse est une migration
+    qu'on ne peut pas verifier.
+    """
+    version = donnees.get("version", 1)
+    if not isinstance(version, int):
+        # `ValueError` et non `TypeError` : ce n'est pas une erreur de
+        # programmation mais un FICHIER dont le contenu ne veut rien dire, et
+        # l'appelant le traite comme les autres refus de lecture.
+        raise ValueError(  # noqa: TRY004
+            t("version de stack.yml illisible : {valeur}", valeur=repr(version))
+        )
+    if version > VERSION_COURANTE:
+        raise VersionFuture(
+            t(
+                "stack.yml est en version {trouvee}, cette version de PlugArr lit "
+                "jusqu'a la {connue}. Mettez PlugArr a jour : continuer effacerait "
+                "les reglages qu'il ne sait pas lire.",
+                trouvee=version,
+                connue=VERSION_COURANTE,
+            )
+        )
+
+    notes: list[str] = []
+    while version < VERSION_COURANTE:
+        transformation = MIGRATIONS.get(version)
+        if transformation is None:
+            raise ValueError(
+                t(
+                    "aucune migration de la version {depuis} vers la {vers}",
+                    depuis=version,
+                    vers=version + 1,
+                )
+            )
+        donnees = transformation(dict(donnees))
+        version += 1
+        donnees["version"] = version
+        notes.append(t("stack.yml migre en version {version}", version=version))
+    return donnees, notes
+
+
+def lire(chemin: Path) -> tuple[StackConfig, list[str]]:
+    """Lit, migre, puis valide. Renvoie la configuration et le journal.
+
+    L'ordre compte : migrer APRES validation reviendrait a migrer des valeurs
+    par defaut inventees par pydantic plutot que le contenu reel du fichier.
+    """
+    donnees = yaml.safe_load(Path(chemin).read_text(encoding="utf-8")) or {}
+    donnees, notes = migrer(donnees)
+    return StackConfig.model_validate(donnees), notes

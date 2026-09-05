@@ -10,7 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-import yaml
 
 from . import (
     __version__,
@@ -23,7 +22,9 @@ from . import (
     i18n,
     indexers_cli,
     journal,
+    migrations,
     orchestrator,
+    pack,
     report,
     sauvegarde,
     vpncheck,
@@ -121,7 +122,15 @@ def _load_config(project_dir: Path) -> StackConfig:
                 chemin=path,
             )
         )
-    cfg = StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    try:
+        cfg, notes = migrations.lire(path)
+    except migrations.VersionFuture as exc:
+        # On s'arrete plutot que de lire a moitie : la premiere ecriture
+        # detruirait ce qu'on n'a pas su lire.
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    for note in notes:
+        console.print(f"[cyan]{note}[/cyan]")
     # L'installation a retenu une langue : les commandes qui reprennent cette
     # pile la reprennent aussi. Sans cela, `plugarr serve` sur un serveur dont
     # la session est en anglais repondrait en anglais a quelqu'un qui a installe
@@ -648,6 +657,115 @@ def wire(project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack
         wirer.close()
     compose.write_artifacts(cfg, project_dir)
     report.print_final(cfg, results)
+    raise typer.Exit(0 if all(r.ok for r in results) else 2)
+
+
+@app.command(help=t("Aligne une installation ancienne sur cette version de PlugArr."))
+def upgrade(
+    project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml.")),
+    yes: bool = typer.Option(False, "--yes", "-y", help=t("Ne pas demander confirmation.")),
+    dry_run: bool = typer.Option(False, "--dry-run", help=t("Montrer le plan, ne rien faire.")),
+    skip_wire: bool = typer.Option(
+        False, "--skip-wire", help=t("Ne pas rejouer le cablage a la fin.")
+    ),
+) -> None:
+    """Aligne une installation ancienne sur cette version de PlugArr.
+
+    Quatre choses, dans cet ordre, parce qu'il compte : migrer `stack.yml`,
+    aligner les images sur le catalogue, regenerer les artefacts, puis rejouer
+    le cablage.
+
+    Le cablage passe en DERNIER : une etape de cablage ajoutee depuis peut
+    dependre d'une image plus recente, l'inverse jamais.
+
+    Rien n'est ecrit avant le recapitulatif, comme pour `install`.
+    """
+    cfg = _load_config(project_dir)
+    cfg.project_dir = project_dir
+
+    retenus, ecartes = pack.ecarts(cfg)
+
+    from rich.table import Table
+
+    if retenus:
+        table = Table(title=t("Images a aligner sur le catalogue"))
+        for col in (t("Service"), t("Installee"), t("Catalogue")):
+            table.add_column(col, overflow="fold")
+        for ecart in retenus:
+            table.add_row(
+                catalog.get(ecart.service).display_name,
+                ecart.tag_installe,
+                ecart.tag_catalogue + (f" [dim]({t('meme version, re-epinglee')})[/dim]"
+                                       if ecart.meme_tag else ""),
+            )
+        console.print(table)
+    else:
+        console.print(t("[green]Les images sont deja celles du catalogue.[/green]"))
+
+    # Ce qui est ECARTE compte autant : sans cette liste, un service saute en
+    # silence et l'utilisateur croit tout aligne.
+    for raison in ecartes:
+        console.print(f"[dim]{t('ignore')} : {raison}[/dim]")
+
+    if not retenus:
+        if skip_wire:
+            console.print(t("[dim]Rien a faire.[/dim]"))
+            raise typer.Exit(0)
+        console.print(t("[dim]Le cablage est rejoue quand meme : il est idempotent.[/dim]"))
+
+    if dry_run:
+        console.print(t("[cyan]--dry-run : rien n'a ete ecrit.[/cyan]"))
+        raise typer.Exit(0)
+
+    if retenus and not yes and not typer.confirm(
+        t("Appliquer ces {nombre} mise(s) a jour ?", nombre=len(retenus)), default=True
+    ):
+        raise typer.Exit(1)
+
+    chemin_journal = journal.start(project_dir, "upgrade")
+    journal.config(cfg)
+
+    runner = Compose(project_dir, cfg.project_name)
+    if retenus:
+        pack.appliquer(cfg, retenus)
+        compose.write_artifacts(cfg, project_dir)
+        for ecart in retenus:
+            ok, message = runner.pull(ecart.service)
+            if not ok:
+                console.print(
+                    t(
+                        "[red]{service} : telechargement echoue[/red]",
+                        service=ecart.service,
+                    )
+                )
+                console.print(f"[dim]{message[:300]}[/dim]")
+                continue
+            ok, message = runner.recreate(ecart.service)
+            marque = "[green]OK[/green]" if ok else "[red]" + t("ECHEC") + "[/red]"
+            console.print(
+                f"  {marque}  {ecart.service} "
+                f"{ecart.tag_installe} -> {ecart.tag_catalogue}"
+            )
+            if not ok:
+                console.print(f"[dim]{message[:300]}[/dim]")
+
+    if skip_wire:
+        console.print(t("[dim]Journal detaille : {chemin}[/dim]", chemin=chemin_journal))
+        raise typer.Exit(0)
+
+    # Le cablage rejoue TOUT, et c'est voulu : il est idempotent, et une etape
+    # ajoutee depuis l'installation d'origine n'est visible qu'en la rejouant.
+    # Tenir un registre des « etapes qui ont change depuis la version X »
+    # coutrait cher pour ne gagner que du temps d'execution.
+    console.print(t("[dim]Rejeu du cablage...[/dim]"))
+    cfg.project_dir = project_dir
+    wirer = Wirer(cfg)
+    try:
+        results = wirer.run(on_step=report.print_step)
+    finally:
+        wirer.close()
+    report.print_final(cfg, results)
+    console.print(t("[dim]Journal detaille : {chemin}[/dim]", chemin=chemin_journal))
     raise typer.Exit(0 if all(r.ok for r in results) else 2)
 
 

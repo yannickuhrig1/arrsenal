@@ -202,6 +202,7 @@ plugarr scan        # detect an existing stack
 plugarr adopt       # wire an existing stack without recreating it
 plugarr serve       # admin page: status, start / stop
 plugarr indexers    # search and add your indexers
+plugarr upgrade     # bring an older installation in line with this version
 plugarr wire        # replay the wiring on an already running stack
 plugarr doctor      # diagnose an existing installation
 plugarr generate    # regenerate docker-compose.yml from stack.yml
@@ -280,6 +281,55 @@ diff.
 | ![Report](docs/screenshots/en/9-rapport.svg) | |
 
 </details>
+
+---
+
+## Updating an older installation
+
+You installed six months ago, you download today's binary. One command:
+
+```bash
+plugarr upgrade
+```
+
+It does four things, in this order — and the order matters: migrate `stack.yml`
+if its schema changed, bring the images in line with this version's catalogue,
+regenerate `docker-compose.yml` and `.env`, then replay the wiring. The wiring
+comes last because a step added since may depend on a newer image; never the
+other way round.
+
+**It never moves a version backwards.** The deployed tag lives in `stack.yml`
+and not in the code, precisely so you can update Sonarr without waiting for a
+new PlugArr, or deliberately stay on an older version. So `upgrade` only offers
+what moves **forward**, and the comparison is on numbers, not strings: `4.9.5`
+comes before `4.16.1`, which alphabetical order reverses.
+
+Whatever is set aside is **shown with its reason**, never skipped silently:
+
+```
+skipped : radarr: 9.9.9 is already newer than 6.3.0
+skipped : prowlarr: maison and 2.5.2 cannot be compared
+```
+
+`--dry-run` shows the plan without writing anything, as `install` does.
+
+### `stack.yml` carries a version, and it is finally read
+
+The `version` field had existed since the project's first line and **nothing
+read it**. Yet it guards against a measurable data loss: pydantic ignores fields
+it does not know, so an older version reading a newer `stack.yml` threw part of
+it away — and the **first write destroyed it**, since `install`, `generate` and
+password rotation all rewrite that file.
+
+The case comes up as soon as you go back: you try a new version, something
+displeases you, you run the old binary again.
+
+PlugArr now refuses to read a `stack.yml` newer than itself:
+
+```
+stack.yml is at version 2, this version of PlugArr reads up to 1.
+Update PlugArr: going on would erase the settings it cannot read.
+```
 
 ---
 

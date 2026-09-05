@@ -5,7 +5,7 @@
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.5.2**
+**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.6.0**
 
 ---
 
@@ -65,6 +65,11 @@ Le **lecteur RSS de qBittorrent** est activé, téléchargement automatique
 compris. PlugArr n'ajoute ni flux ni règle : ils dépendent de vos traqueurs,
 exactement comme les indexeurs.
 
+**Une installation ancienne se rattrape en une commande.** `plugarr upgrade`
+migre `stack.yml` si son schéma a changé, aligne les images sur le catalogue
+de cette version — **sans jamais redescendre** une version que vous auriez
+choisie vous-même — régénère les artefacts, puis rejoue le câblage.
+
 La page d'administration (`plugarr serve`) donne l'état des services, les
 démarre, les arrête, les redémarre, signale les mises à jour et les applique,
 affiche les identifiants, **renouvelle un mot de passe ou une clé API en
@@ -90,22 +95,37 @@ Audiobookshelf et DroppedNeedle.
 
 ## Prochaine étape
 
-**Mise à jour du pack.** Aujourd'hui PlugArr sait dire qu'une image a une
-version plus récente et l'appliquer. Il ne sait pas mettre à jour **sa propre
-installation** quand c'est PlugArr qui change.
+**Shelfarr et Shelfmark**, les deux derniers services de la liste. Leurs
+empreintes sont déjà relevées, et Audiobookshelf les débloque : ils livrent
+dans ses bibliothèques.
 
-Le trou est concret et vérifiable : `stack.yml` porte un champ `version: 1`, et
-**rien ne le lit** — aucune occurrence dans le code. Cette semaine seule, quatre
-champs y sont apparus (`admin_password_hash`, `language`, `secret_key`,
-`extra_ports`). Les valeurs par défaut de pydantic absorbent l'écart en silence,
-ce qui marche tant qu'un champ ne fait qu'apparaître. Le jour où l'un change de
-sens, une installation faite en 0.1.7 se relira sans erreur et sera fausse.
+### Ce que la mise à jour du pack a réglé — livré en 0.6.0
+
+`stack.yml` portait un champ `version: 1` depuis la première ligne du projet,
+et **rien ne le lisait**. Ce n'était pas un détail d'hygiène : pydantic ignore
+les champs qu'il ne connaît pas, donc une version ancienne lisant un `stack.yml`
+récent en jetait une partie — et la **première écriture la détruisait**,
+`install`, `generate` et la rotation d'un mot de passe réécrivant tous ce
+fichier.
+
+La perte a été reproduite avant d'être corrigée :
+
+    version lue          : 2
+    champ futur garde ?  : False
+    champ futur reecrit ?: False
 
 | | |
 |---|---|
-| Migrations de `stack.yml`, indexées sur son numéro de version | à faire |
-| Appliquer les digests épinglés d'un nouveau catalogue à une installation ancienne | à faire |
-| Rejouer les étapes de câblage qui ont changé depuis la version installée | à faire |
+| Migrations de `stack.yml`, indexées sur son numéro de version | ✅ 0.6.0 |
+| Appliquer les digests épinglés d'un nouveau catalogue à une installation ancienne | ✅ 0.6.0 |
+| Rejouer les étapes de câblage qui ont changé depuis la version installée | ✅ par `wire`, voir ci-dessous |
+
+**Le troisième point ne demandait pas ce qu'il annonçait.** Tenir un registre
+des « étapes qui ont changé depuis la version X » supposait de versionner
+chaque étape de câblage et de maintenir cette table à chaque modification —
+pour ne gagner que du temps d'exécution, puisque `wire` est **idempotent** par
+construction et qu'une étape déjà posée se contente de le relire. `upgrade`
+rejoue donc tout, et le dit.
 
 **Pas de fichier de secrets chiffré**, et la raison est mécanique plutôt que
 philosophique : c'est **Docker Compose** qui lit le `.env`, pas plugarr.
@@ -209,6 +229,9 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.6.0** | **`plugarr upgrade` : une installation ancienne se rattrape en une commande.** Jusqu'ici PlugArr savait mettre a jour UN service ; il ne savait pas mettre a jour **sa propre installation** quand c'est lui qui change. Quatre etapes, dans cet ordre parce qu'il compte : migrer `stack.yml`, aligner les images, regenerer les artefacts, rejouer le cablage. Le cablage passe **en dernier** — une etape ajoutee depuis peut dependre d'une image plus recente, l'inverse jamais. |
+| **0.6.0** | **On ne redescend jamais une version.** Le tag deploye vit dans `stack.yml` et non dans le code, precisement pour qu'on puisse mettre Sonarr a jour sans attendre PlugArr, ou rester delibrement en arriere. `upgrade` ne propose donc que ce qui AVANCE, compare des nombres et non des chaines — `4.9.5` vient avant `4.16.1` — et **affiche ce qu'il ecarte avec sa raison** : un service saute en silence donne l'impression d'avoir tout aligne. |
+| **0.6.0** | **`stack.yml` porte une version depuis toujours, et rien ne la lisait.** Ce n'etait pas un detail d'hygiene : pydantic ignore les champs qu'il ne connait pas, donc une version ancienne lisant un `stack.yml` recent en jetait une partie, et la **premiere ecriture la detruisait**. La perte a ete **reproduite avant d'etre corrigee** — champ futur pose, relu, disparu — et PlugArr refuse desormais de lire un fichier plus recent que lui plutot que de le lire a moitie. Les migrations tournent sur le dictionnaire BRUT : apres pydantic, « absent » et « valeur par defaut » sont indistinguables. |
 | **0.5.2** | **`plugarr restore` plantait sur un fichier qui n'est pas une archive**, et sortait sur une trace Python brute suivie de « Failed to execute script 'launcher' ». `zipfile.BadZipFile` herite d'`Exception`, **pas** de `ValueError` ni d'`OSError` : les deux appelants, qui attrapaient ces deux-la, la laissaient passer. La conversion se fait desormais dans `lire_manifeste`, une fois, plutot que dans chaque appelant — un troisieme en beneficiera. Trouve en lancant l'EXECUTABLE PUBLIE sur un fichier texte renomme en `.zip` ; tous les tests passaient. |
 | **0.5.2** | Deux messages restaient francais et ne se voyaient que la : `stack.yml introuvable. Lancez d'abord plugarr install`, et le tableau du contenu d'une archive. Meme methode, meme resultat : lancer le binaire plutot que relire le code. |
 | **0.5.1** | **Le chemin d'ECHEC parle anglais aussi.** La 0.5.0 couvrait tout le chemin nominal ; restaient les messages qu'on ne voit que quand quelque chose casse — « qBittorrent n'est jamais devenu disponible », « le config.xml pre-seme a peut-etre ete ecrase », « NON PROTEGE : le tunnel ressort sur VOTRE adresse publique ». Ils vivaient dans quinze modules clients, `wiring.py`, `vpncheck.py` et l'orchestrateur, sous forme de `WiringError` levees profondement dans le code. Le catalogue les dedoublonne : le meme « X n'est jamais devenu disponible » servait neuf fois. **540 phrases** au total, contre 377 a la 0.5.0. |

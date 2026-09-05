@@ -5,7 +5,7 @@
 Where PlugArr stands, what comes next, and why. Kept up to date after every
 working session.
 
-**Last updated: 5 September 2026** — published version: **0.5.2**
+**Last updated: 5 September 2026** — published version: **0.6.0**
 
 ---
 
@@ -63,6 +63,11 @@ qBittorrent's **RSS reader** is enabled, automatic downloading included. PlugArr
 adds neither feed nor rule: they depend on your trackers, exactly like the
 indexers.
 
+**An older installation catches up in one command.** `plugarr upgrade` migrates
+`stack.yml` if its schema changed, brings the images in line with this
+version's catalogue — **never moving backwards** from a version you chose
+yourself — regenerates the artefacts, then replays the wiring.
+
 The admin page (`plugarr serve`) gives the status of the services, starts them,
 stops them, restarts them, reports available updates and applies them, shows the
 credentials, **rotates a password or an API key while re-wiring everything that
@@ -88,22 +93,35 @@ DroppedNeedle.
 
 ## Next up
 
-**Pack updates.** Today PlugArr can tell you that an image has a newer version
-and apply it. It cannot update **its own installation** when PlugArr itself is
-what changes.
+**Shelfarr and Shelfmark**, the last two services on the list. Their digests are
+already recorded, and Audiobookshelf unblocks them: they deliver into its
+libraries.
 
-The gap is concrete and verifiable: `stack.yml` carries a `version: 1` field, and
-**nothing reads it** — no occurrence anywhere in the code. In one week alone,
-four fields appeared in it (`admin_password_hash`, `language`, `secret_key`,
-`extra_ports`). Pydantic's defaults absorb the difference silently, which works
-as long as a field only ever appears. The day one of them changes meaning, an
-installation made with 0.1.7 will be read back without error and be wrong.
+### What the pack update settled — shipped in 0.6.0
+
+`stack.yml` had carried a `version: 1` field since the project's first line, and
+**nothing read it**. That was not a matter of hygiene: pydantic ignores fields it
+does not know, so an older version reading a newer `stack.yml` threw part of it
+away — and the **first write destroyed it**, since `install`, `generate` and
+password rotation all rewrite that file.
+
+The loss was reproduced before being fixed:
+
+    version read           : 2
+    future field kept?     : False
+    future field written?  : False
 
 | | |
 |---|---|
-| `stack.yml` migrations, keyed on its version number | to do |
-| Apply a new catalogue's pinned digests to an older installation | to do |
-| Replay the wiring steps that changed since the installed version | to do |
+| `stack.yml` migrations, keyed on its version number | ✅ 0.6.0 |
+| Apply a new catalogue's pinned digests to an older installation | ✅ 0.6.0 |
+| Replay the wiring steps that changed since the installed version | ✅ through `wire`, see below |
+
+**The third point did not ask for what it announced.** Keeping a register of
+"steps that changed since version X" meant versioning every wiring step and
+maintaining that table on every change — to gain nothing but execution time,
+since `wire` is **idempotent** by construction and an already-applied step
+simply reads itself back. So `upgrade` replays everything, and says so.
 
 **No encrypted secrets file**, and the reason is mechanical rather than
 philosophical: it is **Docker Compose** that reads the `.env`, not plugarr.
@@ -211,6 +229,9 @@ than deleting them.
 
 | Version | |
 |---|---|
+| **0.6.0** | **`plugarr upgrade`: an older installation catches up in one command.** Until now PlugArr could update ONE service; it could not update **its own installation** when PlugArr itself was what changed. Four steps, in this order because the order matters: migrate `stack.yml`, bring the images in line, regenerate the artefacts, replay the wiring. The wiring comes **last** — a step added since may depend on a newer image, never the other way round. |
+| **0.6.0** | **It never moves a version backwards.** The deployed tag lives in `stack.yml` and not in the code, precisely so Sonarr can be updated without waiting for PlugArr, or deliberately held back. So `upgrade` only offers what moves FORWARD, compares numbers rather than strings — `4.9.5` comes before `4.16.1` — and **shows what it sets aside, with the reason**: a service skipped in silence gives the impression everything was aligned. |
+| **0.6.0** | **`stack.yml` has always carried a version, and nothing read it.** That was not a matter of hygiene: pydantic ignores fields it does not know, so an older version reading a newer `stack.yml` threw part of it away, and the **first write destroyed it**. The loss was **reproduced before being fixed** — future field written, read back, gone — and PlugArr now refuses to read a file newer than itself rather than reading half of it. Migrations run on the RAW dictionary: after pydantic, "absent" and "default value" are indistinguishable. |
 | **0.5.2** | **`plugarr restore` crashed on a file that is not an archive**, exiting on a raw Python traceback followed by "Failed to execute script 'launcher'". `zipfile.BadZipFile` inherits from `Exception`, **not** from `ValueError` or `OSError`: both callers, which caught those two, let it through. The conversion now happens inside `lire_manifeste`, once, rather than in each caller — a third one will benefit too. Found by running the PUBLISHED EXECUTABLE on a text file renamed to `.zip`; every test passed. |
 | **0.5.2** | Two messages were still in French and only showed up there: `stack.yml introuvable. Lancez d'abord plugarr install`, and the archive contents table. Same method, same result: run the binary rather than re-read the code. |
 | **0.5.1** | **The FAILURE path speaks English too.** 0.5.0 covered the whole happy path; what remained were the messages you only see when something breaks — "qBittorrent never became available", "the pre-seeded config.xml may have been overwritten", "NOT PROTECTED: the tunnel exits on YOUR own public address". They lived in fifteen client modules, `wiring.py`, `vpncheck.py` and the orchestrator, as `WiringError`s raised deep in the code. The catalogue deduplicates them: the same "X never became available" was serving nine call sites. **540 phrases** in total, against 377 in 0.5.0. |

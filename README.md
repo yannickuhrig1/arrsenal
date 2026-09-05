@@ -206,6 +206,7 @@ plugarr scan        # detecte une stack existante
 plugarr adopt       # cable une stack existante sans la recreer
 plugarr serve       # page d'administration : etat, demarrer / arreter
 plugarr indexers    # chercher et ajouter vos indexeurs
+plugarr upgrade     # aligne une installation ancienne sur cette version
 plugarr wire        # rejoue le câblage sur une stack déjà démarrée
 plugarr doctor      # diagnostique une installation existante
 plugarr generate    # régénère docker-compose.yml depuis stack.yml
@@ -286,6 +287,58 @@ pull request.
 | ![Rapport](docs/screenshots/9-rapport.svg) | |
 
 </details>
+
+---
+
+## Mettre à jour une installation ancienne
+
+Vous avez installé il y a six mois, vous téléchargez le binaire du jour. Une
+commande :
+
+```bash
+plugarr upgrade
+```
+
+Elle fait quatre choses, dans cet ordre — et l'ordre compte : migrer
+`stack.yml` si son schéma a changé, aligner les images sur le catalogue de
+cette version, régénérer `docker-compose.yml` et `.env`, puis rejouer le
+câblage. Le câblage passe en dernier parce qu'une étape ajoutée depuis peut
+dépendre d'une image plus récente ; l'inverse, jamais.
+
+**Elle ne redescend jamais une version.** Le tag déployé vit dans `stack.yml`
+et non dans le code, précisément pour que vous puissiez mettre Sonarr à jour
+sans attendre une version de PlugArr, ou rester délibérément sur une version
+ancienne. `upgrade` ne propose donc que ce qui **avance**, et la comparaison se
+fait sur des numéros, pas sur des chaînes : `4.9.5` vient avant `4.16.1`, ce
+que l'ordre alphabétique inverse.
+
+Ce qui est écarté est **affiché avec sa raison**, jamais sauté en silence :
+
+```
+ignore : radarr : 9.9.9 est deja plus recent que 6.3.0
+ignore : prowlarr : maison et 2.5.2 ne se comparent pas
+```
+
+`--dry-run` montre le plan sans rien écrire, comme pour `install`.
+
+### `stack.yml` porte une version, et elle est enfin lue
+
+Le champ `version` existait depuis la première ligne du projet et **rien ne le
+lisait**. Il protège pourtant d'une perte de données mesurable : pydantic
+ignore les champs qu'il ne connaît pas, donc une version ancienne lisant un
+`stack.yml` récent en jetait une partie — et la **première écriture la
+détruisait**, `install`, `generate` et la rotation d'un mot de passe réécrivant
+tous ce fichier.
+
+Le cas arrive dès qu'on revient en arrière : on essaie une nouvelle version,
+quelque chose déplaît, on relance l'ancien binaire.
+
+PlugArr refuse maintenant de lire un `stack.yml` plus récent que lui :
+
+```
+stack.yml est en version 2, cette version de PlugArr lit jusqu'a la 1.
+Mettez PlugArr a jour : continuer effacerait les reglages qu'il ne sait pas lire.
+```
 
 ---
 
