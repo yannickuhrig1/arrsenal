@@ -1,3 +1,5 @@
+***Français** · [English](PRIOR-ART.en.md)*
+
 # Ce qui existe déjà
 
 Écrit avant la première ligne de code, pour ne pas refaire ce qui est déjà fait — et

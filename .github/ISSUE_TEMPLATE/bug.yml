@@ -1,5 +1,5 @@
 name: Bug
-description: Quelque chose ne marche pas comme annonce
+description: Quelque chose ne marche pas comme annonce / Something does not work as advertised
 labels: ["bug"]
 body:
   - type: markdown
@@ -10,10 +10,20 @@ body:
 
         **Ne collez aucune cle API ni mot de passe.** `plugarr doctor` ne les
         affiche pas, mais `.env` et la page d'acces en contiennent.
+
+        ---
+
+        Thanks. The output of `plugarr doctor` answers half the questions below:
+        run it first, it will be quicker for everyone.
+
+        **Do not paste any API key or password.** `plugarr doctor` does not show
+        them, but `.env` and the access page contain them.
+
+        Answer in French or in English, whichever you prefer.
   - type: textarea
     id: attendu
     attributes:
-      label: Ce que vous attendiez, et ce qui s'est passe
+      label: Ce que vous attendiez, et ce qui s'est passe / What you expected, and what happened
       placeholder: |
         J'attendais que Sonarr soit rattache a qBittorrent.
         Le rapport affiche "test de connexion echoue".
@@ -22,7 +32,7 @@ body:
   - type: textarea
     id: commande
     attributes:
-      label: La commande exacte
+      label: La commande exacte / The exact command
       render: shell
       placeholder: plugarr install --services sonarr,qbittorrent --data-root /srv/data
     validations:
@@ -30,29 +40,29 @@ body:
   - type: textarea
     id: doctor
     attributes:
-      label: Sortie de `plugarr doctor`
+      label: Sortie de `plugarr doctor` / Output of `plugarr doctor`
       render: shell
     validations:
       required: true
   - type: input
     id: plateforme
     attributes:
-      label: Plateforme
+      label: Plateforme / Platform
       placeholder: Unraid 7.0 / Debian 12 / Synology DSM 7.2 / Docker Desktop Windows
     validations:
       required: true
   - type: input
     id: docker
     attributes:
-      label: Versions Docker
-      description: "Sortie de `docker --version` et `docker compose version --short`"
+      label: Versions Docker / Docker versions
+      description: "Sortie de / output of `docker --version` et / and `docker compose version --short`"
     validations:
       required: true
   - type: checkboxes
     id: verifs
     attributes:
-      label: Avant d'envoyer
+      label: Avant d'envoyer / Before submitting
       options:
-        - label: Aucune cle API ni mot de passe dans ce rapport
+        - label: Aucune cle API ni mot de passe dans ce rapport / No API key or password in this report
           required: true
-        - label: Le preflight signalait-il quelque chose ? Si oui, c'est dans la sortie ci-dessus
+        - label: Le preflight signalait-il quelque chose ? Si oui, c'est dans la sortie ci-dessus / Did the preflight report anything? If so, it is in the output above

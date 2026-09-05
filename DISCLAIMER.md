@@ -1,3 +1,5 @@
+***Français** · [English](DISCLAIMER.en.md)*
+
 # Avertissement
 
 PlugArr est un outil d'automatisation d'installation. Il deploie des logiciels

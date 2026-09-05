@@ -1,3 +1,5 @@
+***Français** · [English](CONTRIBUTING.en.md)*
+
 # Contribuer
 
 Merci d'y jeter un œil. Ce projet a une règle qui prime sur toutes les autres, et il

@@ -1,3 +1,5 @@
+***Français** · [English](COMPATIBILITY.en.md)*
+
 # Compatibilité
 
 Tout ce qui figure ici a été **vérifié contre une instance réelle**, pas déduit de la

@@ -1,3 +1,5 @@
+***Français** · [English](README.en.md)*
+
 # PlugArr
 
 **Déploie *et câble* une stack média complète. Une commande, zéro clic dans huit interfaces web.**
@@ -478,9 +480,9 @@ Voir [DISCLAIMER.md](DISCLAIMER.md).
 
 ## Périmètre actuel
 
-Prowlarr · Sonarr · Radarr · **Lidarr** · Transmission · **qBittorrent** · Jellyfin
-· **Silo** *(expérimental)* · autobrr · Recyclarr · Gluetun *(VPN optionnel)* ·
-Flood et qui *(UI optionnelles)*
+Prowlarr · Sonarr · Radarr · **Lidarr** · Transmission · **qBittorrent** · **SABnzbd**
+· Jellyfin · **Seerr** · **Audiobookshelf** · **DroppedNeedle** · **Silo** *(expérimental)*
+· autobrr · Recyclarr · Gluetun *(VPN optionnel)* · Flood et qui *(UI optionnelles)*
 
 Versions testées : voir [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
@@ -519,16 +521,13 @@ Côté services, dans l'ordre où ils seront étudiés :
 | | Ce qu'il reste à faire |
 |---|---|
 | **Plex** | Second serveur média, à côté de Jellyfin. Son jeton s'obtient par `plex.tv`, pas par l'API locale : c'est le point à vérifier avant de l'inscrire. |
-| **Seerr** | Demandes de médias. Jellyseerr et Overseerr ont fusionné sous ce nom ; le câblage vise Sonarr, Radarr et le serveur média. |
 | **Notifiarr** | Notifications centralisées pour toute la stack. Chaque *arr s'y déclare par une clé API. |
 | **Bazarr** | Sous-titres. Étudié, mais sa configuration passe par un fichier YAML et non par une API — rien n'est encore vérifié. |
-| **SABnzbd** | Client Usenet, à côté des deux clients torrent. |
-| **DroppedNeedle** | Musique. Anciennement *MusicSeerr*, renommé, et le nom de code compte : il **remplace Lidarr** plutôt que de le compléter — moteur de bibliothèque et de téléchargement intégré, catalogue MusicBrainz. Un seul conteneur, `PUID`/`PGID`/`UMASK` et un montage `/data` à parent commun : exactement les conventions de plugarr. Deux points à vérifier : il télécharge par **slskd** (Soulseek) ou SABnzbd, aucun des deux n'étant au catalogue, et son premier compte administrateur se crée par l'interface web, sans variable d'environnement pour le pré-semer. |
 | **Wizarr** | Invitations et gestion des comptes pour Jellyfin, Plex et Emby. Le service le plus autonome de cette liste : un conteneur, et le câblage se réduit au serveur média et à sa clé. |
 | **Tautulli** | Suivi et statistiques **Plex**. Ne peut donc pas précéder Plex, qui figure déjà plus haut : sans jeton Plex, il n'a rien à observer. |
 | **Jellystat** | Statistiques Jellyfin. Obstacle connu : le service exige une base **PostgreSQL** dans un second conteneur, là où tout le catalogue actuel tient en un seul. `JS_USER` / `JS_PASSWORD` laissent en revanche espérer un pré-semis des identifiants. |
 | **Tracearr** | Suivi des lectures et détection de partage de comptes, pour Plex, Jellyfin et Emby. L'image `latest` réclame une base et un Redis externes ; le tag `supervised` réunit le tout en un conteneur — c'est celui à vérifier. |
-| Audiobookshelf, Shelfmark, Shelfarr | Livres et livres audio. |
+| **Shelfmark**, **Shelfarr** | Livres et livres audio, à côté d'Audiobookshelf déjà au catalogue. |
 
 Un service n'entre au catalogue que lorsqu'il est **câblé et vérifié** contre une
 instance réelle. Voir [PROMPT.md](PROMPT.md) pour le détail.

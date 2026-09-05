@@ -1,5 +1,5 @@
-name: Ajouter un service
-description: Proposer un service pour le catalogue
+name: Ajouter un service / Add a service
+description: Proposer un service pour le catalogue / Suggest a service for the catalogue
 labels: ["service"]
 body:
   - type: markdown
@@ -7,24 +7,30 @@ body:
       value: |
         Le catalogue s'etend, mais chaque service ajoute une surface a maintenir et a
         verifier. Ces questions servent a estimer le cout reel, pas a decourager.
+
+        ---
+
+        The catalogue keeps growing, but every service adds a surface to maintain and
+        to verify. These questions are there to estimate the real cost, not to
+        discourage you. Answer in French or in English, whichever you prefer.
   - type: input
     id: nom
     attributes:
-      label: Nom du service
+      label: Nom du service / Service name
     validations:
       required: true
   - type: input
     id: image
     attributes:
-      label: Image Docker et tag stable
-      description: "Tag EPINGLE, jamais `latest` : un tag flottant rend le cablage non reproductible."
+      label: Image Docker et tag stable / Docker image and stable tag
+      description: "Tag EPINGLE, jamais `latest` : un tag flottant rend le cablage non reproductible. / PINNED tag, never `latest`: a floating tag makes the wiring non-reproducible."
       placeholder: lscr.io/linuxserver/bazarr:1.6.0
     validations:
       required: true
   - type: textarea
     id: cablage
     attributes:
-      label: A quoi doit-il etre cable ?
+      label: A quoi doit-il etre cable ? / What must it be wired to?
       placeholder: |
         Bazarr -> Sonarr et Radarr (adresse, port, cle API)
         Bazarr -> systeme de fichiers (dossiers de sous-titres)
@@ -33,20 +39,23 @@ body:
   - type: textarea
     id: api
     attributes:
-      label: Comment se configure-t-il ?
+      label: Comment se configure-t-il ? / How is it configured?
       description: |
         API REST ? Fichier de configuration ? Assistant de premier demarrage ?
         Si vous connaissez les endpoints, donnez-les : c'est le point le plus couteux
         a decouvrir.
+
+        REST API? Configuration file? First-run wizard? If you know the endpoints,
+        give them: that is the most expensive thing to discover.
     validations:
       required: true
   - type: dropdown
     id: preseme
     attributes:
-      label: Sa configuration peut-elle etre pre-semee avant le premier demarrage ?
+      label: Sa configuration peut-elle etre pre-semee avant le premier demarrage ? / Can its configuration be pre-seeded before the first start?
       options:
-        - "Oui, verifie"
-        - "Non, il faut passer par son API apres demarrage"
-        - "Je ne sais pas"
+        - "Oui, verifie / Yes, verified"
+        - "Non, il faut passer par son API apres demarrage / No, it must go through its API after startup"
+        - "Je ne sais pas / I do not know"
     validations:
       required: true

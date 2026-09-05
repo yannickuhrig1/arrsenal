@@ -1,3 +1,5 @@
+***Français** · [English](ROADMAP.en.md)*
+
 # Feuille de route
 
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
@@ -36,9 +38,9 @@ applications qui en acceptent une.
 musique, spectacles, livres, livres audio et logiciels. Chacune a son dossier de
 téléchargement, son dossier de rangement et sa catégorie qBittorrent qui envoie
 l'un vers l'autre. Sonarr reçoit un dossier racine séparé pour l'anime, comme le
-recommandent les TRaSH Guides. Les quatre dernières n'ont pas encore
-d'application qui les pilote : elles rangent les téléchargements manuels, et
-attendent Audiobookshelf, Shelfarr et les autres.
+recommandent les TRaSH Guides. Livres et livres audio sont désormais pilotés par
+Audiobookshelf ; spectacles et logiciels rangent encore les téléchargements
+manuels, en attendant Shelfarr, Shelfmark et les autres.
 
 **La configuration complète se sauvegarde et se restaure.** `plugarr backup`
 archive le répertoire du projet, `CONFIG_ROOT` et **les volumes Docker** — la
@@ -60,19 +62,18 @@ l'installation initiale**.
 
 ---
 
-## Empreintes relevées pour les cinq services à venir
+## Empreintes relevées pour les services à venir
 
 Vérifiées contre les registres le 4 septembre 2026, prêtes à être épinglées. Ce
 n'est pas le travail, c'en est la condition préalable : un service n'entre au
-catalogue que **câblé et vérifié** contre une instance réelle.
+catalogue que **câblé et vérifié** contre une instance réelle. Trois des cinq
+empreintes relevées ce jour-là sont désormais au catalogue : Seerr,
+Audiobookshelf et DroppedNeedle.
 
 | | image épinglée |
 |---|---|
-| Seerr | `ghcr.io/seerr-team/seerr:v3.4.1@sha256:f4768de5…` |
-| Audiobookshelf | `ghcr.io/advplyr/audiobookshelf:2.36.0@sha256:180acad3…` |
 | Shelfarr | `ghcr.io/pedro-revez-silva/shelfarr:2026.08.31.1@sha256:08e06f5b…` |
 | Shelfmark | `ghcr.io/calibrain/shelfmark:v1.3.15@sha256:96022903…` |
-| DroppedNeedle | `ghcr.io/droppedneedle/droppedneedle:v2.9.0@sha256:4687b391…` |
 
 ---
 

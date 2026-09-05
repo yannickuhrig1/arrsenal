@@ -1,3 +1,5 @@
+***Français** · [English](CODE_OF_CONDUCT.en.md)*
+
 # Code de conduite
 
 ## L'esprit

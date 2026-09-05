@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Question sur la configuration des *arr elles-memes
+  - name: Question sur la configuration des *arr elles-memes / Question about configuring the *arr themselves
     url: https://wiki.servarr.com/
-    about: Le wiki Servarr couvre le fonctionnement de Sonarr, Radarr et Prowlarr.
-  - name: Profils de qualite et custom formats
+    about: Le wiki Servarr couvre le fonctionnement de Sonarr, Radarr et Prowlarr. / The Servarr wiki covers how Sonarr, Radarr and Prowlarr work.
+  - name: Profils de qualite et custom formats / Quality profiles and custom formats
     url: https://trash-guides.info/
-    about: Les TRaSH Guides sont la reference. plugarr vise a les appliquer, pas a les remplacer.
+    about: Les TRaSH Guides sont la reference. plugarr vise a les appliquer, pas a les remplacer. / The TRaSH Guides are the reference. plugarr aims to apply them, not to replace them.
