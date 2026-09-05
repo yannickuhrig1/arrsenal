@@ -64,7 +64,8 @@ jobs:
           foreach ($m in @('plugarr.clients.silo','plugarr.langues',
                            'plugarr.clients.jellyfin','plugarr.wiring','plugarr.vpncheck',
                            'plugarr.sauvegarde','plugarr.clients.audiobookshelf',
-                           'plugarr.clients.seerr')) {
+                           'plugarr.clients.seerr','plugarr.i18n','plugarr.traductions',
+                           'plugarr.tui.widgets')) {
             if ($toc -notmatch [regex]::Escape("'$m'")) {
               throw "$m absent de l'executable"
             }

@@ -5,6 +5,10 @@ l'application en memoire et exporte chaque ecran en SVG.
 
     python scripts/screenshots.py
 
+Deux jeux sont produits, un par langue : le francais dans `docs/screenshots/`,
+l'anglais dans `docs/screenshots/en/`. Le site en a besoin des deux, et une
+capture francaise sur une page anglaise annulerait le travail de traduction.
+
 Les fichiers sont regeneres a l'identique a chaque execution ET sur n'importe
 quelle machine, ce qui permet de les versionner et de voir les regressions
 visuelles dans une pull request. La CI le verifie.
@@ -40,7 +44,9 @@ from textual.widgets import (
     Static,
 )
 
+from plugarr import i18n
 from plugarr.clients.prowlarr import IndexerDefinition
+from plugarr.i18n import t
 from plugarr.tui.app import PlugArrApp
 from plugarr.tui.indexers import IndexersScreen
 from plugarr.tui.screens import (
@@ -56,6 +62,11 @@ from plugarr.wiring import StepResult
 
 OUT = ROOT / "docs" / "screenshots"
 SIZE = (104, 34)
+
+#: Ou vont les captures de chaque langue. Le francais reste a la racine : c'est
+#: ce que le README cite depuis toujours, et deplacer ces fichiers casserait
+#: chaque lien deja publie.
+SORTIES = {"fr": OUT, "en": OUT / "en"}
 
 #: Repertoire affiche dans les captures. Surtout PAS celui d'ou l'on lance le
 #: script : le chemin personnel de l'auteur finirait dans une image publiee.
@@ -102,9 +113,9 @@ SHOWN_TEMPLATES = {
 #: machine : sans cela, une machine sans Docker (une CI, par exemple) produit une
 #: capture rouge, et le chemin du binaire trahit le systeme de l'auteur.
 SHOWN_DOCKER = (
-    ("docker", "trouve: /usr/bin/docker"),
-    ("daemon docker", "version serveur 27.3.1"),
-    ("docker compose", "v2.29.7"),
+    ("docker", "trouve : {chemin}", {"chemin": "/usr/bin/docker"}),
+    ("daemon docker", "version serveur {version}", {"version": "27.3.1"}),
+    ("docker compose", "v2.29.7", {}),
 )
 
 
@@ -115,7 +126,8 @@ def freeze_environment() -> None:
     from plugarr.tui import screens
 
     runner.check_docker = lambda: [  # type: ignore[assignment]
-        runner.Check(name, True, detail) for name, detail in SHOWN_DOCKER
+        runner.Check(t(nom), True, t(detail, **valeurs))
+        for nom, detail, valeurs in SHOWN_DOCKER
     ]
 
     # Le profil propose suit desormais la machine : sans le figer, la capture de
@@ -123,7 +135,9 @@ def freeze_environment() -> None:
     # Le depot documente une installation Linux, c'est donc celle-la qu'on montre.
     screens.default_profile = lambda: PlatformProfile.GENERIC_LINUX  # type: ignore[assignment]
 
-    fixed_ids = (1000, 1000, "profil generic-linux", True)
+    # La meme phrase que produit `resolve_ids` en vrai sur un Linux : une
+    # capture qui montre autre chose que le produit ment sur le produit.
+    fixed_ids = (1000, 1000, t("detecte ({origine})", origine=t("utilisateur courant")), True)
     orchestrator.resolve_ids = lambda profile: fixed_ids  # type: ignore[assignment]
     screens.resolve_ids = lambda profile: fixed_ids  # type: ignore[assignment]
     seed.generate_api_key = lambda: SHOWN_API_KEY  # type: ignore[assignment]
@@ -140,40 +154,65 @@ def freeze_environment() -> None:
     screens.orchestrator.unusable_configs = lambda cfg: []  # type: ignore[assignment]
 
 
-#: Resultats fictifs pour illustrer l'ecran de rapport sans rien demarrer.
-FAKE_STEPS = [
-    StepResult("sonarr: dossier racine /data/media/tv", True, "cree", created=True),
-    StepResult("radarr: dossier racine /data/media/movies", True, "cree", created=True),
-    StepResult("qbittorrent: categories avec chemin de sauvegarde", True, "creees: tv, movies"),
-    StepResult("sonarr: client de telechargement qBittorrent", True, "cree (id=1), test OK"),
-    StepResult("radarr: client de telechargement qBittorrent", True, "cree (id=1), test OK"),
-    StepResult("prowlarr -> sonarr (Application, fullSync)", True, "cree (id=1), test OK"),
-    StepResult("prowlarr -> radarr (Application, fullSync)", True, "cree (id=2), test OK"),
-    StepResult("jellyfin: assistant + bibliotheques", True, "Films, Series"),
-]
+def fake_steps() -> list[StepResult]:
+    """Resultats fictifs pour illustrer le rapport sans rien demarrer.
+
+    Construits a l'APPEL et non a l'import : leurs details passent par le
+    catalogue, et les figer ici les gelerait dans la langue chargee au
+    chargement du module.
+    """
+    cree = t("cree")
+    return [
+        StepResult("sonarr: dossier racine /data/media/tv", True, cree, created=True),
+        StepResult("radarr: dossier racine /data/media/movies", True, cree, created=True),
+        StepResult(
+            "qbittorrent: categories avec chemin de sauvegarde",
+            True,
+            t("creees : {noms}", noms="tv, movies"),
+        ),
+        StepResult("sonarr: client de telechargement qBittorrent", True, f"{cree} (id=1), test OK"),
+        StepResult("radarr: client de telechargement qBittorrent", True, f"{cree} (id=1), test OK"),
+        StepResult("prowlarr -> sonarr (Application, fullSync)", True, f"{cree} (id=1), test OK"),
+        StepResult("prowlarr -> radarr (Application, fullSync)", True, f"{cree} (id=2), test OK"),
+        StepResult(
+            "jellyfin: assistant + bibliotheques", True, f"{t('Films')}, {t('Series')}"
+        ),
+    ]
 
 
 #: Definition fictive : plugarr ne nomme et ne recommande aucun indexeur reel.
-FAKE_DEFINITION = IndexerDefinition(
-    name="Votre indexeur",
-    implementation="Torznab",
-    privacy="private",
-    protocol="torrent",
-    language="fr-FR",
-    description="La liste vient de votre Prowlarr. plugarr n'en fournit aucun.",
-    raw={
-        "indexerUrls": ["https://exemple.invalid/"],
-        "fields": [
-            {"name": "baseUrl", "type": "select", "label": "Url", "value": None},
-            {"name": "apiKey", "type": "textbox", "label": "API Key", "privacy": "apiKey"},
-        ],
-    },
-)
+def fake_definition() -> IndexerDefinition:
+    return IndexerDefinition(
+        name=t("Votre indexeur"),
+        implementation="Torznab",
+        privacy="private",
+        protocol="torrent",
+        language="fr-FR",
+        description=t(
+            "La liste vient de votre Prowlarr. plugarr n'en fournit aucun."
+        ),
+        raw={
+            "indexerUrls": ["https://exemple.invalid/"],
+            "fields": [
+                {"name": "baseUrl", "type": "select", "label": "Url", "value": None},
+                {
+                    "name": "apiKey",
+                    "type": "textbox",
+                    "label": "API Key",
+                    "privacy": "apiKey",
+                },
+            ],
+        },
+    )
 
 
-async def capture() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+async def capture(langue: str) -> None:
+    i18n.utiliser(langue)
+    sortie = SORTIES[langue]
+    sortie.mkdir(parents=True, exist_ok=True)
     freeze_environment()
+    etapes = fake_steps()
+    definition = fake_definition()
 
     async def shot(app: PlugArrApp, pilot, name: str) -> None:
         # Le `Footer` monte ses raccourcis de facon asynchrone. Attendre que ses
@@ -187,7 +226,7 @@ async def capture() -> None:
                 break
             await pilot.pause()
             contenu = app.export_screenshot()
-        path = OUT / f"{name}.svg"
+        path = sortie / f"{name}.svg"
         # newline="" : sans cela Python traduit les sauts de ligne en CRLF sous
         # Windows. Git le rattrape a la normalisation, mais un depot configure
         # autrement verrait le controle de la CI echouer sans rien de reel.
@@ -258,11 +297,17 @@ async def capture() -> None:
         # Une barre sans total s'affiche en mode INDETERMINE, c'est-a-dire animee :
         # deux captures ne coincideraient jamais. Lui donner un total la fige, et
         # montre au passage ce que l'utilisateur voit vraiment.
-        screen._set_total(len(FAKE_STEPS))
-        for _ in FAKE_STEPS:
+        screen._set_total(len(etapes))
+        for _ in etapes:
             screen._advance()
-        screen._phase("cablage : 8/8 liens etablis")
-        for step in FAKE_STEPS:
+        screen._phase(
+            t(
+                "[green]Termine : {faits}/{total} liens etablis[/green]",
+                faits=len(etapes),
+                total=len(etapes),
+            )
+        )
+        for step in etapes:
             screen._log(f"  [green]OK[/green]  {step.name} - {step.detail}")
         await pilot.pause()
         await shot(app, pilot, "7-installation")
@@ -274,23 +319,29 @@ async def capture() -> None:
         app.push_screen(IndexersScreen())
         await pilot.pause()
         screen = app.screen
-        screen._set_status("[dim]626 definitions fournies par votre Prowlarr[/dim]")
-        screen._matches = [FAKE_DEFINITION]
+        screen._set_status(
+            t("[dim]{nombre} definitions fournies par votre Prowlarr{deja}[/dim]",
+              nombre=626, deja="")
+        )
+        screen._matches = [definition]
         results = screen.query_one("#indexer-results", ListView)
-        results.append(ListItem(Label("Votre indexeur  [dim]prive - torrent[/dim]")))
-        await screen._render_form(FAKE_DEFINITION)
+        results.append(
+            ListItem(Label(f"{definition.name}  [dim]{t('prive')} - torrent[/dim]"))
+        )
+        await screen._render_form(definition)
         # mount() est asynchrone : sans ces passes, la capture part avant que les
         # champs du formulaire soient rendus.
         for _ in range(4):
             await pilot.pause()
         await shot(app, pilot, "8-indexeurs")
 
-        app.results = FAKE_STEPS
+        app.results = etapes
         app.push_screen(ReportScreen())
         await pilot.pause()
         await shot(app, pilot, "9-rapport")
 
 
 if __name__ == "__main__":
-    print("Generation des captures :")
-    asyncio.run(capture())
+    for code in SORTIES:
+        print(f"Generation des captures ({code}) :")
+        asyncio.run(capture(code))

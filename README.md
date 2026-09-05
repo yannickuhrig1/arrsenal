@@ -192,6 +192,10 @@ plugarr uninstall   # arrête la stack, ne touche jamais à vos médias
 
 ### Après l'installation : la page d'administration
 
+<p align="center">
+  <a href="docs/screenshots/10-administration.html"><img src="docs/screenshots/10-administration.png" alt="La console d'administration : état des services, boutons, identifiants" width="82%"></a>
+</p>
+
 La page d'accès est un **fichier figé** : elle liste les adresses et les identifiants,
 rien de plus. L'état des services, les boutons démarrer / arrêter / redémarrer et les
 mises à jour disponibles viennent d'un petit serveur local.
@@ -245,8 +249,9 @@ La version s'affiche aussi dans le bandeau de l'assistant, en pied de page d'acc
 par `plugarr --version`.
 
 Toutes les captures de ce README sont **générées automatiquement** par
-`python scripts/screenshots.py`, sans terminal ni Docker. Elles sont versionnées : une
-régression visuelle apparaît dans le diff d'une pull request.
+`python scripts/screenshots.py`, sans terminal ni Docker, dans les deux langues.
+Elles sont versionnées : une régression visuelle apparaît dans le diff d'une
+pull request.
 
 <details>
 <summary>Les autres écrans de l'assistant</summary>

@@ -11,8 +11,8 @@ plugarr
 **[plugarr-site.vercel.app](https://plugarr-site.vercel.app/en)** — the project site.
 
 <p align="center">
-  <img src="docs/screenshots/2-services.svg" alt="Service selection" width="49%">
-  <img src="docs/screenshots/7-installation.svg" alt="Wiring in progress" width="49%">
+  <img src="docs/screenshots/en/2-services.svg" alt="Service selection" width="49%">
+  <img src="docs/screenshots/en/7-installation.svg" alt="Wiring in progress" width="49%">
 </p>
 
 You tick what you want. By the end, Prowlarr is already pushing its indexers to Sonarr,
@@ -189,6 +189,10 @@ plugarr uninstall   # stops the stack, never touches your media
 
 ### After installation: the admin page
 
+<p align="center">
+  <a href="docs/screenshots/en/10-administration.html"><img src="docs/screenshots/en/10-administration.png" alt="The admin console: service status, buttons, credentials" width="82%"></a>
+</p>
+
 The access page is a **frozen file**: it lists addresses and credentials, nothing more.
 Service status, the start / stop / restart buttons and available updates come from a small
 local server.
@@ -240,18 +244,19 @@ The version is also shown in the wizard's header, in the footer of the access pa
 `plugarr --version`.
 
 Every screenshot in this README is **generated automatically** by
-`python scripts/screenshots.py`, without a terminal and without Docker. They are committed:
-a visual regression shows up in a pull request diff.
+`python scripts/screenshots.py`, without a terminal and without Docker, in both
+languages. They are committed: a visual regression shows up in a pull request
+diff.
 
 <details>
 <summary>The other wizard screens</summary>
 
 | | |
 |---|---|
-| ![Welcome](docs/screenshots/1-accueil.svg) | ![Paths](docs/screenshots/3-chemins.svg) |
-| ![VPN](docs/screenshots/4-vpn.svg) | ![Quality profiles](docs/screenshots/5-profils.svg) |
-| ![Summary](docs/screenshots/6-recapitulatif.svg) | ![Indexers](docs/screenshots/8-indexeurs.svg) |
-| ![Report](docs/screenshots/9-rapport.svg) | |
+| ![Welcome](docs/screenshots/en/1-accueil.svg) | ![Paths](docs/screenshots/en/3-chemins.svg) |
+| ![VPN](docs/screenshots/en/4-vpn.svg) | ![Quality profiles](docs/screenshots/en/5-profils.svg) |
+| ![Summary](docs/screenshots/en/6-recapitulatif.svg) | ![Indexers](docs/screenshots/en/8-indexeurs.svg) |
+| ![Report](docs/screenshots/en/9-rapport.svg) | |
 
 </details>
 

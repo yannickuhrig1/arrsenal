@@ -88,10 +88,21 @@ def phrases() -> dict[str, list[str]]:
                         noeud.value, ast.Constant
                     ):
                         retenir(fichier, str(noeud.value.value))
-                    elif nom_cible == "CATEGORY_TITLES" and isinstance(noeud.value, ast.Dict):
+                    elif nom_cible in ("CATEGORY_TITLES", "_ROTATIONS") and isinstance(
+                        noeud.value, ast.Dict
+                    ):
+                        # Les libelles vivent dans les valeurs : directement pour
+                        # les titres de categorie, dans un couple pour les
+                        # infobulles de rotation.
                         for valeur in noeud.value.values:
-                            if isinstance(valeur, ast.Constant) and isinstance(valeur.value, str):
-                                retenir(fichier, valeur.value)
+                            elements = (
+                                valeur.elts if isinstance(valeur, ast.Tuple) else [valeur]
+                            )
+                            for element in elements:
+                                if isinstance(element, ast.Constant) and isinstance(
+                                    element.value, str
+                                ):
+                                    retenir(fichier, element.value)
 
         # `resolve_ids` rend trois origines de plus, construites dans son corps
         # plutot que declarees : elles finissent affichees sous le profil de

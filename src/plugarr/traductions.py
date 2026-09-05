@@ -547,4 +547,13 @@ EN: dict[str, str] = {
     'compte cree': 'account created',
     'compte cree, connexion toujours refusee meme apres redemarrage': 'account created, login still refused even after a restart',
     'aucun template choisi, rien a generer': 'no template chosen, nothing to generate',
+    # -- boutons de chaque service sur la console ----------------------------------
+    'etat inconnu': 'status unknown',
+    'verification…': 'checking…',
+    'demarrer': 'start',
+    'redemarrer': 'restart',
+    'arreter': 'stop',
+    'renouveler': 'rotate',
+    'Tirer un nouveau mot de passe et recabler': 'Draw a new password and re-wire',
+    'Tirer une nouvelle cle API et recabler': 'Draw a new API key and re-wire',
 }

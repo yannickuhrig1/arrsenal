@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration — stack media</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --text: #16181d; --muted: #6b7280;
+    --line: #e4e7ec; --warn-bg: #fff7ed; --warn-line: #f59e0b;
+    --info-bg: #eff6ff; --info-line: #4c8dff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101216; --panel: #181b21; --text: #e8eaed; --muted: #9aa3af;
+      --line: #272b33; --warn-bg: #2a2015; --info-bg: #15202f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1.5rem 4rem; background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header h1 { margin: 0 0 .3rem; font-size: 1.6rem; letter-spacing: -.02em; }
+  header p { margin: 0 0 1.6rem; color: var(--muted); }
+  .banner {
+    padding: .8rem 1rem; border-radius: 8px; margin-bottom: .7rem;
+    background: var(--info-bg); border-left: 4px solid var(--info-line);
+  }
+  .banner.warn { background: var(--warn-bg); border-left-color: var(--warn-line); }
+  h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--muted); margin: 2.2rem 0 .9rem; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem 1.1rem; border-top: 3px solid var(--accent);
+  }
+  .title { display: flex; gap: .75rem; align-items: center; text-decoration: none; color: inherit; }
+  .title:hover .url { text-decoration: underline; }
+  .title.headless:hover .url { text-decoration: none; }
+  .title.headless .url { color: var(--muted); font-style: italic; }
+  .badge {
+    width: 38px; height: 38px; flex: none; border-radius: 9px; background: var(--accent);
+    color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 1.1rem;
+  }
+  .title strong { display: block; font-size: 1.05rem; }
+  .url { color: var(--accent); font-size: .87rem; font-family: ui-monospace, monospace; }
+  .note { color: var(--muted); font-size: .85rem; margin: .7rem 0 .5rem; }
+  .creds { border-top: 1px solid var(--line); padding-top: .6rem; }
+  .row { display: flex; justify-content: space-between; align-items: center;
+          gap: .5rem; padding: .22rem 0; font-size: .87rem; }
+  .k { color: var(--muted); }
+  .v { display: flex; align-items: center; gap: .4rem; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .dim { color: var(--muted); }
+  .none { color: var(--muted); }
+  .secret { cursor: pointer; font-family: ui-monospace, monospace; }
+  .secret .dots { letter-spacing: .1em; }
+  button.copy {
+    font: inherit; font-size: .75rem; padding: .1rem .45rem; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  button.copy:hover { color: var(--text); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel);
+           border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line);
+            font-size: .88rem; }
+  th { color: var(--muted); font-weight: 600; font-size: .78rem;
+        text-transform: uppercase; letter-spacing: .05em; }
+  tr:last-child td { border-bottom: none; }
+  td a { color: var(--info-line); }
+  footer { margin-top: 2.5rem; color: var(--muted); font-size: .85rem;
+            border-top: 1px solid var(--line); padding-top: 1.2rem; }
+  code { font-family: ui-monospace, monospace; background: var(--bg);
+          padding: .1rem .35rem; border-radius: 4px; }
+  .state { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap;
+            margin: .6rem 0 .2rem; font-size: .84rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; flex: none; }
+  .dot.up { background: #22c55e; }
+  .dot.down { background: #ef4444; }
+  .dot.busy { background: #f59e0b; }
+  .state .label { color: var(--muted); }
+  .state .actions { margin-left: auto; display: flex; gap: .3rem; }
+  button.act {
+    font: inherit; font-size: .75rem; padding: .15rem .5rem; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 5px;
+  }
+  button.act:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+  button.act.danger:hover:not(:disabled) { color: #ef4444; border-color: #ef4444; }
+  button.act:disabled { opacity: .4; cursor: not-allowed; }
+  button.rotate {
+    margin-left: .5rem; font-size: .78rem; padding: .1rem .5rem; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 5px; background: none; color: var(--muted);
+  }
+  button.rotate:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+  button.rotate:disabled { opacity: .5; cursor: progress; }
+  .card.add { opacity: .85; border-style: dashed; }
+  .card.add:hover { opacity: 1; }
+  button.install {
+    font-size: .82rem; padding: .3rem .8rem; cursor: pointer; border-radius: 6px;
+    border: 1px solid var(--accent); background: none; color: var(--accent);
+  }
+  button.install:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  button.install:disabled { opacity: .5; cursor: progress; }
+  .echec { color: #ef4444; font-size: .8rem; margin-right: .4rem; }
+  .upd { display: inline-flex; align-items: center; gap: .35rem; }
+  .upd .tag {
+    font-size: .7rem; padding: .05rem .4rem; border-radius: 999px;
+    background: var(--warn-bg); color: var(--warn-line);
+    border: 1px solid var(--warn-line); font-weight: 600;
+  }
+  button.upgrade {
+    font: inherit; font-size: .75rem; padding: .15rem .5rem; cursor: pointer;
+    background: var(--warn-line); color: #1b1200; border: none; border-radius: 5px;
+    font-weight: 600;
+  }
+  button.upgrade:disabled { opacity: .5; cursor: not-allowed; }
+  .outils { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
+  button.outil {
+    font: inherit; padding: .35rem .8rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }
+  button.outil:disabled { opacity: .5; cursor: progress; }
+  .outil-etat { font-size: .85rem; color: var(--muted); }
+  pre.rapport {
+    margin-top: .75rem; padding: .75rem 1rem; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--panel); overflow-x: auto;
+    font-size: .85rem; line-height: 1.5; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Votre stack media</h1>
+    <p>5 services installes et cables le 05/09/2026 a 09:34.</p>
+    <div class="banner info">Les liens utilisent 192.168.1.10, l&#x27;adresse de cette machine sur le reseau local, et non localhost : la page reste donc valable depuis un autre appareil.</div><div class="banner warn"><strong>Aucun VPN.</strong> Le trafic BitTorrent sort sur l'adresse IP publique de cette machine.</div><div class="banner warn"><strong>PUID/PGID 1000:1000</strong> — valeur par defaut : detection impossible sur cette plateforme. Cette valeur decide de qui possede vos medias.</div>
+    <div class="outils">
+      <button class="outil" id="btn-doctor">diagnostic</button>
+      <button class="outil" id="btn-maj">chercher les mises a jour</button>
+      <button class="outil" id="btn-sauvegarde">sauvegarder la configuration</button>
+      <span class="outil-etat" id="outil-etat"></span>
+    </div>
+    <pre class="rapport" id="rapport-doctor" hidden></pre>
+  </header>
+
+  <h2>Services</h2>
+  <div class="grid">
+      <article class="card" style="--accent:#31c48d">
+        <a class="title" href="http://192.168.1.10:8080" target="_blank" rel="noopener"><span class="badge">q</span><span><strong>qBittorrent</strong><span class="url">http://192.168.1.10:8080</span></span></a>
+        <p class="note">Categories natives avec chemin dedie.</p>
+        <div class="state" data-service="qbittorrent">
+          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="upd" data-service="qbittorrent" hidden></span>
+          <span class="actions">
+            <button class="act" data-service="qbittorrent" data-action="start">demarrer</button>
+            <button class="act" data-service="qbittorrent" data-action="restart">redemarrer</button>
+            <button class="act danger" data-service="qbittorrent" data-action="stop">arreter</button>
+          </span>
+        </div>
+        <div class="creds"><div class="row"><span class="k">Identifiant</span><span class="v mono">plugarr</span></div><div class="row"><span class="k">Mot de passe</span><span class="v" data-secret="qbittorrent:password"><span class="secret" data-value="MotDePasseGenere42" title="Cliquer pour afficher le mot de passe"><span class="dots">••••••••</span></span><button class="copy" data-value="MotDePasseGenere42" title="Copier">copier</button><button class="rotate" data-service="qbittorrent" data-what="password" title="Tirer un nouveau mot de passe et recabler">renouveler</button></span></div></div>
+      </article>
+      <article class="card" style="--accent:#4c8dff">
+        <a class="title" href="http://192.168.1.10:8989" target="_blank" rel="noopener"><span class="badge">S</span><span><strong>Sonarr</strong><span class="url">http://192.168.1.10:8989</span></span></a>
+        <p class="note">Series TV.</p>
+        <div class="state" data-service="sonarr">
+          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="upd" data-service="sonarr" hidden></span>
+          <span class="actions">
+            <button class="act" data-service="sonarr" data-action="start">demarrer</button>
+            <button class="act" data-service="sonarr" data-action="restart">redemarrer</button>
+            <button class="act danger" data-service="sonarr" data-action="stop">arreter</button>
+          </span>
+        </div>
+        <div class="creds"><div class="row"><span class="k">Identifiant</span><span class="v mono">plugarr</span></div><div class="row"><span class="k">Mot de passe</span><span class="v" data-secret="sonarr:password"><span class="secret" data-value="MotDePasseGenere42" title="Cliquer pour afficher le mot de passe"><span class="dots">••••••••</span></span><button class="copy" data-value="MotDePasseGenere42" title="Copier">copier</button><button class="rotate" data-service="sonarr" data-what="password" title="Tirer un nouveau mot de passe et recabler">renouveler</button></span></div><div class="row"><span class="k">Cle API</span><span class="v" data-secret="sonarr:api_key"><span class="secret" data-value="0123456789abcdef0123456789abcdef" title="Cliquer pour afficher la cle API"><span class="dots">••••••••</span></span><button class="copy" data-value="0123456789abcdef0123456789abcdef" title="Copier">copier</button><button class="rotate" data-service="sonarr" data-what="api_key" title="Tirer une nouvelle cle API et recabler">renouveler</button></span></div></div>
+      </article>
+      <article class="card" style="--accent:#4c8dff">
+        <a class="title" href="http://192.168.1.10:7878" target="_blank" rel="noopener"><span class="badge">R</span><span><strong>Radarr</strong><span class="url">http://192.168.1.10:7878</span></span></a>
+        <p class="note">Films.</p>
+        <div class="state" data-service="radarr">
+          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="upd" data-service="radarr" hidden></span>
+          <span class="actions">
+            <button class="act" data-service="radarr" data-action="start">demarrer</button>
+            <button class="act" data-service="radarr" data-action="restart">redemarrer</button>
+            <button class="act danger" data-service="radarr" data-action="stop">arreter</button>
+          </span>
+        </div>
+        <div class="creds"><div class="row"><span class="k">Identifiant</span><span class="v mono">plugarr</span></div><div class="row"><span class="k">Mot de passe</span><span class="v" data-secret="radarr:password"><span class="secret" data-value="MotDePasseGenere42" title="Cliquer pour afficher le mot de passe"><span class="dots">••••••••</span></span><button class="copy" data-value="MotDePasseGenere42" title="Copier">copier</button><button class="rotate" data-service="radarr" data-what="password" title="Tirer un nouveau mot de passe et recabler">renouveler</button></span></div><div class="row"><span class="k">Cle API</span><span class="v" data-secret="radarr:api_key"><span class="secret" data-value="0123456789abcdef0123456789abcdef" title="Cliquer pour afficher la cle API"><span class="dots">••••••••</span></span><button class="copy" data-value="0123456789abcdef0123456789abcdef" title="Copier">copier</button><button class="rotate" data-service="radarr" data-what="api_key" title="Tirer une nouvelle cle API et recabler">renouveler</button></span></div></div>
+      </article>
+      <article class="card" style="--accent:#4c8dff">
+        <a class="title" href="http://192.168.1.10:9696" target="_blank" rel="noopener"><span class="badge">P</span><span><strong>Prowlarr</strong><span class="url">http://192.168.1.10:9696</span></span></a>
+        <p class="note">Pivot du cablage : alimente les autres en indexeurs.</p>
+        <div class="state" data-service="prowlarr">
+          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="upd" data-service="prowlarr" hidden></span>
+          <span class="actions">
+            <button class="act" data-service="prowlarr" data-action="start">demarrer</button>
+            <button class="act" data-service="prowlarr" data-action="restart">redemarrer</button>
+            <button class="act danger" data-service="prowlarr" data-action="stop">arreter</button>
+          </span>
+        </div>
+        <div class="creds"><div class="row"><span class="k">Identifiant</span><span class="v mono">plugarr</span></div><div class="row"><span class="k">Mot de passe</span><span class="v" data-secret="prowlarr:password"><span class="secret" data-value="MotDePasseGenere42" title="Cliquer pour afficher le mot de passe"><span class="dots">••••••••</span></span><button class="copy" data-value="MotDePasseGenere42" title="Copier">copier</button><button class="rotate" data-service="prowlarr" data-what="password" title="Tirer un nouveau mot de passe et recabler">renouveler</button></span></div><div class="row"><span class="k">Cle API</span><span class="v" data-secret="prowlarr:api_key"><span class="secret" data-value="0123456789abcdef0123456789abcdef" title="Cliquer pour afficher la cle API"><span class="dots">••••••••</span></span><button class="copy" data-value="0123456789abcdef0123456789abcdef" title="Copier">copier</button><button class="rotate" data-service="prowlarr" data-what="api_key" title="Tirer une nouvelle cle API et recabler">renouveler</button></span></div></div>
+      </article>
+      <article class="card" style="--accent:#a855f7">
+        <a class="title" href="http://192.168.1.10:8096" target="_blank" rel="noopener"><span class="badge">J</span><span><strong>Jellyfin</strong><span class="url">http://192.168.1.10:8096</span></span></a>
+        <p class="note">Serveur media. Bibliotheques creees pour vous.</p>
+        <div class="state" data-service="jellyfin">
+          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="upd" data-service="jellyfin" hidden></span>
+          <span class="actions">
+            <button class="act" data-service="jellyfin" data-action="start">demarrer</button>
+            <button class="act" data-service="jellyfin" data-action="restart">redemarrer</button>
+            <button class="act danger" data-service="jellyfin" data-action="stop">arreter</button>
+          </span>
+        </div>
+        <div class="creds"><div class="row"><span class="k">Identifiant</span><span class="v mono">plugarr</span></div><div class="row"><span class="k">Mot de passe</span><span class="v" data-secret="jellyfin:password"><span class="secret" data-value="MotDePasseGenere42" title="Cliquer pour afficher le mot de passe"><span class="dots">••••••••</span></span><button class="copy" data-value="MotDePasseGenere42" title="Copier">copier</button></span></div></div>
+      </article>
+  </div>
+
+
+  <h2>Ajouter un service</h2>
+  <p class="note">Le service est installe puis <b>cable dans les deux sens</b> : il apprend a parler aux autres, et les autres apprennent a lui parler. Rien n'est arrete, et aucun mot de passe existant n'est touche.</p>
+  <div class="grid">
+      <article class="card add" data-add="transmission">
+        <div class="title headless"><span class="badge">T</span><span><strong>Transmission</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Client torrent par defaut.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="transmission">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="sabnzbd">
+        <div class="title headless"><span class="badge">S</span><span><strong>SABnzbd</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Client Usenet. Complete les torrents, il ne les remplace pas.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="sabnzbd">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="lidarr">
+        <div class="title headless"><span class="badge">L</span><span><strong>Lidarr</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Musique. Son API est en v1, pas en v3.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="lidarr">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="recyclarr">
+        <div class="title headless"><span class="badge">R</span><span><strong>Recyclarr</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Profils de qualite TRaSH. Aucune interface web.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="recyclarr">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="autobrr">
+        <div class="title headless"><span class="badge">a</span><span><strong>autobrr</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Ecoute les annonces IRC. Plus rapide que le sondage RSS.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="autobrr">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="silo">
+        <div class="title headless"><span class="badge">S</span><span><strong>Silo</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Serveur media, API compatible Jellyfin. Meilisearch est optionnel et n&#x27;est pas installe. <span class="dim">— tirera aussi PostgreSQL (Silo), Redis (Silo)</span></p>
+        <div class="state"><span class="actions"><button class="install" data-service="silo">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="audiobookshelf">
+        <div class="title headless"><span class="badge">A</span><span><strong>Audiobookshelf</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Livres et livres audio. Remplit les bibliotheques books et audiobooks.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="audiobookshelf">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="droppedneedle">
+        <div class="title headless"><span class="badge">D</span><span><strong>DroppedNeedle</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Musique, de la demande au rangement. REMPLACE Lidarr, ne le complete pas. <span class="dim">— tirera aussi SABnzbd</span></p>
+        <div class="state"><span class="actions"><button class="install" data-service="droppedneedle">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="seerr">
+        <div class="title headless"><span class="badge">S</span><span><strong>Seerr</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">Demandes de medias. Successeur de Jellyseerr et d&#x27;Overseerr.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="seerr">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="flood">
+        <div class="title headless"><span class="badge">F</span><span><strong>Flood</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">UI web pour qBittorrent ou Transmission. N&#x27;est pas un client.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="flood">installer et cabler</button></span></div>
+      </article>
+      <article class="card add" data-add="qui">
+        <div class="title headless"><span class="badge">q</span><span><strong>qui</strong><span class="url">pas encore installe</span></span></div>
+        <p class="note">UI web pour qBittorrent. N&#x27;est pas un client.</p>
+        <div class="state"><span class="actions"><button class="install" data-service="qui">installer et cabler</button></span></div>
+      </article>
+  </div>
+
+  <h2>Dossiers</h2>
+  <table>
+    <thead><tr><th>Contenu</th><th>Sur cette machine</th><th>Vu par les conteneurs</th><th></th></tr></thead>
+    <tbody>
+        <tr>
+          <td>Films</td>
+          <td class="mono">/srv/data/media/movies <button class="copy" data-value="/srv/data/media/movies">copier</button></td>
+          <td class="mono dim">/data/media/movies</td>
+          <td><a href="file:///srv/data/media/movies">ouvrir</a></td>
+        </tr>        <tr>
+          <td>Series</td>
+          <td class="mono">/srv/data/media/tv <button class="copy" data-value="/srv/data/media/tv">copier</button></td>
+          <td class="mono dim">/data/media/tv</td>
+          <td><a href="file:///srv/data/media/tv">ouvrir</a></td>
+        </tr>        <tr>
+          <td>Telechargements</td>
+          <td class="mono">/srv/data/torrents <button class="copy" data-value="/srv/data/torrents">copier</button></td>
+          <td class="mono dim">/data/torrents</td>
+          <td><a href="file:///srv/data/torrents">ouvrir</a></td>
+        </tr>        <tr>
+          <td>Configurations</td>
+          <td class="mono">/opt/plugarr/config <button class="copy" data-value="/opt/plugarr/config">copier</button></td>
+          <td class="mono dim">—</td>
+          <td><a href="file:///opt/plugarr/config">ouvrir</a></td>
+        </tr>
+    </tbody>
+  </table>
+  <p class="note">Les liens « ouvrir » ne fonctionnent que si ce navigateur tourne sur la machine d'installation. Depuis un autre appareil, utilisez le chemin copiable, ou passez par un partage reseau.</p>
+
+  <footer>
+    <p><strong>Prochaine etape : ajoutez vos indexeurs dans Prowlarr. Ils descendront automatiquement vers Sonarr, Radarr. plugarr ne fournit aucun indexeur : ce choix vous appartient.</strong></p>
+    <p>Cette page contient vos mots de passe et vos cles API. Elle est en lecture seule pour vous (<code>chmod 600</code>) et exclue du depot git. Ne la partagez pas.</p>
+    <p>Genere par plugarr 0.5.0 — donnees dans <code>/srv/data</code>.</p>
+  </footer>
+</div>
+<script>
+  document.querySelectorAll('.secret').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var dots = el.querySelector('.dots');
+      if (el.dataset.shown === '1') {
+        dots.textContent = '\u2022'.repeat(8);
+        el.dataset.shown = '0';
+      } else {
+        dots.textContent = el.dataset.value;
+        el.dataset.shown = '1';
+      }
+    });
+  });
+  document.querySelectorAll('button.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(btn.dataset.value).then(function () {
+        var before = btn.textContent;
+        btn.textContent = 'copie';
+        setTimeout(function () { btn.textContent = before; }, 1200);
+      });
+    });
+  });
+</script>
+<script>
+  // Sert uniquement quand la page vient de `plugarr serve` : c'est ce serveur
+  // qui expose /api/status et /api/action. Le jeton voyage en cookie HttpOnly,
+  // pose lors du chargement de la page.
+  var LIBELLES = {running: 'en marche', exited: 'arrete', created: 'cree',
+                  paused: 'en pause', absent: 'conteneur absent'};
+
+  function peindre(services) {
+    services.forEach(function (s) {
+      var bloc = document.querySelector('.state[data-service="' + s.id + '"]');
+      if (!bloc) return;
+      var dot = bloc.querySelector('.dot');
+      dot.className = 'dot ' + (s.up ? 'up' : 'down');
+      dot.title = s.status;
+      bloc.querySelector('.label').textContent =
+        (LIBELLES[s.state] || s.state) + (s.status ? ' — ' + s.status : '');
+      bloc.querySelectorAll('button.act').forEach(function (b) {
+        b.disabled = (b.dataset.action === 'start') ? s.up : !s.up;
+      });
+    });
+  }
+
+  function rafraichir() {
+    fetch('/api/status', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { peindre(d.services); })
+      .catch(function () {});
+  }
+
+  // Renouvellement d'un mot de passe. L'operation dure : elle change le mot de
+  // passe DANS le service, puis rejoue tout le cablage pour que les *arr et
+  // Prowlarr apprennent le nouveau. Sans ce recablage, six liaisons casseraient
+  // en silence et leur bouton Test echouerait sans rien expliquer.
+  document.querySelectorAll('button.rotate').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var cellule = btn.closest('[data-secret]');
+      var quoi = btn.dataset.what;
+      var nom = (quoi === 'api_key') ? 'la cle API' : 'le mot de passe';
+      // Une cle API redemarre le service : le dire, c'est eviter que quelqu'un
+      // se demande pourquoi sa serie s'est arretee de telecharger.
+      var suite = (quoi === 'api_key')
+        ? 'Le service va REDEMARRER, puis toutes les liaisons seront recablees.'
+        : 'Le nouveau sera applique puis toutes les liaisons seront recablees.';
+      if (!window.confirm(
+            'Renouveler ' + nom + ' de ce service ?\n\n' + suite + ' '
+            + 'Toute application exterieure utilisant l\'ancien devra etre mise a jour.')) {
+        return;
+      }
+      var avant = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'en cours…';
+      fetch('/api/rotate', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: btn.dataset.service, what: quoi})
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          btn.disabled = false;
+          btn.textContent = avant;
+          if (!d.ok) {
+            btn.insertAdjacentHTML('beforebegin',
+              '<span class="echec"></span>');
+            cellule.querySelector('.echec').textContent = d.message || d.error;
+            return;
+          }
+          // Le nouveau secret remplace l'ancien sur place, deja devoile : c'est
+          // le seul moment ou l'utilisateur peut le noter.
+          var secret = cellule.querySelector('.secret');
+          secret.dataset.value = d.secret;
+          secret.textContent = d.secret;
+          secret.classList.add('devoile');
+          var copie = cellule.querySelector('button.copy');
+          if (copie) copie.dataset.value = d.secret;
+        })
+        .catch(function (e) {
+          btn.disabled = false;
+          btn.textContent = avant;
+        });
+    });
+  });
+
+  // Ajout d'un service absent de l'installation. L'operation est longue : elle
+  // telecharge une image, demarre le conteneur, puis rejoue tout le cablage —
+  // c'est la seule facon de relier le nouveau venu aux anciens DANS LES DEUX
+  // SENS. Un client de telechargement ajoute doit apparaitre dans les quatre
+  // *arr, et un *arr ajoute doit apparaitre dans Prowlarr et dans autobrr.
+  document.querySelectorAll('button.install').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var carte = btn.closest('.card');
+      if (!window.confirm(
+            'Installer ce service et le cabler ?\n\n'
+            + 'Son image sera telechargee, ce qui peut prendre plusieurs minutes. '
+            + 'Aucun service en marche n\'est arrete, et aucun mot de passe existant '
+            + 'n\'est touche.')) {
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'installation…';
+      fetch('/api/add', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: btn.dataset.service})
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            btn.disabled = false;
+            btn.textContent = 'installer et cabler';
+            carte.insertAdjacentHTML('beforeend', '<p class="echec"></p>');
+            carte.querySelector('.echec').textContent = d.message || d.error;
+            return;
+          }
+          // La carte du nouveau service doit apparaitre avec son adresse et ses
+          // identifiants : seul un rechargement les connait.
+          btn.textContent = 'installe, rechargement…';
+          window.location.reload();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          btn.textContent = 'installer et cabler';
+        });
+    });
+  });
+
+  document.querySelectorAll('button.act').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var bloc = btn.closest('.state');
+      bloc.querySelector('.dot').className = 'dot busy';
+      bloc.querySelector('.label').textContent = 'en cours…';
+      bloc.querySelectorAll('button.act').forEach(function (b) { b.disabled = true; });
+      fetch('/api/action', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: btn.dataset.service, action: btn.dataset.action})
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) { bloc.querySelector('.label').textContent = 'echec : ' + (d.message || d.error); }
+          setTimeout(rafraichir, 900);
+        })
+        .catch(function () { bloc.querySelector('.label').textContent = 'serveur injoignable'; });
+    });
+  });
+
+  function peindreMaj(services) {
+    services.forEach(function (s) {
+      var zone = document.querySelector('.upd[data-service="' + s.id + '"]');
+      if (!zone) return;
+      if (!s.available) { zone.hidden = true; zone.innerHTML = ''; return; }
+      var libelle = s.latest
+        ? 'v' + s.latest.replace(/^v/, '') + ' disponible'
+        : 'image reconstruite';
+      var titre = s.latest
+        ? 'Version ' + s.current + ' installee, ' + s.latest + ' disponible'
+        : 'Meme version, image republiee en amont (correctifs de securite)';
+      zone.hidden = false;
+      zone.innerHTML =
+        '<span class="tag" title="' + titre + '">' + libelle + '</span>' +
+        '<button class="upgrade">mettre a jour</button>';
+      zone.querySelector('button').addEventListener('click', function () {
+        lancerMaj(s, zone);
+      });
+    });
+  }
+
+  function lancerMaj(s, zone) {
+    var quoi = s.latest ? ('passer de ' + s.current + ' a ' + s.latest) : 'retirer la meme version';
+    var question = s.name + ' : ' + quoi + ' ?'
+      + '\n\nLe conteneur sera recree. Les autres services ne bougent pas.';
+    if (!confirm(question)) return;
+    zone.innerHTML = '<span class="tag">mise a jour…</span>';
+    fetch('/api/update', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({service: s.id, target: s.latest || null})
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        zone.innerHTML = '<span class="tag">' + (d.ok ? 'fait : ' + d.message : 'echec') + '</span>';
+        if (!d.ok) { alert(s.name + ' : ' + (d.message || d.error)); }
+        setTimeout(function () { rafraichir(); verifierMaj(); }, 1500);
+      })
+      .catch(function () { zone.innerHTML = '<span class="tag">serveur injoignable</span>'; });
+  }
+
+  function verifierMaj() {
+    fetch('/api/updates', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { peindreMaj(d.services); })
+      .catch(function () {});
+  }
+
+  rafraichir();
+  setInterval(rafraichir, 5000);
+  // Le controle interroge les registres : lent, et sans urgence.
+  verifierMaj();
+  setInterval(verifierMaj, 900000);
+
+  // -- barre d'outils ------------------------------------------------------
+
+  var etat = document.getElementById('outil-etat');
+
+  function heure() {
+    return new Date().toLocaleTimeString();
+  }
+
+  var btnMaj = document.getElementById('btn-maj');
+  if (btnMaj) {
+    btnMaj.addEventListener('click', function () {
+      btnMaj.disabled = true;
+      etat.textContent = 'interrogation des registres…';
+      // La verification tournait deja toutes les 15 minutes, en silence. Ce
+      // bouton ne l'ajoute pas : il la rend declenchable et DATEE.
+      fetch('/api/updates', {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var liste = d.services || [];
+          peindreMaj(liste);
+          var n = liste.filter(function (s) { return s.available; }).length;
+          var soucis = liste.filter(function (s) { return (s.problems || []).length; }).length;
+          etat.textContent = (n ? n + ' mise(s) a jour disponible(s)' : 'tout est a jour')
+            + (soucis ? ', ' + soucis + ' service(s) non verifiable(s)' : '')
+            + ' — ' + heure();
+        })
+        .catch(function () { etat.textContent = 'serveur injoignable'; })
+        .then(function () { btnMaj.disabled = false; });
+    });
+  }
+
+  var btnSauv = document.getElementById('btn-sauvegarde');
+  if (btnSauv) {
+    btnSauv.addEventListener('click', function () {
+      if (!confirm('Sauvegarder la configuration complete ?'
+          + '\n\nLes conteneurs seront ARRETES le temps de la copie, puis redemarres. '
+          + 'Une base copiee a chaud est corrompue. Vos medias ne sont pas touches.')) return;
+      btnSauv.disabled = true;
+      etat.textContent = 'conteneurs arretes, copie en cours…';
+      fetch('/api/backup', {method: 'POST', credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          etat.textContent = d.ok
+            ? d.fichiers + ' fichiers, ' + d.mega + ' Mo — ' + d.archive
+            : 'echec : ' + (d.error || 'inconnu');
+          if (d.ok) { rafraichir(); }
+        })
+        .catch(function () { etat.textContent = 'serveur injoignable'; })
+        .then(function () { btnSauv.disabled = false; });
+    });
+  }
+
+  var btnDoc = document.getElementById('btn-doctor');
+  var rapport = document.getElementById('rapport-doctor');
+  if (btnDoc) {
+    btnDoc.addEventListener('click', function () {
+      if (!rapport.hidden && rapport.dataset.rempli === '1') {
+        rapport.hidden = true;
+        rapport.dataset.rempli = '0';
+        etat.textContent = '';
+        return;
+      }
+      btnDoc.disabled = true;
+      etat.textContent = 'diagnostic en cours…';
+      fetch('/api/doctor', {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var lignes = (d.checks || []).map(function (c) {
+            return (c.ok ? '  OK    ' : '  ECHEC ') + c.name + ' : ' + c.detail;
+          });
+          rapport.textContent = lignes.join('\n') || 'aucun controle';
+          rapport.hidden = false;
+          rapport.dataset.rempli = '1';
+          etat.textContent = (d.failed
+            ? d.failed + ' controle(s) en echec'
+            : 'tout est en ordre') + ' — ' + heure();
+        })
+        .catch(function () { etat.textContent = 'serveur injoignable'; })
+        .then(function () { btnDoc.disabled = false; });
+    });
+  }
+</script>
+</body>
+</html>

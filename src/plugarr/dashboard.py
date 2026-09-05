@@ -112,20 +112,36 @@ def _bouton_rotation(spec, quoi: str, live: bool) -> str:
         return ""
     return (
         f'<button class="rotate" data-service="{spec.id}" data-what="{quoi}" '
-        f'title="{infobulle}">renouveler</button>'
+        f'title="{t(infobulle)}">{t("renouveler")}</button>'
     )
 
 
 _CONTROLS = """        <div class="state" data-service="{sid}">
-          <span class="dot" title="etat inconnu"></span><span class="label">verification…</span>
+          <span class="dot" title="{etat_inconnu}"></span><span class="label">{verification}</span>
           <span class="upd" data-service="{sid}" hidden></span>
           <span class="actions">
-            <button class="act" data-service="{sid}" data-action="start">demarrer</button>
-            <button class="act" data-service="{sid}" data-action="restart">redemarrer</button>
-            <button class="act danger" data-service="{sid}" data-action="stop">arreter</button>
+            <button class="act" data-service="{sid}" data-action="start">{demarrer}</button>
+            <button class="act" data-service="{sid}" data-action="restart">{redemarrer}</button>
+            <button class="act danger" data-service="{sid}" data-action="stop">{arreter}</button>
           </span>
         </div>
 """
+
+
+def _controls(sid: str) -> str:
+    """Boutons d'un service, formes A L'AFFICHAGE.
+
+    Meme raison que pour la barre d'outils : les former a l'import figerait
+    leurs libelles dans la langue chargee a ce moment-la.
+    """
+    return _CONTROLS.format(
+        sid=sid,
+        etat_inconnu=t("etat inconnu"),
+        verification=t("verification…"),
+        demarrer=t("demarrer"),
+        redemarrer=t("redemarrer"),
+        arreter=t("arreter"),
+    )
 
 
 def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
@@ -156,7 +172,7 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
                 f'{_secret(inst.api_key, "la cle API")}'
                 f'{_bouton_rotation(spec, "api_key", live)}</span></div>'
             )
-        controls = _CONTROLS.format(sid=spec.id) if live else ""
+        controls = _controls(spec.id) if live else ""
         # Un service sans port publie n'a pas d'interface a ouvrir. Recyclarr
         # tourne sur une planification. Lui donner un lien vers le port 0 offrirait
         # une carte cliquable qui n'aboutit nulle part : le lecteur en conclurait
