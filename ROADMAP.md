@@ -5,7 +5,7 @@
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.5.1**
+**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.5.2**
 
 ---
 
@@ -209,6 +209,8 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.5.2** | **`plugarr restore` plantait sur un fichier qui n'est pas une archive**, et sortait sur une trace Python brute suivie de « Failed to execute script 'launcher' ». `zipfile.BadZipFile` herite d'`Exception`, **pas** de `ValueError` ni d'`OSError` : les deux appelants, qui attrapaient ces deux-la, la laissaient passer. La conversion se fait desormais dans `lire_manifeste`, une fois, plutot que dans chaque appelant — un troisieme en beneficiera. Trouve en lancant l'EXECUTABLE PUBLIE sur un fichier texte renomme en `.zip` ; tous les tests passaient. |
+| **0.5.2** | Deux messages restaient francais et ne se voyaient que la : `stack.yml introuvable. Lancez d'abord plugarr install`, et le tableau du contenu d'une archive. Meme methode, meme resultat : lancer le binaire plutot que relire le code. |
 | **0.5.1** | **Le chemin d'ECHEC parle anglais aussi.** La 0.5.0 couvrait tout le chemin nominal ; restaient les messages qu'on ne voit que quand quelque chose casse — « qBittorrent n'est jamais devenu disponible », « le config.xml pre-seme a peut-etre ete ecrase », « NON PROTEGE : le tunnel ressort sur VOTRE adresse publique ». Ils vivaient dans quinze modules clients, `wiring.py`, `vpncheck.py` et l'orchestrateur, sous forme de `WiringError` levees profondement dans le code. Le catalogue les dedoublonne : le meme « X n'est jamais devenu disponible » servait neuf fois. **540 phrases** au total, contre 377 a la 0.5.0. |
 | **0.5.1** | **Les fichiers ecrits sur le disque aussi.** `docker-compose.yml`, `.env`, `.gitignore`, `administration.cmd` et le script de demarrage automatique portaient un en-tete francais. Ce ne sont pas des messages a l'ecran, mais ils se lisent : on ouvre son `.env` pour retrouver un mot de passe. Restent en francais deux gabarits HTML et un bloc JavaScript — ce sont des structures, pas des phrases, et les traduire reviendrait a maintenir deux copies d'une page. |
 | **0.5.1** | **Un pluriel perdu, rattrape par un test.** Envelopper « 2 deja configures » avait fait disparaitre l'accord francais. Deux cles plutot qu'une : le francais accorde, l'anglais ne change pas, et une cle unique aurait force l'une des deux langues a etre fausse. |

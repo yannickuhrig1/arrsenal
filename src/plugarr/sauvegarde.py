@@ -260,8 +260,22 @@ def sauvegarder(
 
 
 def lire_manifeste(archive: Path) -> dict:
-    """Manifeste d'une archive, sans rien deballer."""
-    with zipfile.ZipFile(archive) as zf:
+    """Manifeste d'une archive, sans rien deballer.
+
+    `zipfile.BadZipFile` herite d'`Exception`, PAS de `ValueError` ni
+    d'`OSError` : les deux appelants la laissaient donc passer, et un fichier
+    qui n'est pas une archive faisait sortir `plugarr restore` sur une trace
+    Python brute. Constate en lancant l'executable publie sur un fichier
+    texte renomme en .zip. On la convertit ici, une fois, plutot que dans
+    chaque appelant.
+    """
+    try:
+        zf = zipfile.ZipFile(archive)
+    except zipfile.BadZipFile as exc:
+        raise ValueError(
+            t("{fichier} n'est pas une archive lisible", fichier=archive.name)
+        ) from exc
+    with zf:
         if MANIFESTE not in zf.namelist():
             raise ValueError(
                 t("{fichier} n'est pas une sauvegarde PlugArr", fichier=archive.name)

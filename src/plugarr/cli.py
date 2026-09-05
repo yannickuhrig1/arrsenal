@@ -115,7 +115,12 @@ def main(
 def _load_config(project_dir: Path) -> StackConfig:
     path = project_dir / STACK_FILE
     if not path.exists():
-        raise typer.BadParameter(f"{path} introuvable. Lancez d'abord `plugarr install`.")
+        raise typer.BadParameter(
+            t(
+                "{chemin} introuvable. Lancez d'abord `plugarr install`.",
+                chemin=path,
+            )
+        )
     cfg = StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
     # L'installation a retenu une langue : les commandes qui reprennent cette
     # pile la reprennent aussi. Sans cela, `plugarr serve` sur un serveur dont
@@ -867,7 +872,7 @@ def restore(
     """Repose une sauvegarde. N'ecrit RIEN dans DATA_ROOT."""
     archive = Path(archive)
     if not archive.is_file():
-        console.print(f"[red]{archive} introuvable.[/red]")
+        console.print(t("[red]{fichier} introuvable.[/red]", fichier=archive))
         raise typer.Exit(1)
     try:
         manifeste = sauvegarde.lire_manifeste(archive)
@@ -878,14 +883,14 @@ def restore(
     cible = config_root or manifeste["config_root"]
     from rich.table import Table
 
-    table = Table(title="Contenu de l'archive")
+    table = Table(title=t("Contenu de l'archive"))
     for col in ("", ""):
         table.add_column(col, overflow="fold")
-    table.add_row("Date", manifeste["date"])
-    table.add_row("Pile", manifeste["project_name"])
-    table.add_row("Services", ", ".join(manifeste["services"]))
-    table.add_row("Volumes", ", ".join(manifeste["volumes"]) or "aucun")
-    table.add_row("Configuration vers", cible)
+    table.add_row(t("Date"), manifeste["date"])
+    table.add_row(t("Pile"), manifeste["project_name"])
+    table.add_row(t("Services"), ", ".join(manifeste["services"]))
+    table.add_row(t("Volumes"), ", ".join(manifeste["volumes"]) or t("aucun"))
+    table.add_row(t("Configuration vers"), cible)
     console.print(table)
     if manifeste.get("a_chaud"):
         console.print(

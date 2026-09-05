@@ -172,6 +172,8 @@ def test_le_catalogue_ne_traduit_pas_par_l_identite():
         "cause",
         "action",
         ", test OK",
+        "Date",
+        "Volumes",
     }, identiques
 
 

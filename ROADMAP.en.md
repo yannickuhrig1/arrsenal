@@ -5,7 +5,7 @@
 Where PlugArr stands, what comes next, and why. Kept up to date after every
 working session.
 
-**Last updated: 5 September 2026** — published version: **0.5.1**
+**Last updated: 5 September 2026** — published version: **0.5.2**
 
 ---
 
@@ -211,6 +211,8 @@ than deleting them.
 
 | Version | |
 |---|---|
+| **0.5.2** | **`plugarr restore` crashed on a file that is not an archive**, exiting on a raw Python traceback followed by "Failed to execute script 'launcher'". `zipfile.BadZipFile` inherits from `Exception`, **not** from `ValueError` or `OSError`: both callers, which caught those two, let it through. The conversion now happens inside `lire_manifeste`, once, rather than in each caller — a third one will benefit too. Found by running the PUBLISHED EXECUTABLE on a text file renamed to `.zip`; every test passed. |
+| **0.5.2** | Two messages were still in French and only showed up there: `stack.yml introuvable. Lancez d'abord plugarr install`, and the archive contents table. Same method, same result: run the binary rather than re-read the code. |
 | **0.5.1** | **The FAILURE path speaks English too.** 0.5.0 covered the whole happy path; what remained were the messages you only see when something breaks — "qBittorrent never became available", "the pre-seeded config.xml may have been overwritten", "NOT PROTECTED: the tunnel exits on YOUR own public address". They lived in fifteen client modules, `wiring.py`, `vpncheck.py` and the orchestrator, as `WiringError`s raised deep in the code. The catalogue deduplicates them: the same "X never became available" was serving nine call sites. **540 phrases** in total, against 377 in 0.5.0. |
 | **0.5.1** | **The files written to disk, too.** `docker-compose.yml`, `.env`, `.gitignore`, `administration.cmd` and the automatic-startup script carried a French header. They are not on-screen messages, but they do get read: you open your `.env` to find a password. Still in French: two HTML templates and one JavaScript block — those are structures, not sentences, and translating them would mean maintaining two copies of a page. |
 | **0.5.1** | **A lost plural, caught by a test.** Wrapping "2 deja configures" had dropped the French agreement. Two keys rather than one: French agrees, English does not change, and a single key would have forced one of the two languages to be wrong. |

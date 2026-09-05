@@ -248,3 +248,37 @@ def test_la_restauration_reste_en_ligne_de_commande():
     cfg = orchestrator.build_config(services=["sonarr"], config_root="/c", data_root="/d")
 
     assert "/api/restore" not in dashboard.render(cfg, live=True)
+
+
+def test_un_fichier_qui_n_est_pas_une_archive_ne_plante_pas(tmp_path):
+    """`zipfile.BadZipFile` herite d'`Exception`, PAS de `ValueError`.
+
+    Les deux appelants attrapaient `(ValueError, OSError)` : un fichier texte
+    renomme en .zip passait donc au travers, et `plugarr restore` sortait sur
+    une trace Python brute suivie de « Failed to execute script 'launcher' ».
+
+    Constate en lancant l'EXECUTABLE PUBLIE, pas en relisant le code : les
+    tests passaient tous.
+    """
+    faux = tmp_path / "faux.zip"
+    faux.write_text("ceci n'est pas une archive", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="archive"):
+        sauvegarde.lire_manifeste(faux)
+
+
+def test_les_deux_appelants_attrapent_bien_cette_erreur():
+    """Le correctif vaut par la conversion en `ValueError`, pas par un
+    `except` elargi dans chaque appelant : c'est ce qui garantit qu'un
+    troisieme appelant en beneficiera aussi."""
+    import inspect
+
+    from plugarr import cli
+    from plugarr.tui import screens
+
+    for source in (
+        inspect.getsource(cli.restore),
+        inspect.getsource(screens.RestaurationScreen.examiner),
+    ):
+        assert "lire_manifeste" in source
+        assert "ValueError" in source
