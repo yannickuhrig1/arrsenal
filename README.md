@@ -61,7 +61,7 @@ PlugArr automatise cette partie-là.
 | Sonarr, Radarr | Jellyfin | notification de rafraîchissement après import |
 | Jellyfin | système de fichiers | assistant de démarrage + bibliothèques Films, Séries, Musique |
 | Silo | système de fichiers | compte, **profil**, bibliothèques Films, Séries, Musique en **lecture seule**, analyse lancée |
-| Sonarr, Radarr, Lidarr, Prowlarr, Jellyfin, Silo | eux-mêmes | langue de l'interface, choisie une fois |
+| Sonarr, Radarr, Lidarr, Prowlarr, Jellyfin, Silo | eux-mêmes | langue de leur interface, choisie une fois |
 | Sonarr, Radarr, Lidarr, Prowlarr | interface web | compte créé, **connexion réellement testée** |
 | Recyclarr | Sonarr, Radarr | profils de qualité et custom formats des TRaSH Guides, adresse et clé posées dans le template officiel, **première synchronisation lancée** |
 | qui | qBittorrent | compte créé, instance déclarée, connexion confirmée par qui |
@@ -99,6 +99,26 @@ ${DATA_ROOT}/                    ->  /data   (dans TOUS les conteneurs)
 
 Le préflight ne se contente pas de l'espérer : il **crée un vrai hardlink** entre
 `torrents/` et `media/` et vous dit si ça a marché.
+
+---
+
+## Deux langues, pas une
+
+PlugArr existe en **français et en anglais**, et il ne faut pas confondre les
+deux réglages :
+
+| | Où | Ce que ça change |
+|---|---|---|
+| **Langue de PlugArr** | écran d'accueil, ou `--lang fr\|en` | l'assistant, la ligne de commande, le rapport, la page d'accès |
+| **Langue des services** | écran des chemins, ou `--langue <code>` | ce que Sonarr, Radarr, Prowlarr, Jellyfin et Silo afficheront dans **leur** interface |
+
+Sans rien régler, PlugArr suit la langue du système, et les services suivent
+PlugArr. Rien n'oblige à les garder ensemble : on peut vouloir l'outil en
+anglais et sa médiathèque en français.
+
+Le choix est retenu dans `stack.yml` : `plugarr serve` et `plugarr doctor`
+répondent ensuite dans la langue de l'installation, même sur un serveur dont la
+session est en anglais.
 
 ---
 

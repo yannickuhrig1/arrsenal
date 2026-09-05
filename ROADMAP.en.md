@@ -30,7 +30,19 @@ instances at every release.
 The wizard covers **every** command line option: a test compares the signature
 of `install` against what the wizard can set, and fails if a gap appears.
 
-The UI language is asked once and applied to every application that accepts one.
+**PlugArr speaks French and English**, and the two languages at play no longer
+get confused. PlugArr's own — wizard, command line, report, access page — is
+chosen on the welcome screen or through `--lang`, and starts from the system's:
+a French speaker finds it in French without setting anything, everyone else in
+English. The **services'** language is asked separately, on the paths screen,
+and applies to every application that can take it. You may want the tool in
+English and your media library in French.
+
+A phrase added in French and forgotten in the catalogue breaks nothing: it
+would simply show up in French to someone who asked for English, with no error
+and no warning. `scripts/audit_traductions.py` therefore collects all 369
+displayable phrases and **fails if one is missing**, or if the catalogue holds a
+dead entry. It runs in CI.
 
 **Eight libraries** are created and organised: movies, shows, **anime**, music,
 live performances, books, audiobooks and software. Each has its download folder,

@@ -31,8 +31,19 @@ L'assistant couvre **toutes** les options de la ligne de commande : un test
 compare la signature d'`install` à ce que l'assistant sait poser, et échoue si
 un écart apparaît.
 
-La langue des interfaces se demande une fois et s'applique à toutes les
-applications qui en acceptent une.
+**PlugArr parle français et anglais**, et les deux langues en jeu ne se
+confondent plus. Celle de PlugArr — assistant, ligne de commande, rapport,
+page d'accès — se choisit sur l'écran d'accueil ou par `--lang`, et part de
+celle du système : un francophone le trouve en français sans rien régler, tout
+le monde d'autre en anglais. Celle des **services** se demande à part, sur
+l'écran des chemins, et s'applique à chaque application qui sait la recevoir.
+On peut vouloir l'outil en anglais et sa médiathèque en français.
+
+Une phrase ajoutée en français et oubliée dans le catalogue ne casse rien :
+elle s'afficherait simplement en français à quelqu'un qui a demandé l'anglais,
+sans erreur ni avertissement. `scripts/audit_traductions.py` relève donc les
+369 phrases affichables et **échoue s'il en manque une**, ou si le catalogue
+porte une entrée morte. Il tourne en CI.
 
 **Huit bibliothèques** sont créées et rangées : films, séries, **anime**,
 musique, spectacles, livres, livres audio et logiciels. Chacune a son dossier de

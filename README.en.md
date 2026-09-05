@@ -60,7 +60,7 @@ PlugArr automates that part.
 | Sonarr, Radarr | Jellyfin | refresh notification after import |
 | Jellyfin | filesystem | startup wizard + Movies, Shows and Music libraries |
 | Silo | filesystem | account, **profile**, Movies, Shows and Music libraries in **read-only**, scan started |
-| Sonarr, Radarr, Lidarr, Prowlarr, Jellyfin, Silo | themselves | UI language, chosen once |
+| Sonarr, Radarr, Lidarr, Prowlarr, Jellyfin, Silo | themselves | their own UI language, chosen once |
 | Sonarr, Radarr, Lidarr, Prowlarr | web UI | account created, **login actually tested** |
 | Recyclarr | Sonarr, Radarr | TRaSH Guides quality profiles and custom formats, URL and key written into the official template, **first sync started** |
 | qui | qBittorrent | account created, instance declared, connection confirmed by qui |
@@ -97,6 +97,26 @@ ${DATA_ROOT}/                    ->  /data   (in EVERY container)
 
 The preflight does not merely hope for it: it **creates a real hardlink** between
 `torrents/` and `media/` and tells you whether it worked.
+
+---
+
+## Two languages, not one
+
+PlugArr exists in **French and English**, and the two settings must not be
+confused:
+
+| | Where | What it changes |
+|---|---|---|
+| **PlugArr's language** | welcome screen, or `--lang fr\|en` | the wizard, the command line, the report, the access page |
+| **The services' language** | paths screen, or `--langue <code>` | what Sonarr, Radarr, Prowlarr, Jellyfin and Silo will show in **their** interface |
+
+With nothing set, PlugArr follows the system language, and the services follow
+PlugArr. Nothing forces you to keep them together: you may want the tool in
+English and your media library in French.
+
+The choice is kept in `stack.yml`: `plugarr serve` and `plugarr doctor` then
+answer in the installation's language, even on a server whose session is in
+English.
 
 ---
 

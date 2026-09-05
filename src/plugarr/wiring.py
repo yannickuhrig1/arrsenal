@@ -24,6 +24,7 @@ from .clients.jellyfin import JellyfinClient
 from .clients.qbittorrent import QBittorrentClient
 from .clients.qui import QuiClient
 from .downloadclients import profile_for
+from .i18n import t
 from .layout import BIBLIOTHEQUES, CONTAINER_PATHS
 from .models import Category, StackConfig
 
@@ -171,12 +172,12 @@ class Wirer:
                 return StepResult(
                     f"{arr_id}: dossier racine",
                     ok=True,
-                    detail=f"deja configure ({', '.join(existing)}), respecte",
+                    detail=t("deja configure ({dossiers}), respecte", dossiers=", ".join(existing)),
                 )
             return StepResult(
                 f"{arr_id}: dossier racine",
                 ok=True,
-                detail="aucun dossier racine configure",
+                detail=t("aucun dossier racine configure"),
                 warnings=[
                     (
                         f"{arr_id} n'a aucun dossier racine et plugarr ne peut pas "
@@ -204,7 +205,7 @@ class Wirer:
         return StepResult(
             f"{arr_id}: dossier racine {path}",
             ok=present,
-            detail="cree" if created else "deja present",
+            detail=t("cree") if created else t("deja present"),
             created=created,
         )
 
@@ -303,7 +304,7 @@ class Wirer:
             return StepResult(
                 f"{arr_id}: client de telechargement {dl_spec.display_name}",
                 ok=False,
-                detail="identifiants inconnus",
+                detail=t("identifiants inconnus"),
                 warnings=[
                     (
                         f"Le mot de passe de {dl_spec.display_name} est hache dans "
@@ -339,7 +340,7 @@ class Wirer:
             else []
         )
 
-        etat = "cree" if created else "deja present"
+        etat = t("cree") if created else t("deja present")
         if not created:
             # Une entree existante garde les identifiants d'alors. Si le mot de
             # passe du client a change depuis — une reinstallation suffit — elle
@@ -356,7 +357,7 @@ class Wirer:
                     raise
                 modifies = client.sync_fields("downloadclient", obj, identifiants)
             if modifies:
-                etat = f"identifiants mis a jour ({', '.join(modifies)})"
+                etat = t("identifiants mis a jour ({champs})", champs=", ".join(modifies))
 
         result = StepResult(
             f"{arr_id}: client de telechargement {dl_spec.display_name}",
@@ -383,7 +384,7 @@ class Wirer:
             return StepResult(
                 "qbittorrent: categories",
                 ok=True,
-                detail="client existant, categories laissees telles quelles",
+                detail=t("client existant, categories laissees telles quelles"),
             )
         url = f"http://{self.cfg.host}:{inst.host_port}"
         with QBittorrentClient(url, inst.username or "", inst.password or "") as qb:
@@ -409,7 +410,7 @@ class Wirer:
         return StepResult(
             "qbittorrent: categories avec chemin de sauvegarde",
             ok=expected <= present,
-            detail=f"creees: {', '.join(made) or 'aucune (deja presentes)'}",
+            detail=t("creees : {noms}", noms=", ".join(made) or t("aucune (deja presentes)")),
             created=bool(made),
         )
 
@@ -429,7 +430,7 @@ class Wirer:
             return StepResult(
                 "qbittorrent: lecteur RSS",
                 ok=True,
-                detail="client existant, reglages laisses tels quels",
+                detail=t("client existant, reglages laisses tels quels"),
             )
         url = f"http://{self.cfg.host}:{inst.host_port}"
         with QBittorrentClient(url, inst.username or "", inst.password or "") as qb:
@@ -485,7 +486,7 @@ class Wirer:
             if skipped
             else []
         )
-        etat = "cree" if created else "deja present"
+        etat = t("cree") if created else t("deja present")
         if not created:
             # Prowlarr garde la cle API du *arr DANS son entree Application.
             # `ensure_resource` ne touche jamais a l'existant : apres une
@@ -495,7 +496,7 @@ class Wirer:
             # a ceci pres que celui-la se declare « deja present » et vert.
             modifies = prowlarr.sync_fields("applications", obj, values)
             if modifies:
-                etat = f"realigne ({', '.join(modifies)})"
+                etat = t("realigne ({champs})", champs=", ".join(modifies))
         result = StepResult(
             f"prowlarr -> {arr_id} (Application, fullSync)",
             ok=prowlarr.find_by_name("applications", implementation) is not None,
@@ -528,7 +529,7 @@ class Wirer:
         )
         warnings = [f"champs ignores: {', '.join(skipped)}"] if skipped else []
 
-        etat = "cree" if created else "deja present"
+        etat = t("cree") if created else t("deja present")
         if not created:
             # Meme raison que pour les *arr : une entree existante garde les
             # identifiants d'alors, et son test echoue apres un changement de mot
@@ -542,7 +543,7 @@ class Wirer:
                     raise
                 modifies = prowlarr.sync_fields("downloadclient", obj, identifiants)
             if modifies:
-                etat = f"identifiants mis a jour ({', '.join(modifies)})"
+                etat = t("identifiants mis a jour ({champs})", champs=", ".join(modifies))
 
         result = StepResult(
             f"prowlarr: client de telechargement {dl_spec.display_name}",
@@ -595,7 +596,7 @@ class Wirer:
         result = StepResult(
             f"{arr_id} -> jellyfin (rafraichissement de bibliotheque)",
             ok=client.find_by_name("notification", "Jellyfin") is not None,
-            detail=("cree" if created else "deja present") + f" (id={obj.get('id', '?')})",
+            detail=(t("cree") if created else t("deja present")) + f" (id={obj.get('id', '?')})",
             created=created,
             warnings=warnings,
         )
@@ -639,7 +640,7 @@ class Wirer:
             # reelle, deux episodes sur le disque et zero dans Jellyfin.
             analyse = jf.refresh_libraries()
         ok = {name for _a, name, _c, _p in wanted} <= names
-        detail = "assistant execute" if ran else "assistant deja termine"
+        detail = t("assistant execute") if ran else t("assistant deja termine")
         detail += f", bibliotheques creees: {', '.join(made) or 'aucune (deja presentes)'}"
         detail += ", analyse lancee" if analyse else ""
         return StepResult(
@@ -767,7 +768,7 @@ class Wirer:
                 seerr.initialize()
             pret = seerr.initialized
 
-        detail = "accueil deja termine" if deja else "accueil execute"
+        detail = t("accueil deja termine") if deja else t("accueil execute")
         detail += f", identifiant Jellyfin ({identifiant})"
         if declares:
             detail += f", declares : {', '.join(declares)}"
@@ -798,7 +799,7 @@ class Wirer:
             return StepResult(
                 "sabnzbd: categories",
                 ok=True,
-                detail="client existant, categories laissees telles quelles",
+                detail=t("client existant, categories laissees telles quelles"),
             )
 
         url = f"http://{self.cfg.host}:{inst.host_port}"
@@ -834,7 +835,7 @@ class Wirer:
             "sabnzbd: categories avec repertoire",
             # Relu depuis l'application : un `set_config` accepte ne prouve rien.
             ok=not manquantes,
-            detail=f"posees: {', '.join(posees) or 'aucune (deja completes)'}",
+            detail=t("posees : {noms}", noms=", ".join(posees) or t("aucune (deja completes)")),
             created=bool(posees),
             warnings=(
                 [] if not manquantes else [f"categories sans repertoire : {', '.join(manquantes)}"]
@@ -893,7 +894,7 @@ class Wirer:
 
             teste, detail_test = dn.test_sabnzbd() if self.run_tests else (True, "")
 
-        detail = "accueil execute" if cree else "accueil deja termine"
+        detail = t("accueil execute") if cree else t("accueil deja termine")
         if faits:
             detail += f", declares : {', '.join(faits)}"
         if self.run_tests:
@@ -945,7 +946,7 @@ class Wirer:
             # l'utilisateur croit que rien n'a fonctionne.
             analyses = sum(1 for b in existantes if abs_client.scan(b["id"]))
 
-        detail = "accueil execute" if cree else "accueil deja termine"
+        detail = t("accueil execute") if cree else t("accueil deja termine")
         if faites:
             detail += f", bibliotheques creees: {', '.join(faites)}"
         detail += f", {analyses} analyse(s) lancee(s)"
@@ -1007,7 +1008,7 @@ class Wirer:
             analysees = sum(1 for lib in existantes if silo.refresh_metadata(lib["id"]))
 
         ok = {nom for nom, _g, _c in voulues} <= noms
-        detail = "accueil execute" if cree else "accueil deja termine"
+        detail = t("accueil execute") if cree else t("accueil deja termine")
         detail += ", profil cree" if profil else ""
         detail += f", bibliotheques creees: {', '.join(faites) or 'aucune (deja presentes)'}"
         detail += f", {analysees} analyse(s) lancee(s)" if analysees else ""
@@ -1061,7 +1062,7 @@ class Wirer:
                     if not ok:
                         warnings.append(f"{spec.display_name} : {message.splitlines()[0]}")
 
-        detail = "accueil execute" if first else "utilisateur existant"
+        detail = t("accueil execute") if first else t("utilisateur existant")
         detail += f", declares : {', '.join(created) or 'aucun (deja presents)'}"
         return StepResult(
             "autobrr: applications et client de telechargement",
@@ -1096,7 +1097,7 @@ class Wirer:
             return StepResult(
                 "recyclarr: profils de qualite",
                 ok=True,
-                detail="aucun template choisi, rien a generer",
+                detail=t("aucun template choisi, rien a generer"),
             )
 
         # Recyclarr REFUSE d'ecraser un fichier existant, et il a raison : celui-ci
@@ -1259,11 +1260,11 @@ class Wirer:
                 client.wait_ready()
                 repaired = client.web_login_works(username, password)
 
-        detail = "compte cree"
+        detail = t("compte cree")
         if redemarre:
             detail += " (redemarrage necessaire)"
         if not repaired:
-            detail = "compte cree, connexion toujours refusee meme apres redemarrage"
+            detail = t("compte cree, connexion toujours refusee meme apres redemarrage")
         return StepResult(
             f"{arr_id}: acces web",
             ok=repaired,

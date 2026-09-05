@@ -523,4 +523,28 @@ EN: dict[str, str] = {
     "{services} ont deja un etat {ou}. Leurs mots de passe ne se relisent pas, et ceux que plugarr vient de generer seront refuses. Reprenez l'installation d'origine avec --project-dir, ou remettez ces services a zero.": '{services} already have state {ou}. Their passwords cannot be read back, and the ones plugarr has just generated will be refused. Resume the original installation with --project-dir, or reset those services.',
     'nom de projet': 'project name',
     'des conteneurs nommes {nom} tournent deja depuis {ailleurs}. Installer ici les REMPLACERA : Docker identifie une pile par son nom, pas par son repertoire. Les fichiers de {ailleurs} ne seront pas touches, mais ses services repartiront sur la configuration de {ici}.': 'containers named {nom} are already running from {ailleurs}. Installing here will REPLACE them: Docker identifies a stack by its name, not by its directory. The files in {ailleurs} will not be touched, but its services will restart on the configuration in {ici}.',
+    # -- resultat de chaque etape de cablage ---------------------------------------
+    # Ces fragments composent chaque ligne du rapport final : ce sont les plus
+    # lus de tout le catalogue.
+    'cree': 'created',
+    'deja present': 'already present',
+    'deja configure ({dossiers}), respecte': 'already configured ({dossiers}), respected',
+    'aucun dossier racine configure': 'no root folder configured',
+    'identifiants inconnus': 'credentials unknown',
+    'identifiants mis a jour ({champs})': 'credentials updated ({champs})',
+    'realigne ({champs})': 'realigned ({champs})',
+    'client existant, categories laissees telles quelles': 'existing client, categories left as they are',
+    'client existant, reglages laisses tels quels': 'existing client, settings left as they are',
+    'creees : {noms}': 'created: {noms}',
+    'aucune (deja presentes)': 'none (already present)',
+    'posees : {noms}': 'set: {noms}',
+    'aucune (deja completes)': 'none (already complete)',
+    'assistant execute': 'wizard run',
+    'assistant deja termine': 'wizard already completed',
+    'accueil execute': 'setup run',
+    'accueil deja termine': 'setup already completed',
+    'utilisateur existant': 'existing user',
+    'compte cree': 'account created',
+    'compte cree, connexion toujours refusee meme apres redemarrage': 'account created, login still refused even after a restart',
+    'aucun template choisi, rien a generer': 'no template chosen, nothing to generate',
 }
