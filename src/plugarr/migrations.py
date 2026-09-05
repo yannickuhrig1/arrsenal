@@ -111,6 +111,16 @@ def lire(chemin: Path) -> tuple[StackConfig, list[str]]:
     L'ordre compte : migrer APRES validation reviendrait a migrer des valeurs
     par defaut inventees par pydantic plutot que le contenu reel du fichier.
     """
-    donnees = yaml.safe_load(Path(chemin).read_text(encoding="utf-8")) or {}
+    try:
+        donnees = yaml.safe_load(Path(chemin).read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        # `yaml.YAMLError` herite d'`Exception`, PAS de `ValueError` : les
+        # appelants qui attrapent `(ValueError, OSError)` la laisseraient
+        # passer. Meme piege que `zipfile.BadZipFile` en 0.5.2, et meme
+        # remede : on convertit ICI, une fois, plutot que dans chaque
+        # appelant.
+        raise ValueError(
+            t("{chemin} est illisible : {erreur}", chemin=Path(chemin).name, erreur=exc)
+        ) from exc
     donnees, notes = migrer(donnees)
     return StackConfig.model_validate(donnees), notes

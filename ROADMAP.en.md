@@ -5,7 +5,7 @@
 Where PlugArr stands, what comes next, and why. Kept up to date after every
 working session.
 
-**Last updated: 5 September 2026** — published version: **0.6.0**
+**Last updated: 5 September 2026** — published version: **0.7.0**
 
 ---
 
@@ -229,6 +229,11 @@ than deleting them.
 
 | Version | |
 |---|---|
+| **0.7.0** | **Reinstalling over an existing installation no longer loses everything.** Asked from use — "it should offer to keep the settings already there". It was worse than "not offered": `install` built its configuration from scratch and **never read the `stack.yml` present**. Measured: username `yannick` -> `plugarr`, Recyclarr profiles emptied, console password lost, and above all **the VPN silently disabled** — the install even displayed "No VPN is configured". Someone reinstalling to fix something else ended up with their torrent traffic in the clear. |
+| **0.7.0** | **The carry-over fixes a much older defect.** qBittorrent, Jellyfin, autobrr and the others store their password HASHED only: PlugArr could not read it back, generated a new one, announced it, and the service refused it — that is the failure with incomprehensible messages from 0.1.11. But when PlugArr did the installing, the password is in ITS OWN `stack.yml`, and it never needed to read it elsewhere. Carrying the previous credentials over makes what is announced match what is in place. Hand-shifted ports follow too. |
+| **0.7.0** | Carry-over **on by default** — losing a VPN in silence is worse than reusing without asking — but never silent: the summary lists what was carried over, service by service, and a "Start over" choice refuses it. An option given by hand always wins over inheritance, otherwise it would have no effect. `--repartir-de-zero` on the command line. |
+| **0.7.0** | **A third exception-hierarchy trap**, after `BadZipFile` in 0.5.2: `yaml.YAMLError` inherits from `Exception`, not from `ValueError`. A corrupt `stack.yml` therefore surfaced the raw error instead of being treated as "unreadable, start fresh". Converted at the source in `migrations.lire`, as the previous time. Found by a test written before the fix. |
+| **0.7.0** | **The username has its copy button**, on the access page and the console. Asked from use: it gets copied as much as the password — into a login form, right before it — and it alone had none. It stays displayed in the clear: it is not a secret, the button was what was missing. Verified in a browser, not only in the HTML. |
 | **0.6.0** | **`plugarr upgrade`: an older installation catches up in one command.** Until now PlugArr could update ONE service; it could not update **its own installation** when PlugArr itself was what changed. Four steps, in this order because the order matters: migrate `stack.yml`, bring the images in line, regenerate the artefacts, replay the wiring. The wiring comes **last** — a step added since may depend on a newer image, never the other way round. |
 | **0.6.0** | **It never moves a version backwards.** The deployed tag lives in `stack.yml` and not in the code, precisely so Sonarr can be updated without waiting for PlugArr, or deliberately held back. So `upgrade` only offers what moves FORWARD, compares numbers rather than strings — `4.9.5` comes before `4.16.1` — and **shows what it sets aside, with the reason**: a service skipped in silence gives the impression everything was aligned. |
 | **0.6.0** | **`stack.yml` has always carried a version, and nothing read it.** That was not a matter of hygiene: pydantic ignores fields it does not know, so an older version reading a newer `stack.yml` threw part of it away, and the **first write destroyed it**. The loss was **reproduced before being fixed** — future field written, read back, gone — and PlugArr now refuses to read a file newer than itself rather than reading half of it. Migrations run on the RAW dictionary: after pydantic, "absent" and "default value" are indistinguishable. |

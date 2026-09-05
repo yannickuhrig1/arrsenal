@@ -11,7 +11,7 @@ from pathlib import Path
 from textual.app import App
 from textual.theme import Theme
 
-from .. import i18n, journal, orchestrator
+from .. import i18n, journal, orchestrator, reprise
 from ..models import PlatformProfile, StackConfig, VpnConfig
 from ..wiring import StepResult
 from .screens import WelcomeScreen
@@ -65,7 +65,13 @@ class PlugArrApp(App):
         #: Template TRaSH choisi par service. Vide = celui par defaut.
         self.recyclarr_templates: dict[str, str] = {}
         self.stack_config: StackConfig | None = None
+        #: Ce qui a ete repris, pour que le recapitulatif le montre.
+        self.reprise: object | None = None
         self.results: list[StepResult] = []
+        #: Reprendre les reglages d'une installation deja presente. Vrai par
+        #: defaut : perdre un VPN en silence est pire que reprendre sans
+        #: demander, et l'ecran de recapitulatif montre ce qui a ete repris.
+        self.reprendre: bool = True
         #: Ouvrir la page d'acces a la fin. Mis a False par le generateur de
         #: captures et par les tests : lancer un navigateur pendant une CI
         #: n'aurait aucun sens.
@@ -112,6 +118,24 @@ class PlugArrApp(App):
         cfg.ui_language = self.ui_language
         cfg.recyclarr_templates = dict(self.recyclarr_templates)
         cfg.vpn = self.vpn
+
+        # Une installation deja presente : on reprend ce qu'elle portait plutot
+        # que de l'effacer. Le VPN est le cas grave — sans cela il disparait en
+        # silence, et le trafic torrent sort en clair.
+        #
+        # Ce que l'assistant a REELLEMENT demande prime : la langue, le VPN et
+        # les profils viennent de ses ecrans, pas de l'heritage.
+        self.reprise = None
+        if self.reprendre:
+            ancienne = reprise.precedente(self.project_dir)
+            if ancienne is not None:
+                self.reprise = reprise.appliquer(
+                    cfg,
+                    ancienne,
+                    imposes={"vpn", "language", "ui_language", "recyclarr_templates"}
+                    if self.vpn.enabled
+                    else {"language", "ui_language", "recyclarr_templates"},
+                )
         return cfg
 
 

@@ -234,3 +234,35 @@ def test_the_static_page_carries_no_update_machinery():
     page = dashboard.render(make())
     assert "verifierMaj" not in page
     assert 'class="upd"' not in page
+
+
+def test_l_identifiant_a_son_bouton_de_copie():
+    """Demande a l'usage : « ajoute un bouton pour copier le user comme pour le
+    password ».
+
+    L'identifiant se recopie autant que le mot de passe — dans un formulaire de
+    connexion, juste avant lui — et il n'avait pas de bouton. Il n'est pas
+    secret pour autant : il reste affiche en clair, seul le bouton manquait.
+    """
+    cfg = orchestrator.build_config(
+        services=["sonarr"], config_root="/c", data_root="/d", username="yannick"
+    )
+    page = dashboard.render(cfg)
+
+    ligne = next(bloc for bloc in page.split('<div class="row">') if "yannick" in bloc)
+
+    assert 'class="copy" data-value="yannick"' in ligne
+    assert "yannick" in ligne, "l'identifiant reste lisible : ce n'est pas un secret"
+    assert 'class="secret"' not in ligne, "il ne doit pas etre masque"
+
+
+def test_le_bouton_de_l_identifiant_est_celui_des_autres():
+    """C'est le script de la page qui l'anime, sur `button.copy[data-value]`.
+    Un bouton d'une autre forme serait inerte."""
+    cfg = orchestrator.build_config(
+        services=["sonarr"], config_root="/c", data_root="/d", username="yannick"
+    )
+    page = dashboard.render(cfg)
+
+    assert page.count('class="copy" data-value=') >= 2, "identifiant ET secrets"
+    assert "button.copy" in page, "le script qui anime les boutons"

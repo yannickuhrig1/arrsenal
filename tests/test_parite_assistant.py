@@ -25,6 +25,7 @@ SANS_OBJET = {"dry_run", "yes"}
 #: Ou chaque option d'`install` se pose dans l'assistant. Le nom est celui de
 #: l'ecran, pour que l'echec dise ou aller regarder.
 COUVERTES = {
+    "reprendre": "SummaryScreen",
     "services": "ServicesScreen",
     "config_root": "PathsScreen",
     "data_root": "PathsScreen",

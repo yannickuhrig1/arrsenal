@@ -109,6 +109,25 @@ def phrases() -> dict[str, list[str]]:
                                 ):
                                     retenir(fichier, element.value)
 
+        # `_REGLAGES` est un tuple de couples (champ, libelle) : seul le
+        # SECOND element est une phrase.
+        for noeud in ast.walk(arbre):
+            # `_REGLAGES` porte une annotation de type : c'est donc un
+            # `AnnAssign` et non un `Assign`. Les deux formes sont acceptees,
+            # sinon la constante sort du controle selon qu'elle est annotee.
+            cibles = (
+                noeud.targets
+                if isinstance(noeud, ast.Assign)
+                else [noeud.target]
+                if isinstance(noeud, ast.AnnAssign)
+                else []
+            )
+            if any(getattr(cible, "id", None) == "_REGLAGES" for cible in cibles):
+                for couple in getattr(noeud.value, "elts", []):
+                    elements = getattr(couple, "elts", [])
+                    if len(elements) == 2 and isinstance(elements[1], ast.Constant):
+                        retenir(fichier, str(elements[1].value))
+
         # `resolve_ids` rend trois origines de plus, construites dans son corps
         # plutot que declarees : elles finissent affichees sous le profil de
         # plateforme, au meme titre que les autres.

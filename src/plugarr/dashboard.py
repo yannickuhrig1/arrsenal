@@ -74,6 +74,24 @@ def resolve_host(cfg: StackConfig) -> tuple[str, str | None]:
     )
 
 
+def _copiable(valeur: str) -> str:
+    """Une valeur affichee en clair, avec son bouton de copie.
+
+    L'identifiant n'est pas un secret : le masquer n'aurait pas de sens. Mais
+    on le recopie autant que le mot de passe — dans un formulaire de connexion,
+    juste avant lui — et il n'avait pas de bouton.
+
+    Le meme bouton que partout ailleurs : c'est le script de la page qui
+    l'anime, sur `button.copy[data-value]`.
+    """
+    safe = html.escape(valeur)
+    return (
+        f"{safe}"
+        f'<button class="copy" data-value="{safe}" title="{t("Copier")}">'
+        f'{t("copier")}</button>'
+    )
+
+
 def _secret(value: str | None, label: str) -> str:
     if not value:
         return '<span class="none">—</span>'
@@ -154,9 +172,12 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
         accent = _ACCENTS.get(spec.category, "#64748b")
         rows = ""
         if inst.username:
+            # L'identifiant se copie comme le reste. Il n'est pas secret, donc
+            # il reste affiche en clair : c'est le BOUTON qui manquait, pas le
+            # masquage. Demande a l'usage.
             rows += (
                 f'<div class="row"><span class="k">{t("Identifiant")}</span>'
-                f'<span class="v mono">{html.escape(inst.username)}</span></div>'
+                f'<span class="v mono">{_copiable(inst.username)}</span></div>'
             )
         if inst.password:
             rows += (

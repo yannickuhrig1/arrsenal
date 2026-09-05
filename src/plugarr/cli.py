@@ -31,6 +31,9 @@ from . import (
 )
 from . import adopt as adopt_mod
 from . import autostart as autostart_mod
+from . import (
+    reprise as reprise_mod,
+)
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
 from .i18n import t
@@ -251,9 +254,9 @@ def install(
     # Defaut : le profil de la machine. Imposer generic-linux sous Windows
     # proposait des chemins Linux, crees ensuite a la racine du disque courant.
     platform: PlatformProfile = typer.Option(default_profile(), help=t("Profil de plateforme.")),
-    host: str = typer.Option("localhost", help=t("Hote pour les URL du rapport final.")),
-    username: str = typer.Option(
-        "plugarr", help=t("Identifiant commun a tous les services installes.")
+    host: str | None = typer.Option(None, help=t("Hote pour les URL du rapport final.")),
+    username: str | None = typer.Option(
+        None, help=t("Identifiant commun a tous les services installes.")
     ),
     project_name: str = typer.Option(
         "plugarr",
@@ -263,12 +266,12 @@ def install(
             "par son repertoire."
         ),
     ),
-    language: str = typer.Option(
-        "en",
+    language: str | None = typer.Option(
+        None,
         "--langue",
         help=t("Langue des interfaces (code ISO : fr, en, es...). Voir `plugarr langues`."),
     ),
-    timezone: str = typer.Option("Etc/UTC", "--tz"),
+    timezone: str | None = typer.Option(None, "--tz"),
     project_dir: Path = typer.Option(Path("."), help=t("Ou ecrire les artefacts.")),
     dry_run: bool = typer.Option(False, "--dry-run", help=t("N'ecrit rien, montre tout.")),
     yes: bool = typer.Option(False, "--yes", "-y", help=t("Ne pas demander confirmation.")),
@@ -292,6 +295,14 @@ def install(
         "",
         help=t("Template TRaSH pour Radarr. Voir `plugarr templates`. Vide = defaut."),
     ),
+    reprendre: bool = typer.Option(
+        True,
+        "--reprendre/--repartir-de-zero",
+        help=t(
+            "Reprendre les reglages du stack.yml deja present : identifiants, "
+            "VPN, profils. Actif par defaut."
+        ),
+    ),
     reset_config: bool | None = typer.Option(
         None,
         "--reset-config/--keep-config",
@@ -311,10 +322,12 @@ def install(
         config_root=config_root,
         data_root=data_root,
         platform=platform,
-        host=host,
-        timezone=timezone,
-        username=username,
-        language=language,
+        host=host or "localhost",
+        timezone=timezone or "Etc/UTC",
+        username=username or "plugarr",
+        # Sans `--langue`, les services suivent la langue de PlugArr : c'est le
+        # cas courant, et les deux restent separables.
+        language=language or i18n.langue(),
         project_name=project_name,
     )
 
@@ -370,6 +383,47 @@ def install(
                 )
             )
             raise typer.Exit(1)
+
+    # Reprendre AVANT le recapitulatif : c'est lui qui doit montrer ce qui sera
+    # reellement pose. Reprendre apres reviendrait a annoncer une chose et a en
+    # ecrire une autre.
+    #
+    # Une option donnee a la main prime toujours sur ce qu'on herite, sinon
+    # elle serait sans effet et personne ne comprendrait pourquoi.
+    if reprendre:
+        try:
+            ancienne = reprise_mod.precedente(project_dir)
+        except migrations.VersionFuture as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+        if ancienne is not None:
+            imposes = {
+                nom
+                for nom, donne in (
+                    ("username", username is not None),
+                    ("timezone", timezone is not None),
+                    ("host", host is not None),
+                    ("language", language is not None),
+                    ("vpn", vpn),
+                    ("recyclarr_templates", bool(chosen)),
+                )
+                if donne
+            }
+            reprise = reprise_mod.appliquer(cfg, ancienne, imposes=imposes)
+            if reprise:
+                console.print(
+                    t("[cyan]Installation existante detectee : reglages repris.[/cyan]")
+                )
+                if reprise.reglages:
+                    console.print("  " + t("Reglages") + " : " + ", ".join(reprise.reglages))
+                if reprise.services:
+                    console.print(
+                        "  "
+                        + t("Identifiants conserves")
+                        + " : "
+                        + ", ".join(sorted(reprise.services))
+                    )
+                console.print(t("[dim]`--repartir-de-zero` ignore tout cela.[/dim]"))
         if not any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS):
             console.print(
                 "[yellow]--vpn sans client de telechargement : Gluetun ne protegerait "

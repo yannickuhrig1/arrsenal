@@ -981,6 +981,12 @@ class SummaryScreen(WizardScreen):
             yield Static(id="summary-warnings")
             # Choix propose UNIQUEMENT si une configuration inutilisable existe.
             # Il n'apparait donc jamais lors d'une premiere installation.
+            yield Static(id="reprise", classes="hidden")
+            with RadioSet(id="reprise-choix", classes="hidden"):
+                yield RadioButton(
+                    "Reprendre ces reglages", value=True, id="reprise-oui"
+                )
+                yield RadioButton("Repartir de zero", id="reprise-non")
             yield Static(id="config-existante", classes="hidden")
             with RadioSet(id="config-choix", classes="hidden"):
                 yield RadioButton("Conserver ces configurations", value=True, id="cfg-garder")
@@ -1055,7 +1061,41 @@ class SummaryScreen(WizardScreen):
                 )
             )
         self.query_one("#summary-warnings", Static).update("\n\n".join(warnings))
+        self._montrer_reprise()
         self._proposer_reset(cfg)
+
+    def _montrer_reprise(self) -> None:
+        """Dit ce qui a ete repris d'une installation precedente.
+
+        Une reprise silencieuse serait pire que pas de reprise : l'utilisateur
+        doit voir ce que PlugArr a decide de garder a sa place, et pouvoir le
+        refuser.
+        """
+        reprise = getattr(self.app, "reprise", None)
+        if not reprise:
+            return
+        lignes = [
+            t("[cyan]Une installation existe deja ici : ses reglages sont repris.[/cyan]")
+        ]
+        if reprise.reglages:
+            lignes.append(f"[dim]{t('Reglages')} : {', '.join(reprise.reglages)}[/dim]")
+        if reprise.services:
+            lignes.append(
+                f"[dim]{t('Identifiants conserves')} : "
+                f"{', '.join(sorted(reprise.services))}[/dim]"
+            )
+        bandeau = self.query_one("#reprise", Static)
+        bandeau.update("\n".join(lignes))
+        bandeau.remove_class("hidden")
+        self.query_one("#reprise-choix", RadioSet).remove_class("hidden")
+
+    @on(RadioSet.Changed, "#reprise-choix")
+    def _changer_reprise(self, event: RadioSet.Changed) -> None:
+        """Refuser la reprise rebatit la configuration : les identifiants
+        repris doivent disparaitre du recapitulatif, pas seulement de l'ecran."""
+        self.app.reprendre = event.pressed.id == "reprise-oui"
+        self.app.stack_config = None
+        self.on_mount()
 
     def _proposer_reset(self, cfg) -> None:
         """Affiche le choix garder / repartir de zero, s'il a lieu d'etre.

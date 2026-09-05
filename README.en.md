@@ -313,6 +313,31 @@ skipped : prowlarr: maison and 2.5.2 cannot be compared
 
 `--dry-run` shows the plan without writing anything, as `install` does.
 
+### Reinstalling over an existing installation
+
+`install` re-run in the same place **carries over what the previous one held**:
+username, VPN, quality profiles, console password, and **each service's
+credentials**.
+
+That last point settles an old trap. qBittorrent, Jellyfin, autobrr and the
+others store their password **hashed** only: PlugArr cannot read it back,
+generated a new one, announced it, and the service refused it. But when PlugArr
+did the installing, the password is in **its own** `stack.yml`: it never needed
+to read it anywhere else.
+
+The carry-over is **on by default** — losing a VPN in silence is worse than
+reusing without asking — but never silent. The summary lists what was carried
+over, and a **Start over** choice refuses it. An option given by hand always
+wins over inheritance.
+
+```bash
+plugarr install --repartir-de-zero   # ignore the previous installation
+```
+
+Gluetun is covered by this: all its settings live in `stack.yml`. Its
+`${CONFIG_ROOT}/gluetun` directory holds only `servers.json`, a cache it
+regenerates — checked, there is nothing in it to keep.
+
 ### `stack.yml` carries a version, and it is finally read
 
 The `version` field had existed since the project's first line and **nothing

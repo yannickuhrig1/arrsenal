@@ -321,6 +321,31 @@ ignore : prowlarr : maison et 2.5.2 ne se comparent pas
 
 `--dry-run` montre le plan sans rien écrire, comme pour `install`.
 
+### Réinstaller par-dessus une installation existante
+
+`install` relancé au même endroit **reprend ce que la précédente portait** :
+identifiant, VPN, profils de qualité, mot de passe de la console, et les
+**identifiants de chaque service**.
+
+Ce dernier point règle un vieux piège. qBittorrent, Jellyfin, autobrr et les
+autres ne stockent leur mot de passe que **haché** : PlugArr ne peut pas le
+relire, en générait un nouveau, l'annonçait, et le service le refusait. Mais
+quand c'est PlugArr qui a installé, le mot de passe est dans **son** `stack.yml` :
+il n'a jamais eu besoin de le relire ailleurs.
+
+La reprise est **active par défaut** — perdre un VPN en silence est pire que
+reprendre sans demander — mais jamais silencieuse. Le récapitulatif liste ce
+qui a été repris, et un choix **Repartir de zéro** le refuse. Une option donnée
+à la main prime toujours sur l'héritage.
+
+```bash
+plugarr install --repartir-de-zero   # ignorer l'installation précédente
+```
+
+Gluetun est couvert par là : tous ses réglages vivent dans `stack.yml`. Son
+dossier `${CONFIG_ROOT}/gluetun` ne contient que `servers.json`, un cache qu'il
+régénère — vérifié, il n'y a rien à y garder.
+
 ### `stack.yml` porte une version, et elle est enfin lue
 
 Le champ `version` existait depuis la première ligne du projet et **rien ne le
