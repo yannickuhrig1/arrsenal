@@ -40,6 +40,7 @@ python -m venv .venv
 ```bash
 ruff check src tests scripts
 pytest -q
+python scripts/audit_traductions.py
 ```
 
 La suite complète tourne **sans Docker et sans réseau**. Si un test que vous ajoutez a
@@ -116,6 +117,37 @@ Il tourne en CI. Si vous le voyez signaler un cas nouveau : examinez-le, puis aj
 aux listes `REVIEWED_*` du script s'il est correct, ou étendez l'heuristique s'il ne
 l'est pas. Ne le faites pas taire sans regarder.
 
+## L'audit des traductions
+
+PlugArr existe en français et en anglais. **Écrivez vos phrases en français, en
+clair** : ce sont elles qui servent de clé, et les widgets de `tui/widgets.py`
+comme la console de `report.py` les font passer par le catalogue toutes seules.
+Vous n'avez rien à envelopper.
+
+Ce qui vous revient, c'est l'entrée anglaise dans `src/plugarr/traductions.py`.
+`scripts/audit_traductions.py` relève les 548 phrases affichables et **échoue
+s'il en manque une, ou si le catalogue porte une entrée morte** — les deux sens
+comptent : une entrée morte signale une phrase supprimée du code et oubliée là.
+
+```bash
+python scripts/audit_traductions.py              # ce qui manque
+python scripts/audit_traductions.py --squelette  # sortie collable
+```
+
+Trois cas demandent une attention particulière :
+
+- **une phrase construite avec des valeurs** ne peut pas servir de clé telle
+  quelle : donnez-lui des champs nommés, `t("{service} ne repond pas", service=…)`,
+  et non une f-string ;
+- **les balises Rich** (`[b]`, `[dim]`) se reportent à l'identique : une balise
+  ouverte et jamais fermée s'affiche en clair, et Rich ne signale rien ;
+- **le pluriel ne se traduit pas d'une langue à l'autre.** Le français accorde,
+  l'anglais non : deux clés, une par forme, plutôt qu'une clé qui forcerait
+  l'une des deux langues à être fausse.
+
+Un test vérifie aussi que tout widget ajouté à `tui/widgets.py` figure bien dans
+la liste de l'audit : sans cela, ses phrases sortiraient du contrôle en silence.
+
 ## Secrets
 
 Aucune clé, aucun mot de passe, aucun jeton dans le dépôt — y compris dans les fixtures
@@ -146,6 +178,10 @@ et ses utilisateurs. Voir [DISCLAIMER.md](DISCLAIMER.md).
 
 ## Langue
 
-Le code, les commentaires et la documentation sont en français. Les identifiants Python
-restent en anglais, par convention du langage. Une pull request en anglais sera lue et
-acceptée — nous traduirons.
+Le code et les commentaires sont en français, et le français est la langue **source**
+de la documentation : les fichiers `.en.md` en sont des traductions tenues à jour avec
+elle. Les identifiants Python restent en anglais, par convention du langage. Une pull
+request en anglais sera lue et acceptée — nous traduirons.
+
+Ce que l'utilisateur **voit** est une autre affaire, et elle n'est pas facultative :
+voir [L'audit des traductions](#laudit-des-traductions).

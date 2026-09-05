@@ -10,6 +10,9 @@ plugarr
 
 **[plugarr-site.vercel.app](https://plugarr-site.vercel.app/en)** — the project site.
 
+*In English or French, down to the error messages. PlugArr follows your system
+language; your services have their own, chosen separately.*
+
 <p align="center">
   <img src="docs/screenshots/en/2-services.svg" alt="Service selection" width="49%">
   <img src="docs/screenshots/en/7-installation.svg" alt="Wiring in progress" width="49%">
@@ -38,12 +41,16 @@ days later that imports are copying 40 GB instead of making a link.
 
 PlugArr automates that part.
 
-| | Deployment | Cross-app wiring | Quality profiles |
-|---|---|---|---|
-| DockSTARTer | yes | no | no |
-| Saltbox | yes | partial | no |
-| Recyclarr / Configarr | no | no | yes |
-| **PlugArr** | **yes** | **yes** | **yes** (via Recyclarr) |
+| | Deployment | Cross-app wiring | Quality profiles | Tool's language |
+|---|---|---|---|---|
+| DockSTARTer | yes | no | no | English |
+| Saltbox | yes | partial | no | English |
+| Recyclarr / Configarr | no | no | yes | English |
+| **PlugArr** | **yes** | **yes** | **yes** (via Recyclarr) | **French and English** |
+
+That last column is checked, not assumed: none of the three carries a `.po`
+file, an `i18n` directory, or a single occurrence of `gettext`. Recorded on
+5 September 2026, method in [docs/PRIOR-ART.en.md](docs/PRIOR-ART.en.md).
 
 ---
 
@@ -117,6 +124,20 @@ English and your media library in French.
 The choice is kept in `stack.yml`: `plugarr serve` and `plugarr doctor` then
 answer in the installation's language, even on a server whose session is in
 English.
+
+**Including when it breaks.** That is the part everyone forgets: a phrase added
+in French and missing from the catalogue breaks nothing, it simply shows up in
+French to someone who asked for English, with no error and no warning. So a
+check collects all **548** displayable phrases — error messages, wiring
+warnings, the VPN check's verdict, down to the headers written into your `.env`
+— and **fails if one is missing**, or if the catalogue holds an entry that has
+gone dead:
+
+```bash
+python scripts/audit_traductions.py
+```
+
+It runs on every push.
 
 ---
 

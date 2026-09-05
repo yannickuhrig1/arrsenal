@@ -10,6 +10,9 @@ plugarr
 
 **[plugarr-site.vercel.app](https://plugarr-site.vercel.app)** — le site du projet.
 
+*En français ou en anglais, jusqu'aux messages d'erreur. PlugArr suit la langue
+de votre système ; vos services ont la leur, choisie à part.*
+
 <p align="center">
   <img src="docs/screenshots/2-services.svg" alt="Sélection des services" width="49%">
   <img src="docs/screenshots/7-installation.svg" alt="Câblage en cours" width="49%">
@@ -39,12 +42,17 @@ plus tard que les imports recopient 40 Go au lieu de faire un lien.
 
 PlugArr automatise cette partie-là.
 
-| | Déploiement | Câblage inter-apps | Profils qualité |
-|---|---|---|---|
-| DockSTARTer | oui | non | non |
-| Saltbox | oui | partiel | non |
-| Recyclarr / Configarr | non | non | oui |
-| **PlugArr** | **oui** | **oui** | **oui** (via Recyclarr) |
+| | Déploiement | Câblage inter-apps | Profils qualité | Langue de l'outil |
+|---|---|---|---|---|
+| DockSTARTer | oui | non | non | anglais |
+| Saltbox | oui | partiel | non | anglais |
+| Recyclarr / Configarr | non | non | oui | anglais |
+| **PlugArr** | **oui** | **oui** | **oui** (via Recyclarr) | **français et anglais** |
+
+La dernière colonne se vérifie, elle ne se suppose pas : aucun des trois ne
+porte de fichier `.po`, de dossier `i18n`, ni la moindre occurrence de
+`gettext`. Relevé le 5 septembre 2026, méthode dans
+[docs/PRIOR-ART.md](docs/PRIOR-ART.md).
 
 ---
 
@@ -119,6 +127,20 @@ anglais et sa médiathèque en français.
 Le choix est retenu dans `stack.yml` : `plugarr serve` et `plugarr doctor`
 répondent ensuite dans la langue de l'installation, même sur un serveur dont la
 session est en anglais.
+
+**Y compris quand ça casse.** C'est la partie qu'on oublie : une phrase ajoutée
+en français et absente du catalogue ne casse rien, elle s'affiche simplement en
+français à quelqu'un qui a demandé l'anglais, sans erreur ni avertissement. Un
+contrôle relève donc les **548 phrases** affichables — messages d'erreur,
+avertissements de câblage, verdict du contrôle VPN, jusqu'aux en-têtes écrits
+dans votre `.env` — et **échoue s'il en manque une**, ou si le catalogue porte
+une entrée devenue morte :
+
+```bash
+python scripts/audit_traductions.py
+```
+
+Il tourne à chaque poussée.
 
 ---
 

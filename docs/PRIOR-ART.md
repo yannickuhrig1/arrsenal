@@ -7,17 +7,36 @@ mis à jour depuis. Chaque projet a été lu, pas supposé.
 
 ## Le résumé
 
-| Projet | Déploie | Câble les apps entre elles | Profils qualité | Assistant |
-|---|---|---|---|---|
-| [DockSTARTer](https://github.com/GhostWriters/DockSTARTer) | oui | non | non | menu `ncurses` |
-| [Saltbox](https://github.com/saltyorg/Saltbox) | oui | partiel | non | non |
-| [geekau/mediastack](https://github.com/geekau/mediastack) | oui (fichiers) | non | non | non |
-| [Recyclarr](https://github.com/recyclarr/recyclarr) | non | non | **oui** | non |
-| [Configarr](https://github.com/raydak-labs/configarr) | non | non | **oui** | non |
-| [TRaSH Guides](https://trash-guides.info/) | non | non | manuel | non |
-| **PlugArr** | **oui** | **oui** | **oui** (délégués à Recyclarr) | **oui** |
+| Projet | Déploie | Câble les apps entre elles | Profils qualité | Assistant | Langue |
+|---|---|---|---|---|---|
+| [DockSTARTer](https://github.com/GhostWriters/DockSTARTer) | oui | non | non | menu `ncurses` | anglais |
+| [Saltbox](https://github.com/saltyorg/Saltbox) | oui | partiel | non | non | anglais |
+| [geekau/mediastack](https://github.com/geekau/mediastack) | oui (fichiers) | non | non | non | anglais |
+| [Recyclarr](https://github.com/recyclarr/recyclarr) | non | non | **oui** | non | anglais |
+| [Configarr](https://github.com/raydak-labs/configarr) | non | non | **oui** | non | anglais |
+| [TRaSH Guides](https://trash-guides.info/) | non | non | manuel | non | anglais |
+| **PlugArr** | **oui** | **oui** | **oui** (délégués à Recyclarr) | **oui** | **fr + en** |
 
 La colonne qui compte est la deuxième. C'est celle où presque personne ne va.
+
+### Comment la dernière colonne a été relevée
+
+Affirmer qu'un projet ne parle qu'anglais est une affirmation sur le travail de
+quelqu'un d'autre : elle se vérifie. Trois sondes, le 5 septembre 2026, sur
+chacun des cinq dépôts :
+
+| | Résultat |
+|---|---|
+| Fichiers `.po` (`filename:*.po`) | 0 partout |
+| Occurrences de `gettext`, `i18n` ou `localization` dans le code | 0 partout |
+| Dossier `i18n/`, `locale/`, `locales/`, `lang/` ou `translations/` à la racine | aucun |
+
+Ce n'est pas une preuve d'absence — une traduction peut passer par un autre
+mécanisme, et l'index de recherche de GitHub peut retarder. C'est un faisceau
+suffisant pour l'écrire, et la méthode est ici pour qu'on puisse la refaire.
+
+PlugArr, de son côté, porte **548 phrases** au catalogue et un audit qui échoue
+s'il en manque une : `scripts/audit_traductions.py`.
 
 ## Projet par projet
 

@@ -39,6 +39,7 @@ python -m venv .venv
 ```bash
 ruff check src tests scripts
 pytest -q
+python scripts/audit_traductions.py
 ```
 
 The full suite runs **without Docker and without network access**. If a test you add needs
@@ -113,6 +114,37 @@ It runs in CI. If you see it flag a new case: examine it, then add it to the scr
 `REVIEWED_*` lists if it is correct, or extend the heuristic if it is not. Do not silence it
 without looking.
 
+## The translation audit
+
+PlugArr exists in French and English. **Write your phrases in French, in the
+clear**: they are what serves as the key, and the widgets in `tui/widgets.py`
+and `report.py`'s console run them through the catalogue on their own. You have
+nothing to wrap.
+
+What is on you is the English entry in `src/plugarr/traductions.py`.
+`scripts/audit_traductions.py` collects all 548 displayable phrases and **fails
+if one is missing, or if the catalogue holds a dead entry** — both directions
+count: a dead entry means a phrase was removed from the code and forgotten
+there.
+
+```bash
+python scripts/audit_traductions.py              # what is missing
+python scripts/audit_traductions.py --squelette  # paste-ready output
+```
+
+Three cases need care:
+
+- **a phrase built from values** cannot be a key as it stands: give it named
+  fields, `t("{service} ne repond pas", service=…)`, not an f-string;
+- **Rich markup** (`[b]`, `[dim]`) carries over identically: a tag opened and
+  never closed is displayed as-is, and Rich says nothing;
+- **plurals do not translate across languages.** French agrees, English does
+  not: use two keys, one per form, rather than a single key that would force one
+  of the two languages to be wrong.
+
+A test also checks that any widget added to `tui/widgets.py` appears in the
+audit's list: without that, its phrases would drop out of the check in silence.
+
 ## Secrets
 
 No key, no password, no token in the repository — including in test fixtures and
@@ -148,3 +180,6 @@ The code and the comments are in French, and French is the source language for t
 documentation: the `.en.md` files are translations kept in step with it. Python
 identifiers stay in English, by convention of the language. A pull request in English
 will be read and accepted, and we will translate it.
+
+What the user SEES is a separate matter, and it is not optional: see
+[The translation audit](#the-translation-audit).

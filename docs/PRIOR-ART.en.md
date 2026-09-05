@@ -7,17 +7,36 @@ up to date since. Every project was read, not assumed.
 
 ## The summary
 
-| Project | Deploys | Wires the apps together | Quality profiles | Wizard |
-|---|---|---|---|---|
-| [DockSTARTer](https://github.com/GhostWriters/DockSTARTer) | yes | no | no | `ncurses` menu |
-| [Saltbox](https://github.com/saltyorg/Saltbox) | yes | partial | no | no |
-| [geekau/mediastack](https://github.com/geekau/mediastack) | yes (files) | no | no | no |
-| [Recyclarr](https://github.com/recyclarr/recyclarr) | no | no | **yes** | no |
-| [Configarr](https://github.com/raydak-labs/configarr) | no | no | **yes** | no |
-| [TRaSH Guides](https://trash-guides.info/) | no | no | manual | no |
-| **PlugArr** | **yes** | **yes** | **yes** (delegated to Recyclarr) | **yes** |
+| Project | Deploys | Wires the apps together | Quality profiles | Wizard | Language |
+|---|---|---|---|---|---|
+| [DockSTARTer](https://github.com/GhostWriters/DockSTARTer) | yes | no | no | `ncurses` menu | English |
+| [Saltbox](https://github.com/saltyorg/Saltbox) | yes | partial | no | no | English |
+| [geekau/mediastack](https://github.com/geekau/mediastack) | yes (files) | no | no | no | English |
+| [Recyclarr](https://github.com/recyclarr/recyclarr) | no | no | **yes** | no | English |
+| [Configarr](https://github.com/raydak-labs/configarr) | no | no | **yes** | no | English |
+| [TRaSH Guides](https://trash-guides.info/) | no | no | manual | no | English |
+| **PlugArr** | **yes** | **yes** | **yes** (delegated to Recyclarr) | **yes** | **fr + en** |
 
 The column that matters is the second one. That is the one almost nobody goes to.
+
+### How that last column was checked
+
+Claiming a project speaks only English is a claim about somebody else's work: it
+gets verified. Three probes, on 5 September 2026, against each of the five
+repositories:
+
+| | Result |
+|---|---|
+| `.po` files (`filename:*.po`) | 0 everywhere |
+| Occurrences of `gettext`, `i18n` or `localization` in the code | 0 everywhere |
+| An `i18n/`, `locale/`, `locales/`, `lang/` or `translations/` directory at the root | none |
+
+This is not proof of absence — a translation could go through another
+mechanism, and GitHub's search index can lag. It is enough to write it down, and
+the method is here so it can be redone.
+
+PlugArr, for its part, carries **548 phrases** in its catalogue and an audit that
+fails if one is missing: `scripts/audit_traductions.py`.
 
 ## Project by project
 
