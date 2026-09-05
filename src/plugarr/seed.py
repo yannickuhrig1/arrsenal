@@ -19,6 +19,7 @@ import string
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from .i18n import t
 from .layout import CONTAINER_PATHS
 
 
@@ -476,7 +477,7 @@ def seed_sabnzbd(
         texte = ini.read_text(encoding="utf-8", errors="replace")
         manquants = [h for h in hotes_autorises if h and h not in texte]
         if not manquants:
-            return False, "sabnzbd.ini existant, liste d'hotes deja complete"
+            return False, t("sabnzbd.ini existant, liste d'hotes deja complete")
         lignes = []
         for ligne in texte.splitlines():
             if ligne.startswith("host_whitelist"):

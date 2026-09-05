@@ -35,6 +35,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 #: `MediaServerType.JELLYFIN`, lu dans `dist/constants/server.js` de l'image.
@@ -80,7 +81,7 @@ class SeerrClient:
             raise WiringError(
                 f"{self.name}: {method} {path} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:300]}",
-                "le corps attendu est decrit dans /app/seerr-api.yml de l'image",
+                t("le corps attendu est decrit dans /app/seerr-api.yml de l'image"),
             )
         if not resp.content:
             return None
@@ -101,7 +102,7 @@ class SeerrClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "Seerr n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="Seerr"),
                 result.detail,
                 "inspectez `docker logs plugarr-seerr`",
             )

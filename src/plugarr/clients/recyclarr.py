@@ -25,6 +25,8 @@ from pathlib import Path
 
 import httpx
 
+from ..i18n import t
+
 #: Marqueurs poses par les templates officiels. Les remplacer est tout ce
 #: que plugarr a a faire.
 #:
@@ -113,11 +115,13 @@ def fetch_manifest(*, timeout: float = 10.0) -> tuple[dict[str, list[str]], str 
     try:
         response = httpx.get(MANIFEST_URL, timeout=timeout, follow_redirects=True)
     except httpx.HTTPError as exc:
-        return {}, f"depot des templates injoignable : {exc}"
+        return {}, t("depot des templates injoignable : {erreur}", erreur=exc)
     if response.status_code != 200:
-        return {}, f"le depot des templates a repondu HTTP {response.status_code}"
+        return {}, t(
+            "le depot des templates a repondu HTTP {code}", code=response.status_code
+        )
     names = parse_manifest(response.content)
-    return names, None if names else "manifeste des templates illisible"
+    return names, None if names else t("manifeste des templates illisible")
 
 
 def available_templates(

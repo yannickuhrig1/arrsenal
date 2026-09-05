@@ -46,6 +46,7 @@ from pathlib import Path
 import yaml
 
 from . import compose as compose_mod
+from .i18n import t
 from .models import StackConfig
 from .runner import Compose, _run, volume_exists
 
@@ -179,7 +180,7 @@ def sauvegarder(
     runner = Compose(project_dir, cfg.project_name)
     arrete = False
     if not live:
-        dire("arret des conteneurs (une base copiee a chaud est corrompue)")
+        dire(t("arret des conteneurs (une base copiee a chaud est corrompue)"))
         arrete, _ = runner.stop()
 
     try:
@@ -244,7 +245,7 @@ def sauvegarder(
         shutil.rmtree(temporaires, ignore_errors=True)
     finally:
         if arrete:
-            dire("redemarrage des conteneurs")
+            dire(t("redemarrage des conteneurs"))
             runner.up()
 
     compose_mod._restrict(destination)
@@ -262,12 +263,17 @@ def lire_manifeste(archive: Path) -> dict:
     """Manifeste d'une archive, sans rien deballer."""
     with zipfile.ZipFile(archive) as zf:
         if MANIFESTE not in zf.namelist():
-            raise ValueError(f"{archive.name} n'est pas une sauvegarde PlugArr")
+            raise ValueError(
+                t("{fichier} n'est pas une sauvegarde PlugArr", fichier=archive.name)
+            )
         manifeste = json.loads(zf.read(MANIFESTE))
     if manifeste.get("format") != FORMAT:
         raise ValueError(
-            f"archive au format {manifeste.get('format')}, "
-            f"cette version lit le format {FORMAT}"
+            t(
+                "archive au format {trouve}, cette version lit le format {attendu}",
+                trouve=manifeste.get("format"),
+                attendu=FORMAT,
+            )
         )
     return manifeste
 

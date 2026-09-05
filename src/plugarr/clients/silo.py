@@ -26,6 +26,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 #: Types acceptes, releves un par un contre l'instance : chacun a ete envoye et
@@ -67,7 +68,7 @@ class SiloClient:
             raise WiringError(
                 f"{self.name}: {method} {path} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:400]}",
-                "l'accueil a peut-etre deja ete termine manuellement",
+                t("l'accueil a peut-etre deja ete termine manuellement"),
             )
         if not resp.content:
             return None
@@ -94,7 +95,7 @@ class SiloClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "Silo n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="Silo"),
                 result.detail,
                 "inspectez `docker logs plugarr-silo`",
             )
@@ -136,8 +137,8 @@ class SiloClient:
         if not jeton:
             raise WiringError(
                 f"{self.name}: connexion refusee",
-                "aucun jeton dans la reponse",
-                "les identifiants annonces sont-ils bien ceux du compte ?",
+                t("aucun jeton dans la reponse"),
+                t("les identifiants annonces sont-ils bien ceux du compte ?"),
             )
         self._token = jeton
 
@@ -182,7 +183,7 @@ class SiloClient:
             raise WiringError(
                 f"{self.name}: type de bibliotheque inconnu: {kind!r}",
                 f"types acceptes : {', '.join(LIBRARY_TYPES)}",
-                "completez LIBRARY_TYPES apres verification contre une instance",
+                t("completez LIBRARY_TYPES apres verification contre une instance"),
             )
         if any(path in (lib.get("paths") or []) for lib in self.libraries()):
             return False

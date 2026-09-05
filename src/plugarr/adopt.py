@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import catalog, discovery
 from .discovery import Found
+from .i18n import t
 from .models import PlatformProfile, ServiceInstance, StackConfig
 
 
@@ -54,7 +55,7 @@ def build_plan(found: list[Found], picks: dict[str, str] | None = None) -> Plan:
     by_service: dict[str, list[Found]] = {}
     for entry in found:
         if discovery.looks_like_plugarr(entry):
-            skipped.append((entry, "deja gere par plugarr"))
+            skipped.append((entry, t("deja gere par plugarr")))
             continue
         if not entry.usable:
             skipped.append((entry, entry.problems[0] if entry.problems else "inutilisable"))
@@ -97,7 +98,7 @@ def config_from_plan(
         config_root=config_root,
         data_root=data_root,
         host=host,
-        ids_source="stack existante : plugarr ne gere pas ces conteneurs",
+        ids_source=t("stack existante : plugarr ne gere pas ces conteneurs"),
         ids_certain=True,
     )
     for service_id, entry in plan.chosen.items():
@@ -124,8 +125,11 @@ def write_stack(cfg: StackConfig, project_dir: Path) -> Path:
     project_dir.mkdir(parents=True, exist_ok=True)
     path = project_dir / "stack.yml"
     path.write_text(
-        "# Stack ADOPTEE : plugarr cable ces services mais ne les gere pas.\n"
-        "# Aucun docker-compose.yml n'est genere, `uninstall` ne s'y applique pas.\n"
+        t(
+            "# Stack ADOPTEE : plugarr cable ces services mais ne les gere pas.\n"
+            "# Aucun docker-compose.yml n'est genere, `uninstall` ne s'y "
+            "applique pas.\n"
+        )
         + yaml.safe_dump(cfg.model_dump(mode="json"), sort_keys=False),
         encoding="utf-8",
     )
@@ -142,9 +146,9 @@ def missing_for_wiring(cfg: StackConfig) -> list[str]:
     if not any(cfg.enabled(sid) for sid in catalog.MANAGED_ARRS):
         notes.append("aucune application *arr detectee : il n'y a rien a cabler")
     if cfg.enabled("prowlarr") and not any(cfg.enabled(s) for s in catalog.MANAGED_ARRS):
-        notes.append("Prowlarr est seul : aucune application a alimenter")
+        notes.append(t("Prowlarr est seul : aucune application a alimenter"))
     if not any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS):
         notes.append(
-            "aucun client de telechargement detecte : les *arr ne seront pas rattaches"
+            t("aucun client de telechargement detecte : les *arr ne seront pas rattaches")
         )
     return notes

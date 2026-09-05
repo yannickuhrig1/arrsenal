@@ -1031,10 +1031,10 @@ class SummaryScreen(WizardScreen):
         )
         self.query_one("#summary-paths", Static).update("\n".join(lignes))
 
-        vpn_warning = (
+        vpn_warning = t(
             "[yellow]Aucun VPN n'est configure pour le client torrent.[/yellow]\n"
-            "[dim]Le trafic BitTorrent sortira sur l'adresse IP publique de cette "
-            "machine, visible par les autres pairs.[/dim]"
+            "[dim]Le trafic BitTorrent sortira sur l'adresse IP publique de "
+            "cette machine, visible par les autres pairs.[/dim]"
         )
         # L'avertissement ne vaut que si le VPN n'a PAS ete configure. Tant
         # qu'il n'existait qu'en ligne de commande la question ne se posait

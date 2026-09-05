@@ -32,6 +32,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from .i18n import t
+
 NOM = "plugarr-console"
 UNIT = f"{NOM}.service"
 
@@ -76,9 +78,12 @@ def _dossier_demarrage() -> Path:
 def _script_windows(commande: str) -> str:
     return (
         "@echo off\r\n"
-        "rem Genere par `plugarr autostart`. Supprimez ce fichier pour arreter\r\n"
-        "rem le lancement automatique de la console d'administration.\r\n"
-        "title plugarr - console\r\n"
+        + t(
+            "rem Genere par `plugarr autostart`. Supprimez ce fichier pour "
+            "arreter\r\nrem le lancement automatique de la console "
+            "d'administration.\r\n"
+        )
+        +         "title plugarr - console\r\n"
         f"{commande}\r\n"
     )
 
@@ -143,7 +148,7 @@ def status(project_dir: Path) -> Etat:
         cible = _dossier_systemd() / UNIT
         actif, sortie = _systemctl("is-enabled", UNIT)
         return Etat(quel, cible.is_file() and actif, cible, sortie)
-    return Etat(quel, False, None, "aucun mecanisme connu sur cette plateforme")
+    return Etat(quel, False, None, t("aucun mecanisme connu sur cette plateforme"))
 
 
 def enable(project_dir: Path, *, host: str = "127.0.0.1", port: int = 7373) -> tuple[bool, str]:
@@ -169,9 +174,10 @@ def enable(project_dir: Path, *, host: str = "127.0.0.1", port: int = 7373) -> t
             return False, f"systemctl a refuse : {sortie[:300]}"
         return True, f"unite installee et demarree : {cible}"
 
-    return False, (
+    return False, t(
         "aucun mecanisme de lancement automatique connu sur cette plateforme. "
-        f"Lancez cette commande au demarrage de votre machine :\n  {ligne}"
+        "Lancez cette commande au demarrage de votre machine :\n  {commande}",
+        commande=ligne,
     )
 
 
@@ -182,7 +188,7 @@ def disable(project_dir: Path) -> tuple[bool, str]:
     if quel == "demarrage-windows":
         cible = _dossier_demarrage() / f"{NOM}.cmd"
         if not cible.is_file():
-            return True, "aucun lancement automatique installe"
+            return True, t("aucun lancement automatique installe")
         cible.unlink()
         return True, f"retire : {cible}"
 
@@ -194,4 +200,4 @@ def disable(project_dir: Path) -> tuple[bool, str]:
         _systemctl("daemon-reload")
         return True, f"unite retiree : {cible}"
 
-    return True, "aucun mecanisme installe sur cette plateforme"
+    return True, t("aucun mecanisme installe sur cette plateforme")

@@ -8,15 +8,17 @@ from dataclasses import dataclass
 
 import httpx
 
+from ..i18n import t
+
 
 class WiringError(RuntimeError):
     """Erreur de cablage porteuse d'un diagnostic actionnable."""
 
     def __init__(self, what: str, why: str, fix: str = "") -> None:
         self.what, self.why, self.fix = what, why, fix
-        message = f"{what}\n  cause : {why}"
+        message = f"{what}\n  {t('cause')} : {why}"
         if fix:
-            message += f"\n  action : {fix}"
+            message += f"\n  {t('action')} : {fix}"
         super().__init__(message)
 
 
@@ -45,7 +47,11 @@ def wait_until(
     while time.monotonic() - start < timeout:
         try:
             if probe():
-                return ReadinessResult(True, time.monotonic() - start, f"{label} pret")
+                return ReadinessResult(
+                    True,
+                    time.monotonic() - start,
+                    t("{service} pret", service=label),
+                )
         except Exception as exc:  # noqa: BLE001 - on veut le message brut
             last_error = f"{type(exc).__name__}: {exc}"
         time.sleep(delay)
@@ -53,7 +59,12 @@ def wait_until(
     return ReadinessResult(
         False,
         time.monotonic() - start,
-        f"{label} n'a pas repondu en {timeout:.0f}s. Dernier retour: {last_error or 'aucun'}",
+        t(
+            "{service} n'a pas repondu en {secondes:.0f}s. Dernier retour : {dernier}",
+            service=label,
+            secondes=timeout,
+            dernier=last_error or t("aucun"),
+        ),
     )
 
 

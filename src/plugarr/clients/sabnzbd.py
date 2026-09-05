@@ -27,6 +27,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 #: Priorite « par defaut » de SABnzbd. -100 signifie « celle de la categorie »,
@@ -68,7 +69,7 @@ class SabnzbdClient:
             raise WiringError(
                 f"{self.name}: {mode} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:200]}",
-                "la cle API est-elle la bonne ?",
+                t("la cle API est-elle la bonne ?"),
             )
         texte = resp.text.strip()
         if texte.startswith("Access denied"):
@@ -77,7 +78,7 @@ class SabnzbdClient:
             raise WiringError(
                 f"{self.name}: acces refuse",
                 texte[:200],
-                "le nom d'hote appelant est-il dans host_whitelist ?",
+                t("le nom d'hote appelant est-il dans host_whitelist ?"),
             )
         try:
             return resp.json()
@@ -96,7 +97,7 @@ class SabnzbdClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "SABnzbd n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="SABnzbd"),
                 result.detail,
                 "inspectez `docker logs plugarr-sabnzbd`",
             )

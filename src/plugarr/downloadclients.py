@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .i18n import t
 from .layout import CONTAINER_PATHS
 
 #: Prefixe des champs de categorie/repertoire selon l'application.
@@ -121,5 +122,10 @@ def profile_for(service_id: str) -> DownloadClientProfile:
     except KeyError:
         known = ", ".join(sorted(PROFILES))
         raise KeyError(
-            f"pas de profil de client de telechargement pour {service_id!r}. Connus: {known}"
+            t(
+                "pas de profil de client de telechargement pour {service}. "
+                "Connus : {liste}",
+                service=repr(service_id),
+                liste=known,
+            )
         ) from None

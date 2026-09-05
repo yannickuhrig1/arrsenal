@@ -50,6 +50,7 @@ import json
 import httpx
 
 from . import catalog
+from .i18n import t
 from .models import Category, StackConfig
 from .runner import Check, container_id, exec_in, network_mode
 
@@ -88,14 +89,18 @@ def _sortie(conteneur: str) -> tuple[bool, str]:
     """
     ok, sortie = exec_in(conteneur, ["wget", "-qO-", "--timeout=8", CONTROLE])
     if not ok or not sortie:
-        return False, "le serveur de controle de Gluetun est injoignable depuis ce conteneur"
+        return False, t(
+            "le serveur de controle de Gluetun est injoignable depuis ce conteneur"
+        )
     try:
         donnees = json.loads(sortie)
     except ValueError:
-        return False, f"reponse illisible de Gluetun : {sortie[:80]}"
+        return False, t("reponse illisible de Gluetun : {reponse}", reponse=sortie[:80])
     tunnel = donnees.get("public_ip")
     if not tunnel:
-        return False, "Gluetun ne rapporte aucune adresse publique : le tunnel est-il monte ?"
+        return False, t(
+            "Gluetun ne rapporte aucune adresse publique : le tunnel est-il monte ?"
+        )
     pays = donnees.get("country") or "?"
     operateur = (donnees.get("organization") or "?")[:40]
 
@@ -107,13 +112,23 @@ def _sortie(conteneur: str) -> tuple[bool, str]:
     # bricolee, si.
     hote = ip_de_l_hote()
     if hote and hote == tunnel:
-        return False, (
-            f"NON PROTEGE : le tunnel ressort sur VOTRE adresse publique "
-            f"({pays}, {operateur}). Verifiez la configuration du fournisseur."
+        return False, t(
+            "NON PROTEGE : le tunnel ressort sur VOTRE adresse publique "
+            "({pays}, {operateur}). Verifiez la configuration du fournisseur.",
+            pays=pays,
+            operateur=operateur,
         )
     if hote is None:
-        return True, f"sortie par {pays}, {operateur} (adresse de l'hote indeterminable)"
-    return True, f"sortie par {pays}, {operateur}, differente de la votre"
+        return True, t(
+            "sortie par {pays}, {operateur} (adresse de l'hote indeterminable)",
+            pays=pays,
+            operateur=operateur,
+        )
+    return True, t(
+        "sortie par {pays}, {operateur}, differente de la votre",
+        pays=pays,
+        operateur=operateur,
+    )
 
 
 def verifier(cfg: StackConfig) -> list[Check]:
@@ -129,7 +144,10 @@ def verifier(cfg: StackConfig) -> list[Check]:
             Check(
                 "VPN",
                 True,
-                f"aucun VPN configure : {', '.join(clients)} sort par votre connexion",
+                t(
+                    "aucun VPN configure : {clients} sort par votre connexion",
+                    clients=", ".join(clients),
+                ),
                 blocking=False,
             )
         ]
@@ -140,7 +158,9 @@ def verifier(cfg: StackConfig) -> list[Check]:
         conteneur = f"{cfg.project_name}-{sid}"
         mode = network_mode(conteneur)
         if mode is None:
-            controles.append(Check(f"VPN {sid}", True, "conteneur arrete", blocking=False))
+            controles.append(
+                Check(f"VPN {sid}", True, t("conteneur arrete"), blocking=False)
+            )
             continue
 
         # Le test structurel d'abord : il ne coute rien et sa reponse est nette.
@@ -150,9 +170,12 @@ def verifier(cfg: StackConfig) -> list[Check]:
                 Check(
                     f"VPN {sid}",
                     False,
-                    f"NON PROTEGE : le conteneur est sur le reseau {mode}, pas dans le "
-                    f"tunnel. Tout torrent lance sort par votre connexion. "
-                    f"Regenerez la pile puis redemarrez-la.",
+                    t(
+                        "NON PROTEGE : le conteneur est sur le reseau {reseau}, pas "
+                        "dans le tunnel. Tout torrent lance sort par votre "
+                        "connexion. Regenerez la pile puis redemarrez-la.",
+                        reseau=mode,
+                    ),
                 )
             )
             continue
@@ -161,8 +184,12 @@ def verifier(cfg: StackConfig) -> list[Check]:
                 Check(
                     f"VPN {sid}",
                     False,
-                    f"il partage la pile reseau d'un AUTRE conteneur que "
-                    f"{cfg.project_name}-gluetun ({mode[:24]}...)",
+                    t(
+                        "il partage la pile reseau d'un AUTRE conteneur que "
+                        "{attendu} ({reseau}...)",
+                        attendu=f"{cfg.project_name}-gluetun",
+                        reseau=mode[:24],
+                    ),
                 )
             )
             continue

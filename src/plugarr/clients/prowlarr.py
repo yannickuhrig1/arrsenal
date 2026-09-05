@@ -18,6 +18,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from ..i18n import t
 from .arr import ArrClient
 from .base import WiringError
 
@@ -222,9 +223,9 @@ class ProwlarrIndexers:
             if definition.name.lower() == name.lower():
                 return definition
         raise WiringError(
-            f"indexeur {name!r} inconnu de votre Prowlarr",
-            "aucune definition de ce nom",
-            "utilisez `plugarr indexers search <terme>` pour trouver le nom exact",
+            t("indexeur {nom} inconnu de votre Prowlarr", nom=repr(name)),
+            t("aucune definition de ce nom"),
+            t("utilisez `plugarr indexers search <terme>` pour trouver le nom exact"),
         )
 
     # -- etat courant --------------------------------------------------------
@@ -249,7 +250,7 @@ class ProwlarrIndexers:
         """
         existing = {i.get("name", "").lower() for i in self.configured()}
         if definition.name.lower() in existing:
-            return True, "deja configure"
+            return True, t("deja configure")
 
         payload = dict(definition.raw)
         payload["fields"] = [
@@ -296,4 +297,4 @@ def _readable(message: str) -> str:
     # `splitlines()[0]` sur un message vide leve IndexError - dans le gestionnaire
     # d'erreur lui-meme, ce qui transformait un echec d'ajout en plantage.
     lignes = message.splitlines()
-    return lignes[0][:200] if lignes else "aucun detail renvoye par Prowlarr"
+    return lignes[0][:200] if lignes else t("aucun detail renvoye par Prowlarr")

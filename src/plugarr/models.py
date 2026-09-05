@@ -13,6 +13,8 @@ from pathlib import PurePosixPath
 
 from pydantic import BaseModel, Field, field_validator
 
+from .i18n import t
+
 
 class Category(str, Enum):
     ARR = "arr"
@@ -151,12 +153,12 @@ class VpnConfig(BaseModel):
             return []
         gaps: list[str] = []
         if not self.provider:
-            gaps.append("le fournisseur VPN (--vpn-provider)")
+            gaps.append(t("le fournisseur VPN (--vpn-provider)"))
         if self.vpn_type == "wireguard":
             if not self.wireguard_private_key:
-                gaps.append("la cle privee WireGuard (--vpn-key)")
+                gaps.append(t("la cle privee WireGuard (--vpn-key)"))
         elif not self.openvpn_user or not self.openvpn_password:
-            gaps.append("les identifiants OpenVPN (--vpn-user et --vpn-pass)")
+            gaps.append(t("les identifiants OpenVPN (--vpn-user et --vpn-pass)"))
         return gaps
 
     def environment(self, timezone: str) -> dict[str, str]:
@@ -351,7 +353,7 @@ class StackConfig(BaseModel):
     def _no_trailing_sep(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("le chemin ne peut pas etre vide")
+            raise ValueError(t("le chemin ne peut pas etre vide"))
         return v.rstrip("/\\") or v
 
     @field_validator("username")
@@ -368,8 +370,12 @@ class StackConfig(BaseModel):
         v = v.strip()
         if not USERNAME_PATTERN.fullmatch(v):
             raise ValueError(
-                f"identifiant invalide: {v!r}. Attendu 1 a 32 caracteres parmi "
-                f"lettres, chiffres, point, tiret et souligne, sans espace."
+                t(
+                    "identifiant invalide : {valeur}. Attendu 1 a 32 caracteres "
+                    "parmi lettres, chiffres, point, tiret et souligne, sans "
+                    "espace.",
+                    valeur=repr(v),
+                )
             )
         return v
 

@@ -5,7 +5,7 @@
 Où en est PlugArr, ce qui vient ensuite, et pourquoi. Tenue à jour à chaque
 séance de travail.
 
-**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.5.0**
+**Dernière mise à jour : 5 septembre 2026** — version publiée : **0.5.1**
 
 ---
 
@@ -42,7 +42,7 @@ On peut vouloir l'outil en anglais et sa médiathèque en français.
 Une phrase ajoutée en français et oubliée dans le catalogue ne casse rien :
 elle s'afficherait simplement en français à quelqu'un qui a demandé l'anglais,
 sans erreur ni avertissement. `scripts/audit_traductions.py` relève donc les
-369 phrases affichables et **échoue s'il en manque une**, ou si le catalogue
+540 phrases affichables et **échoue s'il en manque une**, ou si le catalogue
 porte une entrée morte. Il tourne en CI.
 
 **Huit bibliothèques** sont créées et rangées : films, séries, **anime**,
@@ -209,8 +209,11 @@ autres plutôt qu'en les effaçant.
 
 | Version | |
 |---|---|
+| **0.5.1** | **Le chemin d'ECHEC parle anglais aussi.** La 0.5.0 couvrait tout le chemin nominal ; restaient les messages qu'on ne voit que quand quelque chose casse — « qBittorrent n'est jamais devenu disponible », « le config.xml pre-seme a peut-etre ete ecrase », « NON PROTEGE : le tunnel ressort sur VOTRE adresse publique ». Ils vivaient dans quinze modules clients, `wiring.py`, `vpncheck.py` et l'orchestrateur, sous forme de `WiringError` levees profondement dans le code. Le catalogue les dedoublonne : le meme « X n'est jamais devenu disponible » servait neuf fois. **540 phrases** au total, contre 377 a la 0.5.0. |
+| **0.5.1** | **Les fichiers ecrits sur le disque aussi.** `docker-compose.yml`, `.env`, `.gitignore`, `administration.cmd` et le script de demarrage automatique portaient un en-tete francais. Ce ne sont pas des messages a l'ecran, mais ils se lisent : on ouvre son `.env` pour retrouver un mot de passe. Restent en francais deux gabarits HTML et un bloc JavaScript — ce sont des structures, pas des phrases, et les traduire reviendrait a maintenir deux copies d'une page. |
+| **0.5.1** | **Un pluriel perdu, rattrape par un test.** Envelopper « 2 deja configures » avait fait disparaitre l'accord francais. Deux cles plutot qu'une : le francais accorde, l'anglais ne change pas, et une cle unique aurait force l'une des deux langues a etre fausse. |
 | **0.5.0** | **PlugArr parle anglais**, et deux langues cessent de se confondre. Celle de PlugArr — assistant, ligne de commande, rapport, page d'accès, preflight — se choisit sur l'écran d'accueil ou par `--lang`, et part de celle du système. Celle des **services** se demande à part : on peut vouloir l'outil en anglais et sa médiathèque en français. Le second réglage existait depuis la 0.1.11, mais il était **seul**, donc ambigu — l'écran annonçait « langue des interfaces » sans dire lesquelles. La clé de traduction est la phrase française elle-même : une phrase absente retombe sur le français, compréhensible au pire, là où une clé mal orthographiée s'afficherait telle quelle. |
-| **0.5.0** | **Les widgets traduisent au passage.** Envelopper cent-cinquante phrases à la main aurait posé la question à chaque ligne écrite, et une phrase oubliée ne casse rien : elle s'afficherait en français à quelqu'un qui a demandé l'anglais, sans erreur ni avertissement. `tui/widgets.py` et la console de `report.py` font passer leurs libellés par le catalogue ; les écrans continuent d'écrire leurs phrases en clair. Le garde-fou est mécanique : `scripts/audit_traductions.py` relève les **377 phrases affichables** et échoue s'il en manque une, **ou** si le catalogue porte une entrée morte. Il tourne en CI, et il a déjà attrapé une entrée posée deux fois. |
+| **0.5.0** | **Les widgets traduisent au passage.** Envelopper cent-cinquante phrases à la main aurait posé la question à chaque ligne écrite, et une phrase oubliée ne casse rien : elle s'afficherait en français à quelqu'un qui a demandé l'anglais, sans erreur ni avertissement. `tui/widgets.py` et la console de `report.py` font passer leurs libellés par le catalogue ; les écrans continuent d'écrire leurs phrases en clair. Le garde-fou est mécanique : `scripts/audit_traductions.py` relève les **540 phrases affichables** et échoue s'il en manque une, **ou** si le catalogue porte une entrée morte. Il tourne en CI, et il a déjà attrapé une entrée posée deux fois. |
 | **0.5.0** | **Un défaut que seul un vrai montage pouvait révéler.** `Select` attend `(libellé, valeur)` et recevait `(valeur, libellé)` : le code `fr` devenait alors illégal, et l'assistant mourait au montage de l'écran d'accueil. Les tests passaient tous. |
 | **0.5.0** | **Les captures existent dans les deux langues**, et la console d'administration en a enfin une. Elle n'est pas un écran du terminal — c'est du HTML servi par `plugarr serve` — donc `screenshots.py` ne pouvait pas la produire : c'était la seule partie visible du produit dont il n'existait aucune image. `scripts/captures_administration.py` écrit la page ET la photographie, avec les mêmes précautions que les autres captures : secrets d'illustration, adresse fixe, **date figée** — celle du jour rendrait le fichier différent à chaque exécution. |
 | **0.4.0** | **DroppedNeedle entre au catalogue**, débloqué par SABnzbd comme prévu. Il **remplace** Lidarr : la musique de la demande au rangement. Une note de cette feuille de route affirmait que son premier compte se créait par l'interface web — **c'était faux**, `POST /api/v1/auth/setup` existe. Deux défauts trouvés en l'intégrant, aucun visible autrement : sa table `auth_users` vit dans `/app/cache`, que le compose amont ne monte pas, si bien que l'accueil réussissait puis la connexion échouait après un simple redémarrage ; et sa base SQLite **refuse de démarrer** sur un montage Windows — « The upgraded library database could not be verified ». Même remède que la base de Silo. |

@@ -22,6 +22,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from . import catalog
+from .i18n import t
 from .seed import read_api_key
 
 #: Fragment d'image permettant de reconnaitre un service. Volontairement large :
@@ -157,8 +158,11 @@ def scan(*, include_stopped: bool = False) -> list[Found]:
         )
         if entry.host_port is None:
             entry.problems.append(
-                f"aucun port de l'hote ne publie {spec.internal_port} : plugarr ne "
-                f"pourra pas le joindre"
+                t(
+                    "aucun port de l'hote ne publie {port} : plugarr ne pourra "
+                    "pas le joindre",
+                    port=spec.internal_port,
+                )
             )
         if spec.api_family == "arr":
             _fill_arr_credentials(entry)
@@ -171,16 +175,21 @@ def scan(*, include_stopped: bool = False) -> list[Found]:
 def _fill_arr_credentials(entry: Found) -> None:
     if not entry.config_dir:
         entry.problems.append(
-            "le volume /config n'est pas monte depuis l'hote : impossible de lire la cle API"
+            t(
+                "le volume /config n'est pas monte depuis l'hote : impossible de "
+                "lire la cle API"
+            )
         )
         return
     config_xml = Path(entry.config_dir) / "config.xml"
     if not config_xml.exists():
-        entry.problems.append(f"{config_xml} introuvable depuis cette machine")
+        entry.problems.append(
+            t("{chemin} introuvable depuis cette machine", chemin=config_xml)
+        )
         return
     key = read_api_key(config_xml)
     if not key:
-        entry.problems.append(f"aucune cle API dans {config_xml}")
+        entry.problems.append(t("aucune cle API dans {chemin}", chemin=config_xml))
         return
     entry.api_key = key
     entry.url_base = _read_url_base(config_xml)

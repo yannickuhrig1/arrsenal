@@ -446,7 +446,13 @@ def reset_configs(cfg: StackConfig, services: list[str]) -> list[Path]:
         if not dossier.is_dir():
             continue
         if racine not in dossier.parents:
-            raise ValueError(f"{dossier} n'est pas sous {racine} : suppression refusee")
+            raise ValueError(
+                t(
+                    "{chemin} n'est pas sous {racine} : suppression refusee",
+                    chemin=dossier,
+                    racine=racine,
+                )
+            )
         shutil.rmtree(dossier)
         efface.append(dossier)
     return efface
@@ -586,7 +592,11 @@ def wait_for_download_clients(cfg: StackConfig, on_progress: ProgressFn = _noop)
         message = (
             f"{catalog.get(sid).display_name} pret"
             if resultat.ready
-            else f"{catalog.get(sid).display_name} ne repond pas : {resultat.detail}"
+            else t(
+                "{service} ne repond pas : {cause}",
+                service=catalog.get(sid).display_name,
+                cause=resultat.detail,
+            )
         )
         if resultat.ready and sid == "qbittorrent":
             leve = _lift_qbittorrent_ban(cfg)
@@ -688,9 +698,9 @@ def install(
     on_progress(
         Progress(
             "arret",
-            "conteneurs existants arretes avant pre-semis"
+            t("conteneurs existants arretes avant pre-semis")
             if arretes
-            else "aucun conteneur a arreter",
+            else t("aucun conteneur a arreter"),
         )
     )
 
@@ -703,9 +713,11 @@ def install(
 
     valid, message = runner.config_valid()
     if not valid:
-        raise InstallAborted(f"Le fichier compose genere est invalide : {message}")
+        raise InstallAborted(
+            t("Le fichier compose genere est invalide : {cause}", cause=message)
+        )
 
-    on_progress(Progress("demarrage", "docker compose up (peut prendre plusieurs minutes)"))
+    on_progress(Progress("demarrage", t("docker compose up (peut prendre plusieurs minutes)")))
     ok, message = runner.up()
     if not ok:
         raise InstallAborted(f"docker compose up a echoue : {message}")
@@ -864,7 +876,11 @@ def rotate_password(
         return False, f"service inconnu : {service_id}", ""
     spec, inst = catalog.get(service_id), cfg.services[service_id]
     if spec.api_family not in ROTATABLE:
-        return False, f"{spec.display_name} ne sait pas changer son mot de passe ici", ""
+        return (
+            False,
+            t("{service} ne sait pas changer son mot de passe ici", service=spec.display_name),
+            "",
+        )
 
     cfg.project_dir = project_dir
     nouveau = seed.generate_password()
@@ -959,7 +975,11 @@ def rotate_api_key(
         return False, f"service inconnu : {service_id}", ""
     spec, inst = catalog.get(service_id), cfg.services[service_id]
     if spec.api_family != "arr":
-        return False, f"{spec.display_name} n'a pas de cle API geree par plugarr", ""
+        return (
+            False,
+            t("{service} n'a pas de cle API geree par plugarr", service=spec.display_name),
+            "",
+        )
 
     cfg.project_dir = project_dir
     nouvelle = seed.generate_api_key()
@@ -1039,7 +1059,11 @@ def add_service(
     except Exception:  # noqa: BLE001 - le catalogue leve un message deja lisible
         return False, f"service inconnu : {service_id}", []
     if cfg.enabled(service_id):
-        return False, f"{catalog.get(service_id).display_name} est deja installe", []
+        return (
+            False,
+            t("{service} est deja installe", service=catalog.get(service_id).display_name),
+            [],
+        )
 
     cfg.project_dir = project_dir
     nouveaux = [
@@ -1057,7 +1081,15 @@ def add_service(
         if not port or port in nos_ports:
             continue
         if not check_port_free(port, sid).ok:
-            return False, f"port {port} deja occupe ({catalog.get(sid).display_name})", []
+            return (
+                False,
+                t(
+                    "port {port} deja occupe ({service})",
+                    port=port,
+                    service=catalog.get(sid).display_name,
+                ),
+                [],
+            )
 
     cfg.services.update(instances)
     on_progress(Progress("ajout", ", ".join(catalog.get(s).display_name for s in nouveaux)))

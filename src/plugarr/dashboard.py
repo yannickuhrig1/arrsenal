@@ -162,7 +162,7 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
             rows += (
                 f'<div class="row"><span class="k">{t("Mot de passe")}</span>'
                 f'<span class="v" data-secret="{spec.id}:password">'
-                f'{_secret(inst.password, "le mot de passe")}'
+                f'{_secret(inst.password, t("le mot de passe"))}'
                 f'{_bouton_rotation(spec, "password", live)}</span></div>'
             )
         if inst.api_key:
@@ -622,6 +622,21 @@ _OUTILS = """<div class="outils">
     <pre class="rapport" id="rapport-doctor" hidden></pre>"""
 
 
+def _commentaire_lanceur(marque: str, fin: str) -> str:
+    """En-tete du script lanceur, dans la langue de l'installation.
+
+    Les deux variantes ne different que par leur marque de commentaire et leur
+    fin de ligne : Windows veut `rem` et CRLF, le reste `#` et LF.
+    """
+    return "".join(
+        f"{marque} {ligne}{fin}"
+        for ligne in t(
+            "Genere par plugarr. Ouvre la page d'administration : etat des|"
+            "services, demarrage, arret, mises a jour."
+        ).split("|")
+    )
+
+
 def _outils() -> str:
     """Barre d'outils formee A L'AFFICHAGE.
 
@@ -950,9 +965,8 @@ def write_admin_launcher(project_dir: Path) -> Path:
     if sys.platform == "win32":
         contenu = (
             "@echo off\r\n"
-            "rem Genere par plugarr. Ouvre la page d'administration : etat des\r\n"
-            "rem services, demarrage, arret, mises a jour.\r\n"
-            "title plugarr - administration\r\n"
+            + _commentaire_lanceur("rem", "\r\n")
+            +             "title plugarr - administration\r\n"
             f"{commande}\r\n"
             "pause\r\n"
         )
@@ -960,9 +974,8 @@ def write_admin_launcher(project_dir: Path) -> Path:
     else:
         contenu = (
             "#!/bin/sh\n"
-            "# Genere par plugarr. Ouvre la page d'administration : etat des\n"
-            "# services, demarrage, arret, mises a jour.\n"
-            f"exec {commande}\n"
+            + _commentaire_lanceur("#", "\n")
+            +             f"exec {commande}\n"
         )
         cible.write_text(contenu, encoding="utf-8")
         cible.chmod(0o755)

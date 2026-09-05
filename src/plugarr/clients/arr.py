@@ -15,6 +15,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 
@@ -47,19 +48,25 @@ class ArrClient:
             raise WiringError(
                 f"{self.name}: appel {method} {resource} impossible",
                 str(exc),
-                f"verifiez que {self.base_url} est joignable et que le conteneur tourne",
+                t(
+                    "verifiez que {adresse} est joignable et que le conteneur tourne",
+                    adresse=self.base_url,
+                ),
             ) from exc
         if resp.status_code == 401:
             raise WiringError(
                 f"{self.name}: cle API refusee sur {resource}",
                 "HTTP 401",
-                "le config.xml pre-seme a peut-etre ete ecrase. Relancez `plugarr doctor`.",
+                t(
+                    "le config.xml pre-seme a peut-etre ete ecrase. "
+                    "Relancez `plugarr doctor`."
+                ),
             )
         if resp.status_code >= 400:
             raise WiringError(
                 f"{self.name}: {method} {resource} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:400]}",
-                "le gabarit renvoye par /schema a peut-etre change de forme",
+                t("le gabarit renvoye par /schema a peut-etre change de forme"),
             )
         return resp.json() if resp.content else None
 
@@ -149,7 +156,7 @@ class ArrClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                f"{self.name} n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service=self.name),
                 result.detail,
                 f"inspectez `docker logs {self.name}`",
             )
@@ -172,9 +179,18 @@ class ArrClient:
                 return entry
         available = sorted({e.get("implementation", "?") for e in schemas})
         raise WiringError(
-            f"{self.name}: implementation {implementation!r} absente de {resource}/schema",
-            f"implementations disponibles: {', '.join(available)}",
-            "la version de l'application ne propose peut-etre pas ce connecteur",
+            t(
+                "{service} : implementation {implementation} absente de "
+                "{ressource}/schema",
+                service=self.name,
+                implementation=repr(implementation),
+                ressource=resource,
+            ),
+            t(
+                "implementations disponibles : {liste}",
+                liste=", ".join(available),
+            ),
+            t("la version de l'application ne propose peut-etre pas ce connecteur"),
         )
 
     @staticmethod
@@ -283,9 +299,13 @@ class ArrClient:
         profiles = self.get(resource) or []
         if not profiles:
             raise WiringError(
-                f"{self.name}: aucun profil dans {resource}",
-                "la liste est vide",
-                "l'application a-t-elle fini son initialisation ?",
+                t(
+                    "{service} : aucun profil dans {ressource}",
+                    service=self.name,
+                    ressource=resource,
+                ),
+                t("la liste est vide"),
+                t("l'application a-t-elle fini son initialisation ?"),
             )
         for entry in profiles:
             if entry.get("name") == preferred:

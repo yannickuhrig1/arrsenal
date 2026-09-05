@@ -31,6 +31,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 #: `post_processing` de SABnzbd tel que DroppedNeedle l'attend. 3 vaut
@@ -71,7 +72,7 @@ class DroppedNeedleClient:
             raise WiringError(
                 f"{self.name}: {method} {path} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:300]}",
-                "l'accueil a peut-etre deja ete termine manuellement",
+                t("l'accueil a peut-etre deja ete termine manuellement"),
             )
         if not resp.content:
             return None
@@ -99,7 +100,7 @@ class DroppedNeedleClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "DroppedNeedle n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="DroppedNeedle"),
                 result.detail,
                 "inspectez `docker logs plugarr-droppedneedle`",
             )
@@ -145,8 +146,8 @@ class DroppedNeedleClient:
         if not (reponse or {}).get("token"):
             raise WiringError(
                 f"{self.name}: connexion refusee",
-                "aucun jeton dans la reponse",
-                "les identifiants annonces sont-ils bien ceux du compte ?",
+                t("aucun jeton dans la reponse"),
+                t("les identifiants annonces sont-ils bien ceux du compte ?"),
             )
 
     # -- serveur media -------------------------------------------------------

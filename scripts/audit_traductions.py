@@ -84,7 +84,12 @@ def phrases() -> dict[str, list[str]]:
             if isinstance(noeud, ast.Assign):
                 for cible in noeud.targets:
                     nom_cible = getattr(cible, "id", None)
-                    if nom_cible in ("SUB_TITLE", "IDS_EXPLICATION") and isinstance(
+                    if nom_cible in (
+                        "SUB_TITLE",
+                        "IDS_EXPLICATION",
+                        "_SILO_AVERTISSEMENT",
+                        "_GITIGNORE_ENTETE",
+                    ) and isinstance(
                         noeud.value, ast.Constant
                     ):
                         retenir(fichier, str(noeud.value.value))

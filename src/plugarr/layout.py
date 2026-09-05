@@ -302,10 +302,15 @@ def path_warning(path: str) -> str | None:
     # `C:\Users\...`, et les signalait tous comme « pas un chemin Windows ».
     ressemble_windows = bool(re.match(r"^[A-Za-z]:[\\/]", texte))
     if sys.platform == "win32" and not ressemble_windows:
-        return (
-            f"« {texte} » n'est pas un chemin Windows. Il sera cree dans "
-            f"{Path(texte).resolve()}, ce qui n'est probablement pas voulu."
+        return t(
+            "« {chemin} » n'est pas un chemin Windows. Il sera cree dans "
+            "{resolu}, ce qui n'est probablement pas voulu.",
+            chemin=texte,
+            resolu=Path(texte).resolve(),
         )
     if sys.platform != "win32" and ressemble_windows:
-        return f"« {texte} » est un chemin Windows, sur une machine qui ne l'est pas."
+        return t(
+            "« {chemin} » est un chemin Windows, sur une machine qui ne l'est pas.",
+            chemin=texte,
+        )
     return None

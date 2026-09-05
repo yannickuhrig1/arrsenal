@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from . import catalog, imageref
+from .i18n import t
 from .models import StackConfig
 
 #: Qualificatifs qui designent une image instable. Un tag qui en contient un
@@ -85,8 +86,12 @@ def newer_tags(image: str, *, timeout: float = 15.0) -> tuple[list[str], str | N
         # Sans tag lisible, il n'y a rien a comparer. C'est le cas d'une image
         # epinglee par digest seul, et de Silo, dont les 488 tags sont des SHA
         # de commit. Le controle de reconstruction, lui, continue de valoir.
-        manque = "aucun tag" if not current_tag else f"le tag deploye ({current_tag})"
-        return [], f"{manque} n'est pas une version comparable"
+        manque = (
+            t("aucun tag")
+            if not current_tag
+            else t("le tag deploye ({tag})", tag=current_tag)
+        )
+        return [], t("{quoi} n'est pas une version comparable", quoi=manque)
 
     tags, problem = list_tags(reference, timeout=timeout)
     if problem:
@@ -185,11 +190,13 @@ def _list_tags(reference: str, *, timeout: float) -> tuple[list[str], str | None
                         client, resp.headers.get("www-authenticate", ""), repo
                     )
                     if token is None:
-                        return [], "le registre demande une authentification non geree"
+                        return [], t("le registre demande une authentification non geree")
                     headers["Authorization"] = f"Bearer {token}"
                     continue
                 if resp.status_code != 200:
-                    return [], f"le registre a repondu HTTP {resp.status_code}"
+                    return [], t(
+                        "le registre a repondu HTTP {code}", code=resp.status_code
+                    )
                 collected += list(resp.json().get("tags") or [])
                 nxt = _next_page(resp.headers.get("link", ""))
                 if not nxt:

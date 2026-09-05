@@ -25,6 +25,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 
@@ -77,7 +78,7 @@ class QuiClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "qui n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="qui"),
                 result.detail,
                 "inspectez `docker logs qui`",
             )
@@ -94,9 +95,9 @@ class QuiClient:
         if resp.status_code == 400 and "already" in resp.text.lower():
             return False
         raise WiringError(
-            "qui: creation du compte initial impossible",
+            t("qui : creation du compte initial impossible"),
             f"HTTP {resp.status_code} - {resp.text[:300]}",
-            "l'API de qui a peut-etre change de forme",
+            t("l'API de qui a peut-etre change de forme"),
         )
 
     def login(self, username: str, password: str) -> None:
@@ -107,7 +108,7 @@ class QuiClient:
             raise WiringError(
                 "qui: connexion refusee",
                 f"HTTP {resp.status_code} - {resp.text[:200]}",
-                "le mot de passe enregistre ne correspond pas au compte existant",
+                t("le mot de passe enregistre ne correspond pas au compte existant"),
             )
 
     # -- instances -----------------------------------------------------------
@@ -138,7 +139,7 @@ class QuiClient:
             raise WiringError(
                 "qui: declaration de l'instance qBittorrent impossible",
                 f"HTTP {resp.status_code} - {resp.text[:300]}",
-                "verifiez que qBittorrent est demarre",
+                t("verifiez que qBittorrent est demarre"),
             )
         return True
 
@@ -149,7 +150,7 @@ class QuiClient:
         session vers qBittorrent. On laisse le temps de s'etablir plutot que de
         conclure trop tot.
         """
-        state = {"detail": "aucune instance a cette adresse"}
+        state = {"detail": t("aucune instance a cette adresse")}
 
         def probe() -> bool:
             for inst in self.instances():

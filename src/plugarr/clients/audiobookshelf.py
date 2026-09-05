@@ -37,6 +37,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 #: Fournisseurs de metadonnees, releves sur l'instance. `audible` pour ce qui
@@ -79,7 +80,7 @@ class AudiobookshelfClient:
             raise WiringError(
                 f"{self.name}: {method} {path} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:300]}",
-                "l'accueil a peut-etre deja ete termine manuellement",
+                t("l'accueil a peut-etre deja ete termine manuellement"),
             )
         if not resp.content:
             return None
@@ -107,7 +108,7 @@ class AudiobookshelfClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "Audiobookshelf n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="Audiobookshelf"),
                 result.detail,
                 "inspectez `docker logs plugarr-audiobookshelf`",
             )
@@ -146,8 +147,8 @@ class AudiobookshelfClient:
         if not password:
             raise WiringError(
                 f"{self.name}: mot de passe vide refuse",
-                "Audiobookshelf accepterait, mais laisserait le compte sans protection",
-                "laissez PlugArr generer le mot de passe",
+                t("Audiobookshelf accepterait, mais laisserait le compte sans protection"),
+                t("laissez PlugArr generer le mot de passe"),
             )
         self._request("POST", "/init", json={"newRoot": {"username": username, "password": password}})
         return True
@@ -159,8 +160,8 @@ class AudiobookshelfClient:
         if not jeton:
             raise WiringError(
                 f"{self.name}: connexion refusee",
-                "aucun jeton dans la reponse",
-                "les identifiants annonces sont-ils bien ceux du compte ?",
+                t("aucun jeton dans la reponse"),
+                t("les identifiants annonces sont-ils bien ceux du compte ?"),
             )
         self._token = jeton
 

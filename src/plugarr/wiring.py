@@ -105,7 +105,7 @@ class Wirer:
         obj = client.find_by_name(resource, name)
         if obj is None:
             result.ok = False
-            result.detail += " - introuvable a la relecture"
+            result.detail += t(" - introuvable a la relecture")
             return result
         ok, message = client.test_resource(resource, obj)
         # La reparation ne vaut que pour un refus d'AUTHENTIFICATION. L'avoir
@@ -117,10 +117,10 @@ class Wirer:
         if refus and on_auth_failure and on_auth_failure():
             ok, message = client.test_resource(resource, obj)
         if ok:
-            result.detail += ", test OK"
+            result.detail += t(", test OK")
         else:
             result.ok = False
-            result.detail += " - le test de connexion a echoue"
+            result.detail += t(" - le test de connexion a echoue")
             result.warnings.append(message.splitlines()[0])
         return result
 
@@ -179,10 +179,11 @@ class Wirer:
                 ok=True,
                 detail=t("aucun dossier racine configure"),
                 warnings=[
-                    (
-                        f"{arr_id} n'a aucun dossier racine et plugarr ne peut pas "
-                        f"deviner votre arborescence. Ajoutez-le dans {arr_id} avant "
-                        f"d'importer."
+                    t(
+                        "{service} n'a aucun dossier racine et plugarr ne peut pas "
+                        "deviner votre arborescence. Ajoutez-le dans {service} "
+                        "avant d'importer.",
+                        service=arr_id,
                     )
                 ],
             )
@@ -226,11 +227,14 @@ class Wirer:
         dossier = Path(self.cfg.config_path(sid))
         if not (dossier.is_dir() and any(dossier.iterdir())):
             return ""
-        return (
-            f"{sid} a une configuration prealable dans {dossier}. Son mot de passe "
-            f"n'y est stocke que hache : plugarr ne peut pas le retrouver, et celui "
-            f"qu'il annonce est refuse. Supprimez ce dossier pour repartir a zero, ou "
-            f"reprenez l'installation d'origine avec --project-dir."
+        return t(
+            "{service} a une configuration prealable dans {dossier}. Son mot de "
+            "passe n'y est stocke que hache : plugarr ne peut pas le retrouver, "
+            "et celui qu'il annonce est refuse. Supprimez ce dossier pour "
+            "repartir a zero, ou reprenez l'installation d'origine avec "
+            "--project-dir.",
+            service=sid,
+            dossier=dossier,
         )
 
     def _unban_download_client(self, dl_id: str) -> bool:
@@ -306,10 +310,11 @@ class Wirer:
                 ok=False,
                 detail=t("identifiants inconnus"),
                 warnings=[
-                    (
-                        f"Le mot de passe de {dl_spec.display_name} est hache dans "
-                        f"sa configuration : plugarr ne peut pas le lire. Passez "
-                        f"--dl-user et --dl-pass."
+                    t(
+                        "Le mot de passe de {service} est hache dans sa "
+                        "configuration : plugarr ne peut pas le lire. Passez "
+                        "--dl-user et --dl-pass.",
+                        service=dl_spec.display_name,
                     )
                 ],
             )
@@ -447,14 +452,21 @@ class Wirer:
             # un reglage qu'il ignore ensuite.
             ok=actif,
             detail=(
-                f"actif, rafraichi toutes les {relu.get('rss_refresh_interval')} min"
-                + (f" (change: {', '.join(changes)})" if changes else " (deja actif)")
+                t(
+                    "actif, rafraichi toutes les {minutes} min",
+                    minutes=relu.get("rss_refresh_interval"),
+                )
+                + (
+                    t(" (change : {champs})", champs=", ".join(changes))
+                    if changes
+                    else t(" (deja actif)")
+                )
             ),
             created=bool(changes),
             warnings=(
                 []
                 if actif
-                else ["le telechargement automatique RSS n'a pas pu etre active"]
+                else [t("le telechargement automatique RSS n'a pas pu etre active")]
             ),
         )
 
@@ -567,9 +579,9 @@ class Wirer:
         jf_key = self.cfg.services["jellyfin"].api_key
         if not jf_key:
             raise WiringError(
-                f"{arr_id} -> jellyfin: cle API Jellyfin absente",
-                "l'etape jellyfin/setup ne s'est pas executee ou a echoue",
-                "relancez `plugarr wire` : la cle est creee par cette etape",
+                t("{service} -> jellyfin : cle API Jellyfin absente", service=arr_id),
+                t("l'etape jellyfin/setup ne s'est pas executee ou a echoue"),
+                t("relancez `plugarr wire` : la cle est creee par cette etape"),
             )
         values = {
             "host": jf_spec.id,
@@ -648,7 +660,9 @@ class Wirer:
             ok=ok,
             detail=detail,
             created=ran,
-            warnings=[] if analyse else ["l'analyse des bibliotheques n'a pas pu etre lancee"],
+            warnings=[]
+            if analyse
+            else [t("l'analyse des bibliotheques n'a pas pu etre lancee")],
         )
 
     def step_langue(self, arr_id: str) -> StepResult:
@@ -672,7 +686,7 @@ class Wirer:
             # Relu depuis l'application : « le PUT est passe » ne prouve rien.
             # La valeur attendue depend du type expose — entier ou code.
             ok=relu in (valeur, self.cfg.language),
-            detail=f"{self.cfg.language}" + ("" if change else " (deja posee)"),
+            detail=f"{self.cfg.language}" + ("" if change else t(" (deja posee)")),
             created=change,
         )
 
@@ -838,7 +852,14 @@ class Wirer:
             detail=t("posees : {noms}", noms=", ".join(posees) or t("aucune (deja completes)")),
             created=bool(posees),
             warnings=(
-                [] if not manquantes else [f"categories sans repertoire : {', '.join(manquantes)}"]
+                []
+                if not manquantes
+                else [
+                    t(
+                        "categories sans repertoire : {noms}",
+                        noms=", ".join(manquantes),
+                    )
+                ]
             ),
         )
 
@@ -1020,7 +1041,7 @@ class Wirer:
             # L'avertissement du projet est repris a CHAQUE installation, pas
             # seulement dans le catalogue : celui qui lit le rapport doit le
             # voir, meme s'il n'a pas lu la page d'acces.
-            warnings=[catalog.get("silo").experimental],
+            warnings=[t(catalog.get("silo").experimental)],
         )
 
     def step_autobrr(self) -> StepResult:
@@ -1063,7 +1084,10 @@ class Wirer:
                         warnings.append(f"{spec.display_name} : {message.splitlines()[0]}")
 
         detail = t("accueil execute") if first else t("utilisateur existant")
-        detail += f", declares : {', '.join(created) or 'aucun (deja presents)'}"
+        detail += t(
+            ", declares : {noms}",
+            noms=", ".join(created) or t("aucun (deja presents)"),
+        )
         return StepResult(
             "autobrr: applications et client de telechargement",
             ok=not warnings,
@@ -1118,8 +1142,10 @@ class Wirer:
                 return StepResult(
                     "recyclarr: profils de qualite",
                     ok=False,
-                    detail="generation impossible",
-                    warnings=[message.splitlines()[-1][:200] if message else "aucun detail"],
+                    detail=t("generation impossible"),
+                    warnings=[
+                        message.splitlines()[-1][:200] if message else t("aucun detail")
+                    ],
                 )
 
         filled, kept, warnings = [], [], []
@@ -1132,9 +1158,13 @@ class Wirer:
         # laissent deux fichiers, l'ancien n'etant jamais efface.
         for path, service in recyclarr_cfg.resolve_split_instances(config_dir, wanted):
             warnings.append(
-                f"{path.name} ecarte : {service} etait configure par plusieurs "
-                f"fichiers, ce que Recyclarr refuse — il n'en synchronisait alors "
-                f"aucun. Le fichier est renomme, pas efface."
+                t(
+                    "{fichier} ecarte : {service} etait configure par plusieurs "
+                    "fichiers, ce que Recyclarr refuse — il n'en synchronisait "
+                    "alors aucun. Le fichier est renomme, pas efface.",
+                    fichier=path.name,
+                    service=service,
+                )
             )
 
         for path in sorted((config_dir / "configs").glob("*.yml")):
@@ -1157,15 +1187,25 @@ class Wirer:
         # Un marqueur restant EMPECHE la synchronisation : c'est bloquant. Un
         # fichier ecarte plus haut ne l'est pas, il a justement ete repare.
         bloquants = [
-            f"{leftover.name} contient encore un marqueur : la synchronisation "
-            f"echouera tant qu'il est la"
+            t(
+                "{fichier} contient encore un marqueur : la synchronisation "
+                "echouera tant qu'il est la",
+                fichier=leftover.name,
+            )
             for leftover in recyclarr_cfg.pending_markers(config_dir)
         ]
         warnings.extend(bloquants)
 
         parts = list(filled)
         if kept:
-            parts.append(f"{len(kept)} deja configure{'s' if len(kept) > 1 else ''}")
+            # Deux cles plutot qu'une : le francais accorde « configures »
+            # au pluriel, l'anglais ne change pas. Une cle unique aurait
+            # force l'une des deux langues a etre fausse.
+            parts.append(
+                t("{nombre} deja configure", nombre=len(kept))
+                if len(kept) == 1
+                else t("{nombre} deja configures", nombre=len(kept))
+            )
 
         # Premiere synchronisation immediate. Sans elle, Recyclarr n'ecrit rien
         # avant son reveil planifie : l'utilisateur ouvre Sonarr juste apres
@@ -1189,25 +1229,35 @@ class Wirer:
                     # Ne devrait plus arriver, la reparation passe avant. Si le cas
                     # revient, il ne doit surtout pas se lire comme un succes.
                     warnings.append(
-                        "Recyclarr a ecarte des instances en double : aucun profil "
-                        "n'a ete pose. Verifiez le contenu de configs/."
+                        t(
+                            "Recyclarr a ecarte des instances en double : aucun "
+                            "profil n'a ete pose. Verifiez le contenu de configs/."
+                        )
                     )
                     wired = False
                 else:
                     # Recyclarr sort en code 0 sans rien faire quand il n'a rien a
                     # poser. « synchronise » tout court se lisait comme un succes.
-                    parts.append("synchronise, aucun profil a creer")
+                    parts.append(t("synchronise, aucun profil a creer"))
             else:
-                last = message.strip().splitlines()[-1][:200] if message.strip() else "aucun detail"
+                last = (
+                    message.strip().splitlines()[-1][:200]
+                    if message.strip()
+                    else t("aucun detail")
+                )
                 warnings.append(
-                    f"premiere synchronisation echouee ({last}). La configuration est "
-                    f"ecrite : Recyclarr reessaiera a sa planification quotidienne."
+                    t(
+                        "premiere synchronisation echouee ({cause}). La "
+                        "configuration est ecrite : Recyclarr reessaiera a sa "
+                        "planification quotidienne.",
+                        cause=last,
+                    )
                 )
 
         return StepResult(
             "recyclarr: profils de qualite",
             ok=wired,
-            detail=", ".join(parts) or "aucun fichier rempli",
+            detail=", ".join(parts) or t("aucun fichier rempli"),
             created=bool(filled),
             warnings=warnings,
         )
@@ -1235,11 +1285,13 @@ class Wirer:
             return StepResult(
                 f"{arr_id}: acces web",
                 ok=True,
-                detail="aucun identifiant genere, rien a verifier",
+                detail=t("aucun identifiant genere, rien a verifier"),
             )
 
         if client.web_login_works(username, password):
-            return StepResult(f"{arr_id}: acces web", ok=True, detail="connexion verifiee")
+            return StepResult(
+                f"{arr_id}: acces web", ok=True, detail=t("connexion verifiee")
+            )
 
         client.ensure_web_user(username, password)
         repaired = client.web_login_works(username, password)
@@ -1273,9 +1325,10 @@ class Wirer:
             warnings=[]
             if repaired
             else [
-                (
-                    f"les identifiants annonces pour {arr_id} n'ouvrent pas l'interface. "
-                    f"Definissez-en depuis Settings > General."
+                t(
+                    "les identifiants annonces pour {service} n'ouvrent pas "
+                    "l'interface. Definissez-en depuis Settings > General.",
+                    service=arr_id,
                 )
             ],
         )
@@ -1306,7 +1359,7 @@ class Wirer:
                 return StepResult(
                     "qui: instance qBittorrent",
                     ok=True,
-                    detail="declaree" if created else "deja declaree",
+                    detail=t("declaree") if created else t("deja declaree"),
                     created=created,
                 )
 
@@ -1316,9 +1369,18 @@ class Wirer:
             return StepResult(
                 "qui: instance qBittorrent",
                 ok=linked,
-                detail=("declaree" if created else "deja declaree") + f", {detail}",
+                detail=(t("declaree") if created else t("deja declaree"))
+                + f", {detail}",
                 created=created,
-                warnings=[] if linked else [f"qui ne parvient pas a joindre {host} ({detail})"],
+                warnings=[]
+                if linked
+                else [
+                    t(
+                        "qui ne parvient pas a joindre {adresse} ({cause})",
+                        adresse=host,
+                        cause=detail,
+                    )
+                ],
             )
 
     # -- graphe --------------------------------------------------------------
@@ -1463,8 +1525,14 @@ class Wirer:
                 result = StepResult(
                     step.name,
                     ok=False,
-                    detail=f"erreur inattendue ({type(exc).__name__}) : {exc}",
-                    warnings=["ceci est un defaut de plugarr, pas de votre installation"],
+                    detail=t(
+                        "erreur inattendue ({genre}) : {erreur}",
+                        genre=type(exc).__name__,
+                        erreur=exc,
+                    ),
+                    warnings=[
+                        t("ceci est un defaut de plugarr, pas de votre installation")
+                    ],
                 )
             results.append(result)
             if on_step:

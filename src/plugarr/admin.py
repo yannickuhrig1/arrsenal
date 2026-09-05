@@ -46,6 +46,7 @@ from . import (
     vpncheck,
 )
 from .clients.arr import ArrClient
+from .i18n import t
 from .models import StackConfig
 from .runner import Compose
 
@@ -321,7 +322,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if self.sessions.locked_out:
             attente = self.sessions.retry_in()
-            page = _page_connexion(f"Trop de tentatives. Reessayez dans {attente} s.")
+            page = _page_connexion(
+                t("Trop de tentatives. Reessayez dans {secondes} s.", secondes=attente)
+            )
             self._send(HTTPStatus.TOO_MANY_REQUESTS, page.encode("utf-8"),
                        "text/html; charset=utf-8")
             return
@@ -423,7 +426,12 @@ class _Handler(BaseHTTPRequestHandler):
             # nom finit dans une ligne de commande docker compose.
             if service not in orchestrator.installable(self.cfg):
                 self._json(
-                    {"error": f"service inconnu ou deja installe: {service}"},
+                    {
+                        "error": t(
+                            "service inconnu ou deja installe : {service}",
+                            service=service,
+                        )
+                    },
                     HTTPStatus.BAD_REQUEST,
                 )
                 return

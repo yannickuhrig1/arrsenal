@@ -18,9 +18,10 @@ from rich.table import Table
 from . import catalog, report
 from .clients.arr import ArrClient
 from .clients.prowlarr import ProwlarrIndexers
+from .i18n import t
 from .models import StackConfig
 
-app = typer.Typer(help="Gerer vos indexeurs dans Prowlarr.", no_args_is_help=True)
+app = typer.Typer(help=t("Gerer vos indexeurs dans Prowlarr."), no_args_is_help=True)
 console = report.console
 
 
@@ -30,7 +31,7 @@ def _open(project_dir: Path) -> tuple[ArrClient, ProwlarrIndexers]:
         raise typer.BadParameter(f"{path} introuvable. Lancez d'abord `plugarr install`.")
     cfg = StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
     if not cfg.enabled("prowlarr"):
-        raise typer.BadParameter("Prowlarr n'est pas installe dans cette stack.")
+        raise typer.BadParameter(t("Prowlarr n'est pas installe dans cette stack."))
     spec, inst = catalog.get("prowlarr"), cfg.services["prowlarr"]
     client = ArrClient(
         inst.url(cfg.host), inst.api_key or "", api_version=spec.api_version, name="prowlarr"
@@ -51,7 +52,12 @@ def search(
         if not matches:
             console.print(f"Aucune definition ne correspond a {term!r}.")
             raise typer.Exit(1)
-        table = Table(title=f"{len(matches)} resultat(s) - source : votre Prowlarr")
+        table = Table(
+            title=t(
+                "{nombre} resultat(s) - source : votre Prowlarr",
+                nombre=len(matches),
+            )
+        )
         for column in ("Nom", "Type", "Protocole", "Identifiants a fournir"):
             table.add_column(column, overflow="fold")
         for definition in matches:
@@ -99,9 +105,9 @@ def list_configured(
 
 @app.command()
 def add(
-    name: str = typer.Argument(..., help="Nom exact de la definition (voir `search`)."),
+    name: str = typer.Argument(..., help=t("Nom exact de la definition (voir `search`).")),
     field: list[str] = typer.Option(
-        [], "--field", "-f", help="Identifiant sous la forme cle=valeur. Repetable."
+        [], "--field", "-f", help=t("Identifiant sous la forme cle=valeur. Repetable.")
     ),
     project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
 ) -> None:
@@ -124,9 +130,14 @@ def add(
         unknown = sorted(set(values) - expected)
         if unknown:
             console.print(
-                f"[yellow]Champs inconnus pour {definition.name}, ignores : "
-                f"{', '.join(unknown)}[/yellow]\n"
-                f"[dim]Champs attendus : {', '.join(sorted(expected))}[/dim]"
+                t(
+                    "[yellow]Champs inconnus pour {indexeur}, ignores : "
+                    "{inconnus}[/yellow]\n"
+                    "[dim]Champs attendus : {attendus}[/dim]",
+                    indexeur=definition.name,
+                    inconnus=", ".join(unknown),
+                    attendus=", ".join(sorted(expected)),
+                )
             )
 
         missing = [

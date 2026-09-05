@@ -16,6 +16,7 @@ from typing import Any
 import yaml
 
 from . import catalog
+from .i18n import t
 from .models import Category, StackConfig
 
 NETWORK_NAME = "plugarr"
@@ -27,10 +28,12 @@ PG_VOLUME = "silo-pgdata"
 #: Tag epingle de Gluetun. Le depot a ete transfere de qdm12/gluetun vers
 #: passteque/gluetun ; l'image, elle, reste qmcgaw/gluetun.
 GLUETUN_TAG = "v3.41.3"
-_HEADER = (
-    "# Genere par plugarr - NE PAS EDITER A LA MAIN.\n"
-    "# Modifiez stack.yml puis relancez `plugarr generate`.\n"
-)
+def _entete() -> str:
+    """En-tete des artefacts generes, dans la langue de l'installation."""
+    return t(
+        "# Genere par plugarr - NE PAS EDITER A LA MAIN.\n"
+        "# Modifiez stack.yml puis relancez `plugarr generate`.\n"
+    )
 
 
 def flood_client(cfg: StackConfig) -> str | None:
@@ -356,7 +359,7 @@ def _service_block(cfg: StackConfig, service_id: str) -> dict:
 def build_compose(cfg: StackConfig) -> dict:
     services = {sid: _service_block(cfg, sid) for sid in catalog.STARTUP_ORDER if cfg.enabled(sid)}
     if not services:
-        raise ValueError("aucun service selectionne")
+        raise ValueError(t("aucun service selectionne"))
     if cfg.vpn.enabled:
         gaps = cfg.vpn.missing()
         if gaps:
@@ -385,7 +388,7 @@ def build_compose(cfg: StackConfig) -> dict:
 
 
 def render_compose(cfg: StackConfig) -> str:
-    return _HEADER + yaml.safe_dump(
+    return _entete() + yaml.safe_dump(
         build_compose(cfg), sort_keys=False, default_flow_style=False, width=100
     )
 
@@ -407,7 +410,7 @@ def _env_value(value: object) -> str:
 
 def render_env(cfg: StackConfig) -> str:
     lines = [
-        "# Genere par plugarr. Contient des secrets : ne JAMAIS commiter.",
+        t("# Genere par plugarr. Contient des secrets : ne JAMAIS commiter."),
         f"COMPOSE_PROJECT_NAME={_env_value(cfg.project_name)}",
         # Les chemins aussi : un dossier contenant une espace est parfaitement
         # ordinaire sous Windows comme sur un NAS.
@@ -418,7 +421,7 @@ def render_env(cfg: StackConfig) -> str:
         f"TZ={_env_value(cfg.timezone)}",
         f"UMASK={_env_value(cfg.umask)}",
         "",
-        "# Cles API pre-semees - utilisees par le cablage automatique.",
+        t("# Cles API pre-semees - utilisees par le cablage automatique."),
     ]
     pilote = flood_client(cfg)
     if pilote is not None:
@@ -452,9 +455,15 @@ def render_env(cfg: StackConfig) -> str:
 
 #: Ce que plugarr depose a cote de ses artefacts. Il n'ecrase jamais un
 #: .gitignore existant : le repertoire peut etre celui de quelqu'un d'autre.
-_GITIGNORE = """# Ecrit par plugarr. Ces fichiers contiennent vos mots de passe, vos cles API
-# et, si le VPN est active, votre cle privee WireGuard. Ne les commitez pas.
-.env
+#: L'en-tete est traduit a l'ecriture ; la liste, elle, ne se traduit pas.
+_GITIGNORE_ENTETE = (
+    "# Ecrit par plugarr. Ces fichiers contiennent vos mots de passe, vos "
+    "cles API\n"
+    "# et, si le VPN est active, votre cle privee WireGuard. Ne les "
+    "commitez pas.\n"
+)
+
+_GITIGNORE = """.env
 stack.yml
 docker-compose.yml
 acces-plugarr.html
@@ -478,7 +487,7 @@ def write_artifacts(cfg: StackConfig, target_dir: Path) -> list[Path]:
 
     stack_path = target_dir / "stack.yml"
     stack_path.write_text(
-        _HEADER.replace("docker-compose.yml", "stack.yml")
+        _entete().replace("docker-compose.yml", "stack.yml")
         + yaml.safe_dump(cfg.model_dump(mode="json"), sort_keys=False),
         encoding="utf-8",
     )
@@ -492,7 +501,7 @@ def write_artifacts(cfg: StackConfig, target_dir: Path) -> list[Path]:
     # qu'une promesse repetee.
     gitignore = target_dir / ".gitignore"
     if not gitignore.exists():
-        gitignore.write_text(_GITIGNORE, encoding="utf-8")
+        gitignore.write_text(t(_GITIGNORE_ENTETE) + _GITIGNORE, encoding="utf-8")
         written.append(gitignore)
     return written
 

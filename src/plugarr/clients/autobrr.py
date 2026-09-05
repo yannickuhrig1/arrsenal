@@ -23,6 +23,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 #: Types acceptes par autobrr, verifies un par un contre l'instance.
@@ -89,7 +90,7 @@ class AutobrrClient:
             raise WiringError(
                 f"{self.name}: {path} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:300]}",
-                "l'API d'autobrr a peut-etre change de forme",
+                t("l'API d'autobrr a peut-etre change de forme"),
             )
         return resp
 
@@ -102,7 +103,7 @@ class AutobrrClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "autobrr n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="autobrr"),
                 result.detail,
                 "inspectez `docker logs autobrr`",
             )
@@ -162,7 +163,7 @@ class AutobrrClient:
             self._request(
                 "POST", "/api/keys", json={"name": name, "scopes": ["read", "write"]}
             ),
-            "creation de la cle API",
+            t("creation de la cle API"),
             200,
             201,
         ).json()
@@ -171,7 +172,7 @@ class AutobrrClient:
             raise WiringError(
                 "autobrr: aucune cle renvoyee",
                 f"reponse inattendue : {created}",
-                "l'API a peut-etre change de forme",
+                t("l'API a peut-etre change de forme"),
             )
         self._token = key
         return key
@@ -200,9 +201,9 @@ class AutobrrClient:
         client_type = CLIENT_TYPES.get(service_id)
         if client_type is None:
             raise WiringError(
-                f"autobrr: {service_id} n'est pas un type connu",
+                t("autobrr : {service} n'est pas un type connu", service=service_id),
                 f"types acceptes : {', '.join(sorted(CLIENT_TYPES))}",
-                "completez CLIENT_TYPES apres verification contre une instance",
+                t("completez CLIENT_TYPES apres verification contre une instance"),
             )
 
         payload: dict[str, Any] = {
@@ -254,7 +255,7 @@ class AutobrrClient:
         """Declenche le test de connexion d'autobrr sur un client enregistre."""
         target = next((c for c in self.clients() if c.get("name") == name), None)
         if target is None:
-            return False, "introuvable a la relecture"
+            return False, t("introuvable a la relecture")
         resp = self._request("POST", "/api/download_clients/test", json=target)
         if resp.status_code in (200, 204):
             return True, "test OK"

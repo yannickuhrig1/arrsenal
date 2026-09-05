@@ -243,7 +243,7 @@ def install(
     ),
     project_name: str = typer.Option(
         "plugarr",
-        help=(
+        help=t(
             "Nom de la pile Docker. A changer pour installer une SECONDE pile "
             "a cote d'une premiere : Docker identifie une pile par ce nom, pas "
             "par son repertoire."
@@ -281,7 +281,7 @@ def install(
     reset_config: bool | None = typer.Option(
         None,
         "--reset-config/--keep-config",
-        help=(
+        help=t(
             "Configuration existante : repartir de zero, ou la conserver. "
             "Sans l'option, la question est posee."
         ),

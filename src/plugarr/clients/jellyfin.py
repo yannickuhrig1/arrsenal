@@ -14,6 +14,7 @@ from typing import Any, Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 _CLIENT_HEADER = (
@@ -55,7 +56,7 @@ class JellyfinClient:
             raise WiringError(
                 f"{self.name}: {method} {path} a echoue",
                 f"HTTP {resp.status_code} - {resp.text[:400]}",
-                "l'assistant de demarrage a peut-etre deja ete termine manuellement",
+                t("l'assistant de demarrage a peut-etre deja ete termine manuellement"),
             )
         if not resp.content:
             return None
@@ -76,7 +77,7 @@ class JellyfinClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "Jellyfin n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="Jellyfin"),
                 result.detail,
                 "inspectez `docker logs jellyfin`",
             )
@@ -141,7 +142,7 @@ class JellyfinClient:
         if not token:
             raise WiringError(
                 "Jellyfin: authentification refusee",
-                "aucun AccessToken dans la reponse",
+                t("aucun AccessToken dans la reponse"),
                 "l'assistant de demarrage a-t-il bien cree l'utilisateur ?",
             )
         self._token = token
@@ -163,9 +164,9 @@ class JellyfinClient:
         created = self._find_key(app_name)
         if not created:
             raise WiringError(
-                "Jellyfin: cle API introuvable apres creation",
-                f"aucune entree {app_name!r} dans /Auth/Keys",
-                "verifiez que l'utilisateur administrateur a bien ete cree",
+                t("Jellyfin : cle API introuvable apres creation"),
+                t("aucune entree {application} dans /Auth/Keys", application=repr(app_name)),
+                t("verifiez que l'utilisateur administrateur a bien ete cree"),
             )
         return created
 

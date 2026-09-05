@@ -5,7 +5,7 @@
 Where PlugArr stands, what comes next, and why. Kept up to date after every
 working session.
 
-**Last updated: 5 September 2026** — published version: **0.5.0**
+**Last updated: 5 September 2026** — published version: **0.5.1**
 
 ---
 
@@ -40,7 +40,7 @@ English and your media library in French.
 
 A phrase added in French and forgotten in the catalogue breaks nothing: it
 would simply show up in French to someone who asked for English, with no error
-and no warning. `scripts/audit_traductions.py` therefore collects all 369
+and no warning. `scripts/audit_traductions.py` therefore collects all 540
 displayable phrases and **fails if one is missing**, or if the catalogue holds a
 dead entry. It runs in CI.
 
@@ -211,8 +211,11 @@ than deleting them.
 
 | Version | |
 |---|---|
+| **0.5.1** | **The FAILURE path speaks English too.** 0.5.0 covered the whole happy path; what remained were the messages you only see when something breaks — "qBittorrent never became available", "the pre-seeded config.xml may have been overwritten", "NOT PROTECTED: the tunnel exits on YOUR own public address". They lived in fifteen client modules, `wiring.py`, `vpncheck.py` and the orchestrator, as `WiringError`s raised deep in the code. The catalogue deduplicates them: the same "X never became available" was serving nine call sites. **540 phrases** in total, against 377 in 0.5.0. |
+| **0.5.1** | **The files written to disk, too.** `docker-compose.yml`, `.env`, `.gitignore`, `administration.cmd` and the automatic-startup script carried a French header. They are not on-screen messages, but they do get read: you open your `.env` to find a password. Still in French: two HTML templates and one JavaScript block — those are structures, not sentences, and translating them would mean maintaining two copies of a page. |
+| **0.5.1** | **A lost plural, caught by a test.** Wrapping "2 deja configures" had dropped the French agreement. Two keys rather than one: French agrees, English does not change, and a single key would have forced one of the two languages to be wrong. |
 | **0.5.0** | **PlugArr speaks English**, and two languages stop being confused. PlugArr's own — wizard, command line, report, access page, preflight — is chosen on the welcome screen or through `--lang`, and starts from the system's. The **services'** language is asked separately: you may want the tool in English and your media library in French. The second setting had existed since 0.1.11, but it was **alone**, and therefore ambiguous — the screen said "interface language" without saying whose. The translation key is the French phrase itself: a missing phrase falls back to French, understandable at worst, where a misspelled key would be displayed as-is. |
-| **0.5.0** | **The widgets translate in passing.** Wrapping a hundred and fifty phrases by hand would have raised the question on every line written, and a forgotten phrase breaks nothing: it would show in French to someone who asked for English, with no error and no warning. `tui/widgets.py` and `report.py`'s console run their labels through the catalogue; the screens go on writing their phrases in the clear. The safeguard is mechanical: `scripts/audit_traductions.py` collects all **377 displayable phrases** and fails if one is missing, **or** if the catalogue holds a dead entry. It runs in CI, and it already caught one entry added twice. |
+| **0.5.0** | **The widgets translate in passing.** Wrapping a hundred and fifty phrases by hand would have raised the question on every line written, and a forgotten phrase breaks nothing: it would show in French to someone who asked for English, with no error and no warning. `tui/widgets.py` and `report.py`'s console run their labels through the catalogue; the screens go on writing their phrases in the clear. The safeguard is mechanical: `scripts/audit_traductions.py` collects all **540 displayable phrases** and fails if one is missing, **or** if the catalogue holds a dead entry. It runs in CI, and it already caught one entry added twice. |
 | **0.5.0** | **A defect only a real mount could reveal.** `Select` expects `(label, value)` and was getting `(value, label)`: the code `fr` then became illegal, and the wizard died while mounting the welcome screen. Every test passed. |
 | **0.5.0** | **The screenshots now exist in both languages**, and the admin console finally has one. It is not a terminal screen — it is HTML served by `plugarr serve` — so `screenshots.py` could not produce it: it was the only visible part of the product with no image at all. `scripts/captures_administration.py` writes the page AND photographs it, with the same precautions as the other captures: illustrative secrets, a fixed address, and a **frozen date** — today's would make the file different on every run. |
 | **0.4.0** | **DroppedNeedle enters the catalogue**, unblocked by SABnzbd as expected. It **replaces** Lidarr: music from request to filing. A note in this roadmap claimed its first account was created through the web UI — **that was false**, `POST /api/v1/auth/setup` exists. Two defects found while integrating it, neither visible any other way: its `auth_users` table lives in `/app/cache`, which the upstream compose does not mount, so the setup succeeded and then the login failed after a simple restart; and its SQLite database **refuses to start** on a Windows mount — "The upgraded library database could not be verified". Same remedy as Silo's database. |

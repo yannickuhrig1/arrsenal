@@ -11,6 +11,7 @@ from typing import Self
 
 import httpx
 
+from ..i18n import t
 from .base import WiringError, new_client, wait_until
 
 
@@ -53,9 +54,12 @@ class QBittorrentClient:
             ) from exc
         if "Fails." in resp.text:
             raise WiringError(
-                f"{self.name}: identifiants refuses",
-                'la WebUI a repondu "Fails."',
-                "le qBittorrent.conf pre-seme a peut-etre ete ecrase. Relancez `plugarr doctor`.",
+                t("{service} : identifiants refuses", service=self.name),
+                t('la WebUI a repondu "Fails."'),
+                t(
+                    "le qBittorrent.conf pre-seme a peut-etre ete ecrase. "
+                    "Relancez `plugarr doctor`."
+                ),
             )
         self._authenticated = any(c.startswith("QBT_SID") for c in self._http.cookies) or (
             resp.status_code in (200, 204)
@@ -69,7 +73,7 @@ class QBittorrentClient:
         result = wait_until(probe, label=self.name, timeout=timeout)
         if not result.ready:
             raise WiringError(
-                "qBittorrent n'est jamais devenu disponible",
+                t("{service} n'est jamais devenu disponible", service="qBittorrent"),
                 result.detail,
                 "inspectez `docker logs qbittorrent`",
             )
@@ -92,9 +96,9 @@ class QBittorrentClient:
             # brut avec un code 200. Sans ce garde-fou, l'appelant recevait une
             # JSONDecodeError nue au lieu d'un diagnostic.
             raise WiringError(
-                "qbittorrent: reponse illisible sur les categories",
+                t("qbittorrent : reponse illisible sur les categories"),
                 f"contenu non JSON : {resp.text[:120]!r}",
-                "les identifiants sont probablement refuses",
+                t("les identifiants sont probablement refuses"),
             ) from exc
 
     def ensure_category(self, name: str, save_path: str) -> bool:
@@ -112,9 +116,13 @@ class QBittorrentClient:
         )
         if resp.status_code >= 400:
             raise WiringError(
-                f"{self.name}: creation de la categorie {name!r} refusee",
+                t(
+                    "{service} : creation de la categorie {categorie} refusee",
+                    service=self.name,
+                    categorie=repr(name),
+                ),
                 f"HTTP {resp.status_code} - {resp.text[:200]}",
-                "la session est-elle bien authentifiee ?",
+                t("la session est-elle bien authentifiee ?"),
             )
         return True
 
@@ -124,7 +132,7 @@ class QBittorrentClient:
             raise WiringError(
                 f"{self.name}: preferences illisibles",
                 f"HTTP {resp.status_code}",
-                "la session est-elle bien authentifiee ?",
+                t("la session est-elle bien authentifiee ?"),
             )
         return resp.json()
 
@@ -161,7 +169,7 @@ class QBittorrentClient:
             raise WiringError(
                 f"{self.name}: activation du RSS refusee",
                 f"HTTP {resp.status_code} - {resp.text[:200]}",
-                "la version de qBittorrent expose-t-elle bien ces reglages ?",
+                t("la version de qBittorrent expose-t-elle bien ces reglages ?"),
             )
         # On RELIT : `setPreferences` repond 200 meme pour un reglage inconnu,
         # qu'il ignore ensuite en silence.
@@ -187,6 +195,6 @@ class QBittorrentClient:
             raise WiringError(
                 f"{self.name}: changement de mot de passe refuse",
                 f"HTTP {resp.status_code} - {resp.text[:200]}",
-                "la session est-elle bien authentifiee ?",
+                t("la session est-elle bien authentifiee ?"),
             )
         self._password = password
