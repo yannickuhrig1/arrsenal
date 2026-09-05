@@ -12,7 +12,24 @@ from .models import StackConfig
 from .runner import Check
 from .wiring import StepResult
 
-console = Console()
+
+class _ConsoleTraduisante(Console):
+    """Console Rich qui fait passer ses chaines par le catalogue.
+
+    Meme raison que pour les widgets de l'assistant (`tui/widgets.py`) :
+    envelopper soixante appels a la main aurait pose la question a chaque
+    ligne ecrite, et une phrase oubliee ne casse rien — elle s'affiche
+    simplement en francais a quelqu'un qui a demande l'anglais.
+
+    Ce qui n'est pas une chaine passe intact : `console.print(table)` et
+    `console.print(panel)` doivent arriver a Rich tels quels.
+    """
+
+    def print(self, *objets: object, **kw: object) -> None:  # type: ignore[override]
+        super().print(*(t(o) if isinstance(o, str) else o for o in objets), **kw)
+
+
+console = _ConsoleTraduisante()
 
 
 def print_checks(checks: list[Check]) -> bool:

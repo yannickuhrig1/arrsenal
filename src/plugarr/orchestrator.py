@@ -228,12 +228,18 @@ def check_project_collision(cfg: StackConfig, project_dir: Path | None) -> Check
     if Path(ailleurs).resolve() == Path(project_dir).resolve():
         return None
     return Check(
-        "nom de projet",
+        t("nom de projet"),
         False,
-        f"des conteneurs nommes {cfg.project_name!r} tournent deja depuis {ailleurs}. "
-        f"Installer ici les REMPLACERA : Docker identifie une pile par son nom, pas "
-        f"par son repertoire. Les fichiers de {ailleurs} ne seront pas touches, mais "
-        f"ses services repartiront sur la configuration de {project_dir}.",
+        t(
+            "des conteneurs nommes {nom} tournent deja depuis {ailleurs}. "
+            "Installer ici les REMPLACERA : Docker identifie une pile par son "
+            "nom, pas par son repertoire. Les fichiers de {ailleurs} ne seront "
+            "pas touches, mais ses services repartiront sur la configuration "
+            "de {ici}.",
+            nom=repr(cfg.project_name),
+            ailleurs=ailleurs,
+            ici=project_dir,
+        ),
         blocking=False,
     )
 
@@ -256,7 +262,11 @@ def preflight(cfg: StackConfig, project_dir: Path | None = None) -> list[Check]:
                 continue
             if port in nos_ports:
                 checks.append(
-                    Check(f"port {port} ({sid})", True, "occupe par votre propre pile plugarr")
+                    Check(
+                        f"port {port} ({sid})",
+                        True,
+                        t("occupe par votre propre pile plugarr"),
+                    )
                 )
             else:
                 checks.append(check_port_free(port, sid))
@@ -323,29 +333,39 @@ def check_existing_config(cfg: StackConfig) -> Check:
     ]
     if not hachants:
         return Check(
-            "configuration existante",
+            t("configuration existante"),
             True,
-            "aucune, installation neuve" if not present else f"reprise : {', '.join(present)}",
+            t("aucune, installation neuve")
+            if not present
+            else t("reprise : {services}", services=", ".join(present)),
             blocking=False,
         )
     # La base de Silo n'est pas dans un dossier : le dire evite d'envoyer
     # chercher sous config_root quelque chose qui n'y est pas.
-    ou = f"dans {cfg.config_root}"
+    ou = t("dans {chemin}", chemin=cfg.config_root)
     if _SECRET_ILLISIBLE[0] in hachants:
         volumes = [n for s in _SECRET_ILLISIBLE if s in hachants for n in volumes_nommes(cfg, s)]
         liste = ", ".join(volumes)
         ou = (
-            f"dans {cfg.config_root}, et dans les volumes Docker {liste}"
+            t(
+                "dans {chemin}, et dans les volumes Docker {volumes}",
+                chemin=cfg.config_root,
+                volumes=liste,
+            )
             if len(hachants) > 1
-            else f"dans le volume Docker {liste}"
+            else t("dans le volume Docker {volumes}", volumes=liste)
         )
     return Check(
-        "configuration existante",
+        t("configuration existante"),
         False,
-        f"{', '.join(hachants)} ont deja un etat {ou}. "
-        f"Leurs mots de passe ne se relisent pas, et ceux que plugarr vient de generer "
-        f"seront refuses. Reprenez l'installation d'origine avec --project-dir, ou "
-        f"remettez ces services a zero.",
+        t(
+            "{services} ont deja un etat {ou}. Leurs mots de passe ne se "
+            "relisent pas, et ceux que plugarr vient de generer seront "
+            "refuses. Reprenez l'installation d'origine avec --project-dir, "
+            "ou remettez ces services a zero.",
+            services=", ".join(hachants),
+            ou=ou,
+        ),
         blocking=False,
     )
 

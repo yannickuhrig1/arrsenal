@@ -36,8 +36,10 @@ sys.path.insert(0, str(RACINE / "src"))
 #: sorte pas du controle en silence.
 WIDGETS_TRADUISANTS = ("Button", "Label", "Static", "Checkbox", "RadioButton", "DataTable")
 
-#: Methodes de ces widgets dont le premier argument est une phrase.
-METHODES_TRADUISANTES = ("update",)
+#: Methodes dont le premier argument est une phrase. `update` pose le texte
+#: d'un widget deja monte ; `print` est celui de la console traduisante de
+#: `report.py`, qui joue le meme role pour la ligne de commande.
+METHODES_TRADUISANTES = ("update", "print")
 
 #: Ce qui ressemble a une phrase mais n'en est pas. Les identifiants et les
 #: classes CSS passent par des mots-cles (`id=`, `classes=`), donc jamais par

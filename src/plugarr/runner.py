@@ -10,6 +10,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from .i18n import t
 from .layout import hardlink_supported
 
 
@@ -53,25 +54,36 @@ def check_docker() -> list[Check]:
             Check(
                 "docker",
                 False,
-                "binaire `docker` introuvable dans le PATH. Installez Docker Engine "
-                "ou Docker Desktop, puis relancez.",
+                t(
+                    "binaire `docker` introuvable dans le PATH. Installez "
+                    "Docker Engine ou Docker Desktop, puis relancez."
+                ),
             )
         ]
-    checks.append(Check("docker", True, f"trouve: {binary}"))
+    checks.append(Check("docker", True, t("trouve : {chemin}", chemin=binary)))
 
     info = _run(["docker", "info", "--format", "{{.ServerVersion}}"], timeout=PROBE_TIMEOUT)
     if info.returncode != 0:
         checks.append(
             Check(
-                "daemon docker",
+                t("daemon docker"),
                 False,
-                "le binaire repond mais le daemon est injoignable ou trop lent. "
-                "Demarrez Docker (Desktop, ou `systemctl start docker`). "
-                f"Detail: {info.stderr.strip()[:200]}",
+                t(
+                    "le binaire repond mais le daemon est injoignable ou trop "
+                    "lent. Demarrez Docker (Desktop, ou `systemctl start "
+                    "docker`). Detail : {detail}",
+                    detail=info.stderr.strip()[:200],
+                ),
             )
         )
         return checks
-    checks.append(Check("daemon docker", True, f"version serveur {info.stdout.strip()}"))
+    checks.append(
+        Check(
+            t("daemon docker"),
+            True,
+            t("version serveur {version}", version=info.stdout.strip()),
+        )
+    )
 
     compose = _run(["docker", "compose", "version", "--short"], timeout=PROBE_TIMEOUT)
     checks.append(
@@ -80,7 +92,7 @@ def check_docker() -> list[Check]:
             compose.returncode == 0,
             f"v{compose.stdout.strip()}"
             if compose.returncode == 0
-            else "plugin `docker compose` absent. Installez docker-compose-plugin.",
+            else t("plugin `docker compose` absent. Installez docker-compose-plugin."),
         )
     )
     return checks
@@ -169,7 +181,12 @@ def check_port_free(port: int, label: str) -> Check:
     return Check(
         f"port {port} ({label})",
         not busy,
-        "libre" if not busy else f"deja utilise. Changez le port de {label} dans stack.yml.",
+        t("libre")
+        if not busy
+        else t(
+            "deja utilise. Changez le port de {service} dans stack.yml.",
+            service=label,
+        ),
     )
 
 
@@ -184,13 +201,25 @@ def check_disk_space(path: str | Path, min_gb: int = 20) -> Check:
     try:
         usage = shutil.disk_usage(Path(path).anchor or str(path))
     except OSError as exc:
-        return Check("espace disque", False, f"impossible de lire {path}: {exc}", blocking=False)
+        return Check(
+            t("espace disque"),
+            False,
+            t("impossible de lire {chemin} : {erreur}", chemin=path, erreur=exc),
+            blocking=False,
+        )
     free_gb = usage.free / 1024**3
     return Check(
-        "espace disque",
+        t("espace disque"),
         free_gb >= min_gb,
-        f"{free_gb:.1f} Go libres"
-        + ("" if free_gb >= min_gb else f" - moins que le minimum conseille de {min_gb} Go"),
+        t("{libres:.1f} Go libres", libres=free_gb)
+        + (
+            ""
+            if free_gb >= min_gb
+            else t(
+                " - moins que le minimum conseille de {minimum} Go",
+                minimum=min_gb,
+            )
+        ),
         blocking=False,
     )
 

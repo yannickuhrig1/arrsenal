@@ -165,6 +165,9 @@ def test_le_catalogue_ne_traduit_pas_par_l_identite():
         "Detail",
         "diagnostic",
         "[green]Configuration complete.[/green]",
+        # Des commandes a taper : les traduire les rendrait fausses.
+        "  plugarr admin-password",
+        "  loginctl enable-linger $USER",
     }, identiques
 
 

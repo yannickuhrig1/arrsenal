@@ -32,15 +32,40 @@ from . import adopt as adopt_mod
 from . import autostart as autostart_mod
 from .clients import recyclarr as recyclarr_cfg
 from .clients.arr import ArrClient
+from .i18n import t
 from .layout import create_tree, default_profile, path_warning
 from .models import VPN_PROVIDERS, PlatformProfile, StackConfig, VpnConfig
 from .orchestrator import InstallAborted, Progress
 from .runner import Compose
 from .wiring import Wirer
 
+
+def _langue_a_l_import() -> str:
+    """Langue a poser AVANT que Typer ne lise ses libelles.
+
+    Les decorateurs `@app.command(help=...)` tournent a l'import, et `--help`
+    s'affiche avant la fonction de rappel : attendre celle-ci laisserait toute
+    l'aide en francais. On regarde donc `sys.argv` nous-memes, puis le systeme.
+
+    Ce pre-decoupage ne remplace pas l'analyse de Typer, il la precede : la
+    fonction de rappel repose la langue proprement ensuite.
+    """
+    import sys
+
+    arguments = sys.argv[1:]
+    for index, argument in enumerate(arguments):
+        if argument.startswith("--lang="):
+            return i18n.utiliser(argument.split("=", 1)[1])
+        if argument == "--lang" and index + 1 < len(arguments):
+            return i18n.utiliser(arguments[index + 1])
+    return i18n.utiliser(i18n.langue_du_systeme())
+
+
+_langue_a_l_import()
+
 app = typer.Typer(
     add_completion=False,
-    help="Deploie ET cable automatiquement une stack media *arr.",
+    help=t("Deploie ET cable automatiquement une stack media *arr."),
     invoke_without_command=True,
 )
 console = report.console
@@ -65,11 +90,11 @@ def main(
     ctx: typer.Context,
     _version: bool = typer.Option(
         False, "--version", "-V", callback=_show_version, is_eager=True,
-        help="Affiche la version et quitte.",
+        help=t("Affiche la version et quitte."),
     ),
     lang: str = typer.Option(
         "", "--lang",
-        help="Langue de PlugArr : fr, en. Par defaut, celle du systeme.",
+        help=t("Langue de PlugArr : fr, en. Par defaut, celle du systeme."),
     ),
 ) -> None:
     """Sans sous-commande, lance l'assistant interactif."""
@@ -133,10 +158,14 @@ def _traiter_config_existante(
         return
 
     console.print(
-        f"\n[yellow]Etat existant detecte[/yellow] pour "
-        f"[bold]{', '.join(concernes)}[/bold].\n"
-        f"[dim]Leurs mots de passe ne se relisent pas : plugarr ne peut pas les "
-        f"reprendre, et ceux qu'il va annoncer seront refuses.[/dim]"
+        t(
+            "\n[yellow]Etat existant detecte[/yellow] pour "
+            "[bold]{services}[/bold].\n"
+            "[dim]Leurs mots de passe ne se relisent pas : plugarr ne peut "
+            "pas les reprendre, et ceux qu'il va annoncer seront "
+            "refuses.[/dim]",
+            services=", ".join(concernes),
+        )
     )
     for sid in concernes:
         # La base de Silo n'a pas de dossier : montrer un chemin qui n'existe
@@ -156,7 +185,9 @@ def _traiter_config_existante(
             "\n[dim]Vos medias ne sont jamais touches : seul l'etat ci-dessus le "
             "serait.[/dim]"
         )
-        reset = typer.confirm("Supprimer cet etat et repartir de zero ?", default=False)
+        reset = typer.confirm(
+            t("Supprimer cet etat et repartir de zero ?"), default=False
+        )
 
     if not reset:
         console.print("[dim]Configurations conservees.[/dim]")
@@ -176,14 +207,14 @@ def _echo(progress: Progress) -> None:
 # ---------------------------------------------------------------------- commands
 
 
-@app.command()
+@app.command(help=t("Lance l'assistant interactif plein ecran."))
 def wizard(
     # Deux reglages qui n'ont pas leur place DANS l'assistant : ils decident de
     # son lancement, pas de la stack. Ils vivent donc sur la commande, comme
     # leurs homologues de `install`.
-    project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
+    project_dir: Path = typer.Option(Path("."), help=t("Ou ecrire les artefacts.")),
     open_page: bool = typer.Option(
-        True, "--open/--no-open", help="Ouvrir la page d'acces a la fin."
+        True, "--open/--no-open", help=t("Ouvrir la page d'acces a la fin.")
     ),
 ) -> None:
     """Lance l'assistant interactif plein ecran."""
@@ -192,23 +223,23 @@ def wizard(
     raise typer.Exit(run_wizard(project_dir, open_page=open_page))
 
 
-@app.command()
+@app.command(help=t("Deploie et cable la stack de bout en bout, sans interaction."))
 def install(
     services: str = typer.Option(
         ",".join(catalog.DEFAULT_SELECTION),
         "--services",
         "-s",
-        help="Liste separee par des virgules. Connus: "
+        help=t("Liste separee par des virgules. Connus: ")
         + ", ".join(sorted(s.id for s in catalog.selectable())),
     ),
-    config_root: str | None = typer.Option(None, help="Racine des configurations."),
-    data_root: str | None = typer.Option(None, help="Racine des donnees (monte sur /data)."),
+    config_root: str | None = typer.Option(None, help=t("Racine des configurations.")),
+    data_root: str | None = typer.Option(None, help=t("Racine des donnees (monte sur /data).")),
     # Defaut : le profil de la machine. Imposer generic-linux sous Windows
     # proposait des chemins Linux, crees ensuite a la racine du disque courant.
-    platform: PlatformProfile = typer.Option(default_profile(), help="Profil de plateforme."),
-    host: str = typer.Option("localhost", help="Hote pour les URL du rapport final."),
+    platform: PlatformProfile = typer.Option(default_profile(), help=t("Profil de plateforme.")),
+    host: str = typer.Option("localhost", help=t("Hote pour les URL du rapport final.")),
     username: str = typer.Option(
-        "plugarr", help="Identifiant commun a tous les services installes."
+        "plugarr", help=t("Identifiant commun a tous les services installes.")
     ),
     project_name: str = typer.Option(
         "plugarr",
@@ -221,31 +252,31 @@ def install(
     language: str = typer.Option(
         "en",
         "--langue",
-        help="Langue des interfaces (code ISO : fr, en, es...). Voir `plugarr langues`.",
+        help=t("Langue des interfaces (code ISO : fr, en, es...). Voir `plugarr langues`."),
     ),
     timezone: str = typer.Option("Etc/UTC", "--tz"),
-    project_dir: Path = typer.Option(Path("."), help="Ou ecrire les artefacts."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="N'ecrit rien, montre tout."),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Ne pas demander confirmation."),
+    project_dir: Path = typer.Option(Path("."), help=t("Ou ecrire les artefacts.")),
+    dry_run: bool = typer.Option(False, "--dry-run", help=t("N'ecrit rien, montre tout.")),
+    yes: bool = typer.Option(False, "--yes", "-y", help=t("Ne pas demander confirmation.")),
     open_page: bool = typer.Option(
-        True, "--open/--no-open", help="Ouvrir la page d'acces dans le navigateur."
+        True, "--open/--no-open", help=t("Ouvrir la page d'acces dans le navigateur.")
     ),
-    vpn: bool = typer.Option(False, "--vpn", help="Faire passer le client torrent par un VPN."),
+    vpn: bool = typer.Option(False, "--vpn", help=t("Faire passer le client torrent par un VPN.")),
     vpn_provider: str = typer.Option(
-        "", help="Fournisseur VPN. Voir `plugarr vpn-providers`."
+        "", help=t("Fournisseur VPN. Voir `plugarr vpn-providers`.")
     ),
-    vpn_type: str = typer.Option("wireguard", help="wireguard ou openvpn."),
-    vpn_user: str = typer.Option("", help="Identifiant OpenVPN."),
-    vpn_pass: str = typer.Option("", help="Mot de passe OpenVPN."),
-    vpn_key: str = typer.Option("", help="Cle privee WireGuard."),
-    vpn_countries: str = typer.Option("", help="Pays souhaites, separes par des virgules."),
+    vpn_type: str = typer.Option("wireguard", help=t("wireguard ou openvpn.")),
+    vpn_user: str = typer.Option("", help=t("Identifiant OpenVPN.")),
+    vpn_pass: str = typer.Option("", help=t("Mot de passe OpenVPN.")),
+    vpn_key: str = typer.Option("", help=t("Cle privee WireGuard.")),
+    vpn_countries: str = typer.Option("", help=t("Pays souhaites, separes par des virgules.")),
     recyclarr_sonarr: str = typer.Option(
         "",
-        help="Template TRaSH pour Sonarr. Voir `plugarr templates`. Vide = defaut.",
+        help=t("Template TRaSH pour Sonarr. Voir `plugarr templates`. Vide = defaut."),
     ),
     recyclarr_radarr: str = typer.Option(
         "",
-        help="Template TRaSH pour Radarr. Voir `plugarr templates`. Vide = defaut.",
+        help=t("Template TRaSH pour Radarr. Voir `plugarr templates`. Vide = defaut."),
     ),
     reset_config: bool | None = typer.Option(
         None,
@@ -288,12 +319,19 @@ def install(
         for sid, name in chosen.items():
             if not problem and name not in known.get(sid, []):
                 console.print(
-                    f"[red]Template inconnu pour {sid} : {name}[/red]\n"
-                    f"[dim]`plugarr templates` liste les noms acceptes.[/dim]"
+                    t(
+                        "[red]Template inconnu pour {service} : {nom}[/red]\n"
+                        "[dim]`plugarr templates` liste les noms "
+                        "acceptes.[/dim]",
+                        service=sid,
+                        nom=name,
+                    )
                 )
                 raise typer.Exit(1)
         if problem:
-            console.print(f"[yellow]Noms de templates non verifies : {problem}[/yellow]")
+            console.print(
+                t("[yellow]Noms de templates non verifies : {cause}[/yellow]", cause=problem)
+            )
         cfg.recyclarr_templates = chosen
 
     if vpn:
@@ -309,9 +347,13 @@ def install(
         gaps = cfg.vpn.missing()
         if gaps:
             console.print(
-                f"[red]VPN active mais incomplet : il manque {', '.join(gaps)}.[/red]\n"
-                f"[dim]Sans cela Gluetun refuse de demarrer, et le client torrent "
-                f"reste injoignable puisqu'il partage sa pile reseau.[/dim]"
+                t(
+                    "[red]VPN active mais incomplet : il manque {champs}.[/red]\n"
+                    "[dim]Sans cela Gluetun refuse de demarrer, et le client "
+                    "torrent reste injoignable puisqu'il partage sa pile "
+                    "reseau.[/dim]",
+                    champs=", ".join(gaps),
+                )
             )
             raise typer.Exit(1)
         if not any(cfg.enabled(sid) for sid in catalog.DOWNLOAD_CLIENTS):
@@ -322,9 +364,15 @@ def install(
 
     if not cfg.ids_certain:
         console.print(
-            f"[yellow]PUID/PGID {cfg.puid}:{cfg.pgid} - {cfg.ids_source}.[/yellow]\n"
-            f"[dim]C'est l'utilisateur Linux, a l'interieur des conteneurs, qui possedera "
-            f"vos fichiers. Sur un NAS, lancez `id` en tant que l'utilisateur voulu.[/dim]"
+            t(
+                "[yellow]PUID/PGID {uid}:{gid} - {origine}.[/yellow]\n"
+                "[dim]C'est l'utilisateur Linux, a l'interieur des "
+                "conteneurs, qui possedera vos fichiers. Sur un NAS, lancez "
+                "`id` en tant que l'utilisateur voulu.[/dim]",
+                uid=cfg.puid,
+                gid=cfg.pgid,
+                origine=t(cfg.ids_source),
+            )
         )
 
     # Un chemin Linux saisi sous Windows est cree a la racine du disque courant,
@@ -353,7 +401,9 @@ def install(
         console.print(compose.render_compose(cfg))
         raise typer.Exit(0)
 
-    if not yes and not typer.confirm("Ecrire les fichiers et demarrer la stack ?", default=True):
+    if not yes and not typer.confirm(
+        t("Ecrire les fichiers et demarrer la stack ?"), default=True
+    ):
         raise typer.Exit(0)
 
     try:
@@ -366,7 +416,9 @@ def install(
     except Exception as exc:
         journal.LOGGER.exception("installation")
         console.print(f"[red]{type(exc).__name__} : {exc}[/red]")
-        console.print(f"[dim]Detail complet dans {chemin_journal}[/dim]")
+        console.print(
+            t("[dim]Detail complet dans {chemin}[/dim]", chemin=chemin_journal)
+        )
         raise typer.Exit(1) from exc
 
     report.print_final(cfg, results)
@@ -376,12 +428,14 @@ def install(
     # Le journal n'est signale que s'il sert a quelque chose : tout annoncer a
     # chaque fois finit par n'etre plus lu.
     if echecs:
-        console.print(f"\n[dim]Journal detaille : {chemin_journal}[/dim]")
+        console.print(
+            t("\n[dim]Journal detaille : {chemin}[/dim]", chemin=chemin_journal)
+        )
     raise typer.Exit(0 if not echecs else 2)
 
 
-@app.command()
-def scan(include_stopped: bool = typer.Option(False, "--all", help="Inclure les arretes.")) -> None:
+@app.command(help=t("Liste les services deja installes sur cette machine. N'ecrit rien."))
+def scan(include_stopped: bool = typer.Option(False, "--all", help=t("Inclure les arretes."))) -> None:
     """Liste les services deja installes sur cette machine. N'ecrit rien."""
     from rich.table import Table
 
@@ -413,30 +467,36 @@ def scan(include_stopped: bool = typer.Option(False, "--all", help="Inclure les 
     for service_id, items in doubles.items():
         names = ", ".join(i.container for i in items)
         console.print(
-            f"[yellow]{catalog.get(service_id).display_name} est present {len(items)} fois "
-            f"({names}).[/yellow]\n"
-            f"[dim]Precisez lequel cabler : --pick {service_id}=<conteneur>[/dim]"
+            t(
+                "[yellow]{service} est present {nombre} fois ({noms}).[/yellow]\n"
+                "[dim]Precisez lequel cabler : --pick {identifiant}="
+                "<conteneur>[/dim]",
+                service=catalog.get(service_id).display_name,
+                nombre=len(items),
+                noms=names,
+                identifiant=service_id,
+            )
         )
 
 
-@app.command()
+@app.command(help=t("Cable une stack DEJA installee, sans la recreer."))
 def adopt(
-    data_root: str = typer.Option(..., help="Racine des medias de la stack existante."),
-    config_root: str = typer.Option(..., help="Racine des configurations existantes."),
+    data_root: str = typer.Option(..., help=t("Racine des medias de la stack existante.")),
+    config_root: str = typer.Option(..., help=t("Racine des configurations existantes.")),
     pick: list[str] = typer.Option(
-        [], "--pick", help="Lever une ambiguite : service=conteneur. Repetable."
+        [], "--pick", help=t("Lever une ambiguite : service=conteneur. Repetable.")
     ),
     host: str | None = typer.Option(
-        None, help="Adresse de cette machine, joignable DEPUIS les conteneurs."
+        None, help=t("Adresse de cette machine, joignable DEPUIS les conteneurs.")
     ),
     dl_user: str | None = typer.Option(
-        None, help="Identifiant du client de telechargement existant."
+        None, help=t("Identifiant du client de telechargement existant.")
     ),
     dl_pass: str | None = typer.Option(
-        None, help="Mot de passe du client existant. Illisible depuis sa configuration."
+        None, help=t("Mot de passe du client existant. Illisible depuis sa configuration.")
     ),
-    project_dir: Path = typer.Option(Path("."), help="Ou ecrire stack.yml."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Montrer le plan, ne rien faire."),
+    project_dir: Path = typer.Option(Path("."), help=t("Ou ecrire stack.yml.")),
+    dry_run: bool = typer.Option(False, "--dry-run", help=t("Montrer le plan, ne rien faire.")),
     yes: bool = typer.Option(False, "--yes", "-y"),
 ) -> None:
     """Cable une stack DEJA installee, sans la recreer.
@@ -467,7 +527,7 @@ def adopt(
             )
             raise typer.Exit(1)
         host = detected
-        console.print(f"[dim]Adresse retenue pour le cablage : {host}[/dim]")
+        console.print(t("[dim]Adresse retenue pour le cablage : {hote}[/dim]", hote=host))
 
     plan = adopt_mod.build_plan(discovery.scan(), picks)
 
@@ -476,8 +536,12 @@ def adopt(
     for service_id, items in plan.ambiguous.items():
         names = ", ".join(i.container for i in items)
         console.print(
-            f"[red]{service_id} est ambigu : {names}.[/red] "
-            f"[dim]Ajoutez --pick {service_id}=<conteneur>[/dim]"
+            t(
+                "[red]{identifiant} est ambigu : {noms}.[/red] "
+                "[dim]Ajoutez --pick {identifiant}=<conteneur>[/dim]",
+                identifiant=service_id,
+                noms=names,
+            )
         )
     if not plan.chosen:
         console.print("[red]Rien d'adoptable. Lancez `plugarr scan` pour comprendre.[/red]")
@@ -498,13 +562,16 @@ def adopt(
     console.print()
     report.print_summary(cfg)
     console.print(
-        f"[cyan]{orchestrator.planned_links(cfg)} lien(s) seraient poses sur ces "
-        f"conteneurs existants. Aucun ne sera recree.[/cyan]"
+        t(
+            "[cyan]{nombre} lien(s) seraient poses sur ces conteneurs "
+            "existants. Aucun ne sera recree.[/cyan]",
+            nombre=orchestrator.planned_links(cfg),
+        )
     )
 
     if dry_run:
         raise typer.Exit(0)
-    if not yes and not typer.confirm("Cabler ces services ?", default=True):
+    if not yes and not typer.confirm(t("Cabler ces services ?"), default=True):
         raise typer.Exit(0)
 
     adopt_mod.write_stack(cfg, project_dir)
@@ -518,15 +585,15 @@ def adopt(
     raise typer.Exit(0 if all(r.ok for r in results) else 2)
 
 
-@app.command()
-def generate(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml.")) -> None:
+@app.command(help=t("Regenere docker-compose.yml et .env depuis stack.yml, sans rien demarrer."))
+def generate(project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml."))) -> None:
     """Regenere docker-compose.yml et .env depuis stack.yml, sans rien demarrer."""
     written = compose.write_artifacts(_load_config(project_dir), project_dir)
     console.print("Regenere : " + ", ".join(p.name for p in written))
 
 
-@app.command()
-def wire(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml.")) -> None:
+@app.command(help=t("Rejoue uniquement le cablage sur une stack deja demarree. Idempotent."))
+def wire(project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml."))) -> None:
     """Rejoue uniquement le cablage sur une stack deja demarree. Idempotent."""
     cfg = _load_config(project_dir)
     cfg.project_dir = project_dir
@@ -579,12 +646,12 @@ def wire(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.y
     raise typer.Exit(0 if all(r.ok for r in results) else 2)
 
 
-@app.command()
+@app.command(help=t("Page d'administration : etat des services, demarrer / arreter / redemarrer."))
 def serve(
-    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
-    host: str = typer.Option("127.0.0.1", help="Adresse d'ecoute."),
-    port: int = typer.Option(7373, help="Port d'ecoute."),
-    open_page: bool = typer.Option(True, "--open/--no-open", help="Ouvrir le navigateur."),
+    project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml.")),
+    host: str = typer.Option("127.0.0.1", help=t("Adresse d'ecoute.")),
+    port: int = typer.Option(7373, help=t("Port d'ecoute.")),
+    open_page: bool = typer.Option(True, "--open/--no-open", help=t("Ouvrir le navigateur.")),
 ) -> None:
     """Page d'administration : etat des services, demarrer / arreter / redemarrer.
 
@@ -596,9 +663,14 @@ def serve(
 
     if host not in ("127.0.0.1", "localhost"):
         console.print(
-            f"[yellow]Ecoute sur {host} : la page sera joignable depuis le reseau.[/yellow]\n"
-            f"[dim]Elle permet d'arreter vos services et affiche vos identifiants. "
-            f"Le jeton est la seule protection ; ne partagez pas l'URL.[/dim]"
+            t(
+                "[yellow]Ecoute sur {hote} : la page sera joignable depuis le "
+                "reseau.[/yellow]\n"
+                "[dim]Elle permet d'arreter vos services et affiche vos "
+                "identifiants. Le jeton est la seule protection ; ne partagez "
+                "pas l'URL.[/dim]",
+                hote=host,
+            )
         )
 
     def ready(url: str, _token: str) -> None:
@@ -616,15 +688,22 @@ def serve(
     try:
         admin.serve(cfg, project_dir, host=host, port=port, token=token, on_ready=ready)
     except OSError as exc:
-        console.print(f"[red]Impossible d'ecouter sur {host}:{port} : {exc}[/red]")
+        console.print(
+            t(
+                "[red]Impossible d'ecouter sur {hote}:{port} : {erreur}[/red]",
+                hote=host,
+                port=port,
+                erreur=exc,
+            )
+        )
         raise typer.Exit(1) from exc
     console.print("Serveur arrete.")
 
 
-@app.command("admin-password")
+@app.command("admin-password", help=t("Pose le mot de passe de la page d'administration."))
 def admin_password(
-    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
-    clear: bool = typer.Option(False, "--clear", help="Retirer le mot de passe."),
+    project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml.")),
+    clear: bool = typer.Option(False, "--clear", help=t("Retirer le mot de passe.")),
 ) -> None:
     """Pose le mot de passe de la page d'administration.
 
@@ -644,7 +723,9 @@ def admin_password(
         console.print("Mot de passe retire. Seul le jeton de session ouvre desormais la console.")
         return
 
-    mot_de_passe = typer.prompt("Nouveau mot de passe", hide_input=True, confirmation_prompt=True)
+    mot_de_passe = typer.prompt(
+        t("Nouveau mot de passe"), hide_input=True, confirmation_prompt=True
+    )
     if len(mot_de_passe) < 8:
         console.print("[red]Huit caracteres au minimum.[/red]")
         raise typer.Exit(1)
@@ -657,12 +738,12 @@ def admin_password(
     )
 
 
-@app.command()
+@app.command(help=t("Lance la console d'administration a chaque ouverture de session."))
 def autostart(
-    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
-    disable: bool = typer.Option(False, "--disable", help="Retirer le lancement automatique."),
-    host: str = typer.Option("127.0.0.1", help="Adresse d'ecoute de la console."),
-    port: int = typer.Option(7373, help="Port d'ecoute de la console."),
+    project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml.")),
+    disable: bool = typer.Option(False, "--disable", help=t("Retirer le lancement automatique.")),
+    host: str = typer.Option("127.0.0.1", help=t("Adresse d'ecoute de la console.")),
+    port: int = typer.Option(7373, help=t("Port d'ecoute de la console.")),
 ) -> None:
     """Lance la console d'administration a chaque ouverture de session.
 
@@ -695,7 +776,9 @@ def autostart(
         raise typer.Exit(1)
 
     if etat.actif:
-        console.print(f"[dim]Deja installe : {etat.chemin}. Reecriture.[/dim]")
+        console.print(
+            t("[dim]Deja installe : {chemin}. Reecriture.[/dim]", chemin=etat.chemin)
+        )
 
     ok, message = autostart_mod.enable(project_dir, host=host, port=port)
     if not ok:
@@ -703,7 +786,14 @@ def autostart(
         raise typer.Exit(1)
 
     console.print(message)
-    console.print(f"[dim]Console : http://{host}:{port} — au prochain demarrage de session.[/dim]")
+    console.print(
+        t(
+            "[dim]Console : http://{hote}:{port} — au prochain demarrage "
+            "de session.[/dim]",
+            hote=host,
+            port=port,
+        )
+    )
     if autostart_mod.mecanisme() == "systemd-utilisateur":
         console.print(
             "[dim]Une unite utilisateur s'arrete a la deconnexion. Pour qu'elle "
@@ -712,14 +802,14 @@ def autostart(
         console.print("  loginctl enable-linger $USER")
 
 
-@app.command()
+@app.command(help=t("Archive la configuration complete : projet, CONFIG_ROOT et volumes."))
 def backup(
-    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
-    out: Path | None = typer.Option(None, "--out", "-o", help="Fichier d'archive a ecrire."),
+    project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml.")),
+    out: Path | None = typer.Option(None, "--out", "-o", help=t("Fichier d'archive a ecrire.")),
     live: bool = typer.Option(
         False,
         "--live",
-        help="Ne PAS arreter les conteneurs. Plus rapide, et la sauvegarde peut etre corrompue.",
+        help=t("Ne PAS arreter les conteneurs. Plus rapide, et la sauvegarde peut etre corrompue."),
     ),
 ) -> None:
     """Archive la configuration complete : projet, CONFIG_ROOT et volumes."""
@@ -756,17 +846,23 @@ def backup(
         "[yellow]Cette archive contient vos mots de passe et vos cles API en clair.[/yellow]\n"
         "[dim]Elle est en lecture seule pour vous (chmod 600). Rangez-la comme un secret.[/dim]"
     )
-    console.print(f"[dim]Vos medias dans {cfg.data_root} ne sont PAS dedans, et c'est voulu.[/dim]")
+    console.print(
+        t(
+            "[dim]Vos medias dans {racine} ne sont PAS dedans, et c'est "
+            "voulu.[/dim]",
+            racine=cfg.data_root,
+        )
+    )
 
 
-@app.command()
+@app.command(help=t("Repose une sauvegarde. N'ecrit RIEN dans DATA_ROOT."))
 def restore(
-    archive: Path = typer.Argument(..., help="Archive produite par `plugarr backup`."),
-    project_dir: Path = typer.Option(Path("."), help="Ou reposer le projet."),
+    archive: Path = typer.Argument(..., help=t("Archive produite par `plugarr backup`.")),
+    project_dir: Path = typer.Option(Path("."), help=t("Ou reposer le projet.")),
     config_root: str | None = typer.Option(
-        None, help="Restaurer AILLEURS que l'origine. Les chemins sont reecrits."
+        None, help=t("Restaurer AILLEURS que l'origine. Les chemins sont reecrits.")
     ),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Ne pas demander confirmation."),
+    yes: bool = typer.Option(False, "--yes", "-y", help=t("Ne pas demander confirmation.")),
 ) -> None:
     """Repose une sauvegarde. N'ecrit RIEN dans DATA_ROOT."""
     archive = Path(archive)
@@ -798,7 +894,12 @@ def restore(
         )
 
     if not yes and not typer.confirm(
-        f"Ecraser la configuration dans {cible} et le projet dans {project_dir} ?",
+        t(
+            "Ecraser la configuration dans {config} et le projet dans "
+            "{projet} ?",
+            config=cible,
+            projet=project_dir,
+        ),
         default=False,
     ):
         raise typer.Exit(0)
@@ -811,13 +912,16 @@ def restore(
     )
     console.print("[green]Restauration terminee.[/green]")
     console.print(
-        f"[dim]Demarrez la pile, puis `plugarr wire --project-dir {project_dir}` "
-        f"pour verifier que tout repond.[/dim]"
+        t(
+            "[dim]Demarrez la pile, puis `plugarr wire --project-dir "
+            "{repertoire}` pour verifier que tout repond.[/dim]",
+            repertoire=project_dir,
+        )
     )
 
 
-@app.command()
-def doctor(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml.")) -> None:
+@app.command(help=t("Diagnostique une installation existante."))
+def doctor(project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml."))) -> None:
     """Diagnostique une installation existante."""
     cfg = _load_config(project_dir)
     if not report.print_checks(orchestrator.preflight(cfg, project_dir)):
@@ -847,10 +951,10 @@ def doctor(project_dir: Path = typer.Option(Path("."), help="Repertoire du stack
             console.print(f"  [red]ECHEC[/red] {sid} : {exc}")
 
 
-@app.command()
+@app.command(help=t("Arrete la stack. Ne touche JAMAIS a DATA_ROOT."))
 def uninstall(
-    project_dir: Path = typer.Option(Path("."), help="Repertoire du stack.yml."),
-    remove_config: bool = typer.Option(False, "--remove-config", help="Supprime CONFIG_ROOT."),
+    project_dir: Path = typer.Option(Path("."), help=t("Repertoire du stack.yml.")),
+    remove_config: bool = typer.Option(False, "--remove-config", help=t("Supprime CONFIG_ROOT.")),
 ) -> None:
     """Arrete la stack. Ne touche JAMAIS a DATA_ROOT."""
     cfg = _load_config(project_dir)
@@ -859,12 +963,17 @@ def uninstall(
         console.print(message if not ok else "Conteneurs arretes et supprimes.")
     else:
         if not typer.confirm(
-            f"Supprimer definitivement {cfg.config_root} (bases, historiques, reglages) ?",
+            t(
+                "Supprimer definitivement {chemin} (bases, historiques, "
+                "reglages) ?",
+                chemin=cfg.config_root,
+            ),
             default=False,
         ):
             raise typer.Exit(0)
         if not typer.confirm(
-            "Confirmez une seconde fois : cette action est irreversible.", default=False
+            t("Confirmez une seconde fois : cette action est irreversible."),
+            default=False,
         ):
             raise typer.Exit(0)
         # `-v` emporte AUSSI les volumes Docker. Sans lui, la base de Silo
@@ -879,10 +988,15 @@ def uninstall(
 
         shutil.rmtree(cfg.config_root, ignore_errors=True)
         console.print(f"{cfg.config_root} supprime.")
-    console.print(f"[dim]Vos medias dans {cfg.data_root} n'ont pas ete touches.[/dim]")
+    console.print(
+        t(
+            "[dim]Vos medias dans {racine} n'ont pas ete touches.[/dim]",
+            racine=cfg.data_root,
+        )
+    )
 
 
-@app.command("langues")
+@app.command("langues", help=t("Langues d'interface acceptees."))
 def langues_cmd() -> None:
     """Langues d'interface acceptees.
 
@@ -897,14 +1011,16 @@ def langues_cmd() -> None:
         console.print(f"  {lang.code:4} {lang.nom}")
     autres = sorted(set(langues_mod.ARR_UI_LANGUAGE) - proposees)
     console.print("")
-    console.print(f"[dim]Aussi acceptees par --langue : {', '.join(autres)}[/dim]")
+    console.print(
+        t("[dim]Aussi acceptees par --langue : {codes}[/dim]", codes=", ".join(autres))
+    )
     console.print(
         "[dim]Jellyfin et Silo acceptent tout code ISO ; la liste ci-dessus est "
         "celle que les *arr savent afficher.[/dim]"
     )
 
 
-@app.command("vpn-providers")
+@app.command("vpn-providers", help=t("Liste les fournisseurs VPN acceptes par Gluetun."))
 def vpn_providers() -> None:
     """Liste les fournisseurs VPN acceptes par Gluetun."""
     console.print("[dim]Liste obtenue de Gluetun v3.41.3 lui-meme, pas recopiee.[/dim]\n")
@@ -912,7 +1028,7 @@ def vpn_providers() -> None:
         console.print(f"  {name}")
 
 
-@app.command("list")
+@app.command("list", help=t("Liste le catalogue."))
 def list_services() -> None:
     """Liste le catalogue."""
     from rich.table import Table
@@ -935,10 +1051,10 @@ def list_services() -> None:
     console.print(table)
 
 
-@app.command("templates")
+@app.command("templates", help=t("Liste les profils de qualite TRaSH proposables a Recyclarr."))
 def list_templates(
     config_root: str | None = typer.Option(
-        None, help="Racine des configurations, pour lire le manifeste deja clone."
+        None, help=t("Racine des configurations, pour lire le manifeste deja clone.")
     ),
 ) -> None:
     """Liste les profils de qualite TRaSH proposables a Recyclarr."""
