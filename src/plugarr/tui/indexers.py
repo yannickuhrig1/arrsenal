@@ -13,12 +13,16 @@ from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.content import Content
-from textual.widgets import Button, Input, Label, ListItem, ListView, Static
+from textual.widgets import ListItem, ListView
 
 from .. import catalog, journal
 from ..clients.arr import ArrClient
 from ..clients.prowlarr import IndexerDefinition, ProwlarrIndexers
+from ..i18n import t
 from .screens import WizardScreen
+
+# Widgets traduisants : voir tui/widgets.py.
+from .widgets import Button, Input, Label, Static
 
 MAX_RESULTS = 40
 
@@ -75,7 +79,8 @@ class IndexersScreen(WizardScreen):
         except Exception as exc:  # noqa: BLE001
             journal.LOGGER.exception("chargement des definitions Prowlarr")
             self.app.call_from_thread(
-                self._set_status, f"[red]Prowlarr injoignable : {exc}[/red]"
+                self._set_status,
+                t("[red]Prowlarr injoignable : {erreur}[/red]", erreur=exc),
             )
             client.close()
             return
@@ -83,9 +88,15 @@ class IndexersScreen(WizardScreen):
         self.app.call_from_thread(self._ready, count, already)
 
     def _ready(self, count: int, already: list[str]) -> None:
-        configured = f" - deja configures : {', '.join(already)}" if already else ""
+        configured = (
+            t(" - deja configures : {noms}", noms=", ".join(already)) if already else ""
+        )
         self._set_status(
-            f"[dim]{count} definitions fournies par votre Prowlarr{configured}[/dim]"
+            t(
+                "[dim]{nombre} definitions fournies par votre Prowlarr{deja}[/dim]",
+                nombre=count,
+                deja=configured,
+            )
         )
 
     def _set_status(self, text: str) -> None:
@@ -182,7 +193,9 @@ class IndexersScreen(WizardScreen):
             for inp in self.query(".indexer-field").results(Input)
             if inp.id
         }
-        self._set_status(f"[dim]Validation de {self._current.name} par Prowlarr...[/dim]")
+        self._set_status(
+            t("[dim]Validation de {nom} par Prowlarr...[/dim]", nom=self._current.name)
+        )
         self.query_one("#add", Button).disabled = True
         self.submit(self._current, values)
 

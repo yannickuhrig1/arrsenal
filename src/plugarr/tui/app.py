@@ -11,7 +11,7 @@ from pathlib import Path
 from textual.app import App
 from textual.theme import Theme
 
-from .. import journal, orchestrator
+from .. import i18n, journal, orchestrator
 from ..models import PlatformProfile, StackConfig, VpnConfig
 from ..wiring import StepResult
 from .screens import WelcomeScreen
@@ -48,9 +48,15 @@ class PlugArrApp(App):
         #: par son repertoire : deux installations qui le partagent partagent
         #: leurs conteneurs, et la seconde recree ceux de la premiere.
         self.project_name: str = "plugarr"
-        #: Langue des interfaces. Le francais par defaut dans l'assistant : il
-        #: est en francais, quelqu'un qui le lit le comprend.
-        self.language: str = "fr"
+        #: Langue des SERVICES : celle que Sonarr, Jellyfin et les autres
+        #: afficheront dans leur propre interface. A ne pas confondre avec
+        #: `ui_language` juste en dessous.
+        self.language: str = i18n.langue()
+        #: Langue de PlugArr lui-meme. Deduite du systeme au premier
+        #: demarrage, changeable des l'ecran d'accueil. Un francophone trouve
+        #: l'assistant en francais sans rien regler, tout le monde d'autre en
+        #: anglais.
+        self.ui_language: str = i18n.langue()
         #: Hote des URL du rapport final. `localhost` ne vaut que si le
         #: navigateur tourne sur la machine qui heberge la stack.
         self.host: str = "localhost"
@@ -103,6 +109,7 @@ class PlugArrApp(App):
             language=self.language,
             host=self.host,
         )
+        cfg.ui_language = self.ui_language
         cfg.recyclarr_templates = dict(self.recyclarr_templates)
         cfg.vpn = self.vpn
         return cfg

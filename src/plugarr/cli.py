@@ -20,6 +20,7 @@ from . import (
     compose,
     dashboard,
     discovery,
+    i18n,
     indexers_cli,
     journal,
     orchestrator,
@@ -46,6 +47,10 @@ console = report.console
 
 STACK_FILE = "stack.yml"
 
+#: `--lang` a-t-il ete donne ? Si oui il prime sur ce que porte `stack.yml` :
+#: une option ecrite a la main ne doit jamais etre annulee par un fichier.
+_LANGUE_EXPLICITE = False
+
 app.add_typer(indexers_cli.app, name="indexers")
 
 
@@ -62,8 +67,19 @@ def main(
         False, "--version", "-V", callback=_show_version, is_eager=True,
         help="Affiche la version et quitte.",
     ),
+    lang: str = typer.Option(
+        "", "--lang",
+        help="Langue de PlugArr : fr, en. Par defaut, celle du systeme.",
+    ),
 ) -> None:
     """Sans sous-commande, lance l'assistant interactif."""
+    # La langue AVANT tout le reste : les messages de la commande en cours
+    # doivent deja etre dans la bonne. Sans valeur explicite, on suit le
+    # systeme, ce qui donne le francais a un francophone et l'anglais aux
+    # autres sans que personne ait rien a regler.
+    global _LANGUE_EXPLICITE
+    _LANGUE_EXPLICITE = bool(lang)
+    i18n.utiliser(lang or i18n.langue_du_systeme())
     if ctx.invoked_subcommand is not None:
         return
     from .tui.app import run_wizard
@@ -75,7 +91,14 @@ def _load_config(project_dir: Path) -> StackConfig:
     path = project_dir / STACK_FILE
     if not path.exists():
         raise typer.BadParameter(f"{path} introuvable. Lancez d'abord `plugarr install`.")
-    return StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    cfg = StackConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    # L'installation a retenu une langue : les commandes qui reprennent cette
+    # pile la reprennent aussi. Sans cela, `plugarr serve` sur un serveur dont
+    # la session est en anglais repondrait en anglais a quelqu'un qui a installe
+    # en francais.
+    if not _LANGUE_EXPLICITE:
+        i18n.utiliser(cfg.ui_language)
+    return cfg
 
 
 def _announce_page(path: Path, open_page: bool) -> None:

@@ -301,11 +301,19 @@ class StackConfig(BaseModel):
     #: Hote joignable depuis le navigateur de l'utilisateur, pour le rapport final.
     host: str = "localhost"
 
-    #: Langue des interfaces, code ISO 639-1. Appliquee partout ou le service
+    #: Langue des SERVICES, code ISO 639-1. Appliquee partout ou le service
     #: sait la recevoir. Avant, plugarr imposait le francais a Jellyfin — en
     #: dur, dans la signature du client — et laissait tout le reste en anglais :
     #: une incoherence que personne n'avait choisie.
     language: str = "en"
+
+    #: Langue de PLUGARR lui-meme : assistant, ligne de commande, rapport,
+    #: page d'acces. Distincte de `language` juste au-dessus, qui vise les
+    #: services : on peut vouloir l'outil en anglais et sa mediatheque en
+    #: francais. Conservee ici pour que `serve`, `doctor` et la page
+    #: d'administration retrouvent le choix fait a l'installation, plutot que
+    #: de redemander ou de retomber sur le systeme d'une autre machine.
+    ui_language: str = "fr"
 
     #: Identifiant commun a tous les services. « plugarr » n'est qu'un defaut :
     #: demande a l'usage, tout le monde ne veut pas ce nom-la.

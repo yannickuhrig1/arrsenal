@@ -18,6 +18,9 @@ jobs:
       - run: ruff check src tests scripts
       - run: pytest -q
 
+      - name: Aucune phrase n'echappe au catalogue de traduction
+        run: python scripts/audit_traductions.py
+
       - name: Les captures du README sont a jour
         run: |
           python scripts/screenshots.py

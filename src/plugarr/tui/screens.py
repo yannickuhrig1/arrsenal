@@ -14,24 +14,18 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
-    Button,
-    Checkbox,
-    DataTable,
     Footer,
-    Input,
-    Label,
     ProgressBar,
-    RadioButton,
     RadioSet,
     RichLog,
     Rule,
     Select,
     SelectionList,
-    Static,
 )
 
-from .. import catalog, journal, langues, orchestrator, vpnservers
+from .. import catalog, i18n, journal, langues, orchestrator, vpnservers
 from ..clients import recyclarr as recyclarr_cfg
+from ..i18n import t
 from ..layout import (
     PROFILE_DEFAULTS,
     default_profile,
@@ -42,6 +36,19 @@ from ..layout import (
 from ..models import VPN_PROVIDERS, Category, PlatformProfile, VpnConfig
 from ..orchestrator import InstallAborted, Progress
 from ..wiring import StepResult
+
+# Memes widgets que ceux de Textual, mais ils font passer leur libelle par le
+# catalogue de traduction. Les ecrans ecrivent leurs phrases en francais, en
+# clair, et n'ont rien a envelopper.
+from .widgets import (
+    Button,
+    Checkbox,
+    DataTable,
+    Input,
+    Label,
+    RadioButton,
+    Static,
+)
 
 CATEGORY_TITLES = {
     Category.ARR: "Mediatheque",
@@ -74,11 +81,22 @@ class WizardScreen(Screen):
 
     BINDINGS = [("escape", "app.pop_screen", "Retour"), ("ctrl+q", "app.quit", "Quitter")]
 
-    #: Sous-titre affiche dans le bandeau.
+    #: Sous-titre affiche dans le bandeau. C'est une CLE de traduction :
+    #: le libelle francais sert d'index, et `compose` le traduit.
     SUB_TITLE = ""
 
+    def __init__(self, *args: object, **kw: object) -> None:
+        # Les raccourcis du pied de page sont declares au niveau de la
+        # classe, donc lus a l'import, avant que la langue soit connue. On
+        # les traduit sur l'INSTANCE, que Textual consulte en priorite.
+        self.BINDINGS = [
+            (touche, action, t(libelle))
+            for touche, action, libelle in type(self).BINDINGS
+        ]
+        super().__init__(*args, **kw)
+
     def compose(self) -> ComposeResult:
-        yield WizardHeader(self.SUB_TITLE)
+        yield WizardHeader(t(self.SUB_TITLE))
         yield from self.content()
         yield Footer()
 
@@ -95,11 +113,30 @@ class WelcomeScreen(WizardScreen):
     def content(self) -> ComposeResult:
         with Vertical(id="welcome"):
             yield Static(
-                "Cet assistant va deployer les services que vous choisissez, puis "
-                "[b]les cabler entre eux[/b] : cles API echangees, indexeurs "
-                "synchronises, dossiers racine crees, bibliotheques scannees.\n\n"
-                "Rien n'est ecrit avant l'ecran de recapitulatif.",
+                t(
+                    "Cet assistant va deployer les services que vous choisissez, "
+                    "puis [b]les cabler entre eux[/b] : cles API echangees, "
+                    "indexeurs synchronises, dossiers racine crees, "
+                    "bibliotheques scannees.\n\n"
+                    "Rien n'est ecrit avant l'ecran de recapitulatif."
+                ),
                 id="pitch",
+            )
+            yield Rule()
+            # La langue de PlugArr se choisit AVANT tout le reste : c'est la
+            # premiere chose que quelqu'un qui ne lit pas le francais doit
+            # pouvoir faire. L'enterrer dans un ecran de reglages trois etapes
+            # plus loin reviendrait a la reserver a ceux qui lisent deja.
+            yield Label("Langue de PlugArr", classes="group-title")
+            # `Select` attend (libelle, valeur), dans cet ordre. Passer la
+            # paire telle qu'elle est declaree faisait du NOM la valeur, et le
+            # code « fr » devenait alors illegal : l'assistant mourait au
+            # montage de l'ecran d'accueil.
+            yield Select(
+                [(nom, code) for code, nom in i18n.DISPONIBLES],
+                value=i18n.langue(),
+                allow_blank=False,
+                id="ui-langue",
             )
             yield Rule()
             yield Static(id="docker-status")
@@ -109,6 +146,21 @@ class WelcomeScreen(WizardScreen):
                 Button("Quitter", id="quit"),
                 classes="actions",
             )
+
+    @on(Select.Changed, "#ui-langue")
+    def _changer_langue(self, event: Select.Changed) -> None:
+        """Rebascule l'assistant sans le redemarrer.
+
+        Textual ne re-compose pas un ecran deja monte : on le remplace par
+        un neuf. C'est aussi ce qui fait suivre le bandeau et le pied de
+        page, construits au montage.
+        """
+        if not isinstance(event.value, str) or event.value == i18n.langue():
+            return
+        i18n.utiliser(event.value)
+        self.app.ui_language = event.value
+        self.app.pop_screen()
+        self.app.push_screen(WelcomeScreen())
 
     def on_mount(self) -> None:
         self.check_docker()
@@ -122,12 +174,14 @@ class WelcomeScreen(WizardScreen):
         except Exception as exc:  # noqa: BLE001
             journal.LOGGER.exception("diagnostic docker")
             self.app.call_from_thread(
-                self._render_docker, f"[red]Diagnostic impossible : {exc}[/red]", False
+                self._render_docker,
+                f"[red]{t('Diagnostic impossible')} : {exc}[/red]",
+                False,
             )
             return
         lines, ok = [], True
         for check in checks:
-            mark = "[green]OK[/green]" if check.ok else "[red]ECHEC[/red]"
+            mark = "[green]OK[/green]" if check.ok else f"[red]{t('ECHEC')}[/red]"
             lines.append(f"{mark}  {check.name} : {check.detail}")
             ok = ok and check.ok
         self.app.call_from_thread(self._render_docker, "\n".join(lines), ok)
@@ -227,8 +281,10 @@ class RestaurationScreen(WizardScreen):
         ]
         if manifeste.get("a_chaud"):
             lignes.append(
-                "[yellow]Prise A CHAUD, conteneurs en marche : ses bases peuvent "
-                "etre corrompues.[/yellow]"
+                t(
+                    "[yellow]Prise A CHAUD, conteneurs en marche : ses bases "
+                    "peuvent etre corrompues.[/yellow]"
+                )
             )
         etat.update("\n".join(lignes))
         self.query_one("#poser", Button).disabled = False
@@ -255,9 +311,12 @@ class RestaurationScreen(WizardScreen):
             return
         self.app.call_from_thread(
             etat.update,
-            "[green]Restauration terminee.[/green]\n\n"
-            f"{len(manifeste['services'])} services reposes. Demarrez la pile, "
-            "puis [b]plugarr wire[/b] pour verifier que tout repond.",
+            t(
+                "[green]Restauration terminee.[/green]\n\n"
+                "{nombre} services reposes. Demarrez la pile, puis "
+                "[b]plugarr wire[/b] pour verifier que tout repond.",
+                nombre=len(manifeste["services"]),
+            ),
         )
 
     @on(Button.Pressed, "#retour")
@@ -324,10 +383,17 @@ class ServicesScreen(WizardScreen):
         resolved = catalog.resolve_dependencies(chosen)
         added = [s for s in resolved if s not in chosen]
         cfg = orchestrator.build_config(services=resolved)
-        text = f"[b]{len(resolved)} services[/b] - [b]{orchestrator.planned_links(cfg)} liens[/b] seront cables"
+        text = t(
+            "[b]{services} services[/b] - [b]{liens} liens[/b] seront cables",
+            services=len(resolved),
+            liens=orchestrator.planned_links(cfg),
+        )
         if added:
             names = ", ".join(catalog.get(s).display_name for s in added)
-            text += f"\n[cyan]Ajoute automatiquement (prerequis) : {names}[/cyan]"
+            text += t(
+                "\n[cyan]Ajoute automatiquement (prerequis) : {noms}[/cyan]",
+                noms=names,
+            )
         summary.update(text)
         self.query_one("#next", Button).disabled = False
 
@@ -383,14 +449,20 @@ class PathsScreen(WizardScreen):
             )
             yield Input(value="plugarr", id="username")
 
+            # La langue des SERVICES, pas celle de PlugArr : elle decide de ce
+            # que Sonarr, Jellyfin et les autres afficheront dans leur propre
+            # interface. Elle part de celle de PlugArr, qui est le cas courant,
+            # mais rien n'oblige a les garder ensemble : on peut vouloir
+            # l'assistant en anglais et sa mediatheque en francais.
             yield Label(
-                "Langue des interfaces "
-                "[dim](appliquee a chaque service qui sait la recevoir)[/dim]",
+                "Langue des services installes "
+                "[dim](Sonarr, Jellyfin... ; celle de PlugArr se choisit "
+                "sur l'ecran d'accueil)[/dim]",
                 classes="group-title",
             )
             yield Select(
                 [(lang.nom, lang.code) for lang in langues.PROPOSEES],
-                value="fr",
+                value=self._langue_par_defaut(),
                 allow_blank=False,
                 id="langue",
             )
@@ -421,6 +493,17 @@ class PathsScreen(WizardScreen):
             classes="actions",
         )
 
+    @staticmethod
+    def _langue_par_defaut() -> str:
+        """Celle de PlugArr, si les services savent la recevoir.
+
+        `langues.PROPOSEES` est volontairement plus courte que ce que les *arr
+        acceptent : si la langue de PlugArr n'y figure pas, la liste refuserait
+        la valeur et l'ecran ne se monterait pas.
+        """
+        courante = i18n.langue()
+        return courante if any(lang.code == courante for lang in langues.PROPOSEES) else "en"
+
     def on_mount(self) -> None:
         self._update_note(default_profile())
 
@@ -444,12 +527,17 @@ class PathsScreen(WizardScreen):
         note = self.query_one("#platform-note", Static)
         entete = f"[dim]PUID/PGID[/dim] [b]{uid}:{gid}[/b]"
         if certain:
-            note.update(f"{entete} [dim]- {source}[/dim]\n{self.IDS_EXPLICATION}")
+            note.update(f"{entete} [dim]- {t(source)}[/dim]\n{t(self.IDS_EXPLICATION)}")
         else:
             note.update(
-                f"{entete} [yellow]- non detectables ici, valeur de repli.[/yellow]\n"
-                f"{self.IDS_EXPLICATION}\n"
-                f"[dim]Sur un NAS, lancez `id` et corrigez ces valeurs.[/dim]"
+                entete
+                + t(
+                    " [yellow]- non detectables ici, valeur de repli.[/yellow]\n"
+                )
+                + t(self.IDS_EXPLICATION)
+                + t(
+                    "\n[dim]Sur un NAS, lancez `id` et corrigez ces valeurs.[/dim]"
+                )
             )
 
     def platform(self) -> PlatformProfile:
@@ -472,12 +560,14 @@ class PathsScreen(WizardScreen):
         if avertissement:
             lignes.append(f"[yellow]{avertissement}[/yellow]")
         else:
-            lignes.append(f"[dim]Dossier vise : {Path(data_root).resolve()}[/dim]")
+            lignes.append(
+                t("[dim]Dossier vise : {chemin}[/dim]", chemin=Path(data_root).resolve())
+            )
 
         try:
             Path(data_root).mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            lignes.append(f"[red]Impossible de le creer : {exc}[/red]")
+            lignes.append(t("[red]Impossible de le creer : {erreur}[/red]", erreur=exc))
             target.update("\n".join(lignes))
             return
 
@@ -585,7 +675,7 @@ class TemplatesScreen(WizardScreen):
             names, problem = recyclarr_cfg.available_templates(config_dir)
         except Exception as exc:  # noqa: BLE001
             journal.LOGGER.exception("liste des templates Recyclarr")
-            names, problem = {}, f"liste indisponible : {exc}"
+            names, problem = {}, t("liste indisponible : {erreur}", erreur=exc)
         self.app.call_from_thread(self._loaded, names, problem)
 
     def _loaded(self, names: dict[str, list[str]], problem: str | None) -> None:
@@ -596,7 +686,10 @@ class TemplatesScreen(WizardScreen):
             # d'empecher quelqu'un qui sait ce qu'il veut.
             status.update(
                 f"[yellow]{problem}[/yellow]\n"
-                "[dim]Les noms ne seront pas verifies ici. Les defauts restent valables.[/dim]"
+                + t(
+                    "[dim]Les noms ne seront pas verifies ici. Les defauts "
+                    "restent valables.[/dim]"
+                )
             )
             return
         status.update("")
@@ -608,8 +701,11 @@ class TemplatesScreen(WizardScreen):
             if defaut in available:
                 liste.value = defaut
             self.query_one(f"#tpl-choices-{sid}", Static).update(
-                f"[dim]{len(available)} profils proposes par les TRaSH Guides. "
-                f"Cliquez pour derouler la liste.[/dim]"
+                t(
+                    "[dim]{nombre} profils proposes par les TRaSH Guides. "
+                    "Cliquez pour derouler la liste.[/dim]",
+                    nombre=len(available),
+                )
             )
         self._validate()
 
@@ -638,8 +734,11 @@ class TemplatesScreen(WizardScreen):
         button = self.query_one("#next", Button)
         if unknown:
             status.update(
-                f"[red]Template inconnu — {', '.join(unknown)}[/red]\n"
-                "[dim]Recyclarr refuserait de generer la configuration.[/dim]"
+                t(
+                    "[red]Template inconnu — {noms}[/red]\n"
+                    "[dim]Recyclarr refuserait de generer la configuration.[/dim]",
+                    noms=", ".join(unknown),
+                )
             )
             button.disabled = True
             return False
@@ -767,10 +866,16 @@ class VpnScreen(WizardScreen):
         if choix:
             liste.add_options([(lieu, lieu) for lieu in choix])
             liste.display = True
-            titre.update(f"{vpnservers.label(fournisseur)} [dim](facultatif)[/dim]")
+            titre.update(
+                f"{vpnservers.label(fournisseur)} " + t("[dim](facultatif)[/dim]")
+            )
             note.update(
-                f"[dim]{len(choix)} choix proposes par Gluetun {vpnservers.gluetun_version()}. "
-                f"Sans selection, le VPN choisit pour vous.[/dim]"
+                t(
+                    "[dim]{nombre} choix proposes par Gluetun {version}. "
+                    "Sans selection, le VPN choisit pour vous.[/dim]",
+                    nombre=len(choix),
+                    version=vpnservers.gluetun_version(),
+                )
             )
         else:
             # `custom` n'a par construction aucune liste : l'utilisateur fournit
@@ -828,9 +933,12 @@ class VpnScreen(WizardScreen):
         manques = self.config().missing()
         if manques:
             status.update(
-                f"[yellow]Il manque {', '.join(manques)}.[/yellow]\n"
-                "[dim]Sans cela Gluetun refuse de demarrer, et le client de "
-                "telechargement reste injoignable.[/dim]"
+                t(
+                    "[yellow]Il manque {champs}.[/yellow]\n"
+                    "[dim]Sans cela Gluetun refuse de demarrer, et le client de "
+                    "telechargement reste injoignable.[/dim]",
+                    champs=", ".join(manques),
+                )
             )
             bouton.disabled = True
             return False
@@ -892,13 +1000,16 @@ class SummaryScreen(WizardScreen):
             table.add_row(
                 spec.display_name,
                 spec.image,
-                inst.url(cfg.host) if inst.has_web_ui else "tache de fond",
+                inst.url(cfg.host) if inst.has_web_ui else t("tache de fond"),
             )
 
         lignes = [
-            f"[b]Configurations[/b]  {cfg.config_root}",
-            f"[b]Donnees[/b]        {cfg.data_root}  -> /data dans tous les conteneurs",
-            f"[b]PUID:PGID[/b]      {cfg.puid}:{cfg.pgid} [dim]({cfg.ids_source})[/dim]",
+            t("[b]Configurations[/b]  {chemin}", chemin=cfg.config_root),
+            t(
+                "[b]Donnees[/b]        {chemin}  -> /data dans tous les conteneurs",
+                chemin=cfg.data_root,
+            ),
+            f"[b]PUID:PGID[/b]      {cfg.puid}:{cfg.pgid} [dim]({t(cfg.ids_source)})[/dim]",
             f"[b]UMASK / TZ[/b]     {cfg.umask}   {cfg.timezone}",
         ]
         # Un VPN configure ajoute un conteneur que le tableau ci-dessus ne montre
@@ -907,11 +1018,17 @@ class SummaryScreen(WizardScreen):
         # disparition de l'avertissement serait le seul indice qu'il a ete pris.
         if cfg.vpn_enabled:
             lignes.append(
-                f"[b]VPN[/b]            gluetun - {cfg.vpn.provider} "
-                f"[dim]({cfg.vpn.vpn_type}) ; le client de telechargement ne "
-                f"demarrera pas sans le tunnel[/dim]"
+                t(
+                    "[b]VPN[/b]            gluetun - {fournisseur} "
+                    "[dim]({protocole}) ; le client de telechargement ne "
+                    "demarrera pas sans le tunnel[/dim]",
+                    fournisseur=cfg.vpn.provider,
+                    protocole=cfg.vpn.vpn_type,
+                )
             )
-        lignes.append(f"[b]Liens a cabler[/b] {orchestrator.planned_links(cfg)}")
+        lignes.append(
+            t("[b]Liens a cabler[/b] {nombre}", nombre=orchestrator.planned_links(cfg))
+        )
         self.query_one("#summary-paths", Static).update("\n".join(lignes))
 
         vpn_warning = (
@@ -928,10 +1045,14 @@ class SummaryScreen(WizardScreen):
             warnings.append(vpn_warning)
         if not cfg.ids_certain:
             warnings.append(
-                f"[yellow]PUID/PGID non detectables ici : repli sur "
-                f"{cfg.puid}:{cfg.pgid}.[/yellow]\n"
-                f"[dim]Des identifiants faux font ecrire toute la stack avec de "
-                f"mauvaises permissions. Sur un NAS, lancez `id`.[/dim]"
+                t(
+                    "[yellow]PUID/PGID non detectables ici : repli sur "
+                    "{uid}:{gid}.[/yellow]\n"
+                    "[dim]Des identifiants faux font ecrire toute la stack avec "
+                    "de mauvaises permissions. Sur un NAS, lancez `id`.[/dim]",
+                    uid=cfg.puid,
+                    gid=cfg.pgid,
+                )
             )
         self.query_one("#summary-warnings", Static).update("\n\n".join(warnings))
         self._proposer_reset(cfg)
@@ -954,11 +1075,15 @@ class SummaryScreen(WizardScreen):
         chemins = "\n".join(f"  {cfg.config_path(sid)}" for sid in concernes)
         bandeau = self.query_one("#config-existante", Static)
         bandeau.update(
-            f"[yellow]Une configuration existe deja pour {', '.join(concernes)}.[/yellow]\n"
-            f"[dim]Leurs mots de passe n'y sont stockes que haches : plugarr ne peut "
-            f"pas les reprendre, et ceux qu'il va vous annoncer seront refuses.[/dim]\n"
-            f"[dim]{chemins}[/dim]\n"
-            f"[dim]Vos medias ne sont jamais touches.[/dim]"
+            t(
+                "[yellow]Une configuration existe deja pour {services}.[/yellow]\n"
+                "[dim]Leurs mots de passe n'y sont stockes que haches : plugarr "
+                "ne peut pas les reprendre, et ceux qu'il va vous annoncer seront "
+                "refuses.[/dim]\n",
+                services=", ".join(concernes),
+            )
+            + f"[dim]{chemins}[/dim]\n"
+            + t("[dim]Vos medias ne sont jamais touches.[/dim]")
         )
         bandeau.remove_class("hidden")
         self.query_one("#config-choix", RadioSet).remove_class("hidden")
@@ -1029,7 +1154,9 @@ class InstallScreen(WizardScreen):
         app.stack_config = cfg
         chemin = journal.start(Path(app.project_dir), "assistant : installation")
         journal.config(cfg)
-        app.call_from_thread(self._log, f"[dim]Journal detaille : {chemin}[/dim]")
+        app.call_from_thread(
+            self._log, t("[dim]Journal detaille : {chemin}[/dim]", chemin=chemin)
+        )
         app.call_from_thread(self._set_total, orchestrator.expected_events(cfg))
 
         def on_progress(progress: Progress) -> None:
@@ -1063,7 +1190,11 @@ class InstallScreen(WizardScreen):
             journal.LOGGER.exception("installation")
             app.call_from_thread(self._log, f"[red]{type(exc).__name__} : {exc}[/red]")
             app.call_from_thread(
-                self._log, f"[dim]Detail complet dans {app.project_dir / journal.FILENAME}[/dim]"
+                self._log,
+                t(
+                    "[dim]Detail complet dans {chemin}[/dim]",
+                    chemin=app.project_dir / journal.FILENAME,
+                ),
             )
             app.call_from_thread(self._phase, "[red]Installation interrompue[/red]")
             app.call_from_thread(self._enable_done, [])
@@ -1079,9 +1210,17 @@ class InstallScreen(WizardScreen):
         self._complete()
         ok = sum(1 for r in results if r.ok)
         self._phase(
-            f"[green]Termine : {ok}/{len(results)} liens etablis[/green]"
+            t(
+                "[green]Termine : {faits}/{total} liens etablis[/green]",
+                faits=ok,
+                total=len(results),
+            )
             if results and ok == len(results)
-            else f"[yellow]Termine : {ok}/{len(results)} liens etablis[/yellow]"
+            else t(
+                "[yellow]Termine : {faits}/{total} liens etablis[/yellow]",
+                faits=ok,
+                total=len(results),
+            )
         )
         self.query_one("#done", Button).disabled = False
 
@@ -1128,10 +1267,10 @@ class ReportScreen(WizardScreen):
             )
         failed = [r for r in self.app.results if not r.ok]
         if failed:
-            body = "[red]Liens en echec :[/red]\n" + "\n".join(
+            body = t("[red]Liens en echec :[/red]\n") + "\n".join(
                 f"  - {r.name} : {r.detail.splitlines()[0]}" for r in failed
             )
-            body += "\n\n[dim]Diagnostic : plugarr doctor[/dim]"
+            body += t("\n\n[dim]Diagnostic : plugarr doctor[/dim]")
         else:
             # `stack_config` est pose par l'installation. S'il manque, le
             # rapport reste affichable : on retombe sur la formule generale.
@@ -1139,7 +1278,7 @@ class ReportScreen(WizardScreen):
             lignes = (
                 orchestrator.prochaine_etape(cfg)
                 if cfg is not None
-                else ["Prochaine etape : ouvrez chaque service depuis la page d'acces."]
+                else [t("Prochaine etape : ouvrez chaque service depuis la page d'acces.")]
             )
             # La derniere ligne est un aparte : elle passe en retrait.
             body = "[b]" + lignes[0] + "[/b]"
@@ -1147,9 +1286,10 @@ class ReportScreen(WizardScreen):
                 body += "\n" + "\n".join(lignes[1:-1])
             if len(lignes) > 1:
                 body += "\n\n[dim]" + lignes[-1] + "[/dim]"
-        body += (
-            f"\n\n[dim]Ces identifiants sont aussi dans "
-            f"{self.app.project_dir / '.env'} (chmod 600).[/dim]"
+        body += t(
+            "\n\n[dim]Ces identifiants sont aussi dans {chemin} "
+            "(chmod 600).[/dim]",
+            chemin=self.app.project_dir / ".env",
         )
         self.query_one("#report-next", Static).update(body)
         self._ouvrir_automatiquement()
@@ -1171,7 +1311,7 @@ class ReportScreen(WizardScreen):
             return
         chemin = Path(self.app.project_dir) / dashboard.FILENAME
         if chemin.exists() and dashboard.open_in_browser(chemin):
-            self.query_one("#open-page", Button).label = "Rouvrir la page d'acces"
+            self.query_one("#open-page", Button).label = t("Rouvrir la page d'acces")
 
     @on(Button.Pressed, "#open-page")
     def open_page(self) -> None:
@@ -1180,17 +1320,21 @@ class ReportScreen(WizardScreen):
         path = self.app.project_dir / dashboard.FILENAME
         target = self.query_one("#report-next", Static)
         if not path.exists():
-            target.update(f"[yellow]Page introuvable : {path}[/yellow]")
+            target.update(t("[yellow]Page introuvable : {chemin}[/yellow]", chemin=path))
             return
         if dashboard.open_in_browser(path):
             target.update(
-                f"[green]Page ouverte dans votre navigateur.[/green]\n[dim]{path}[/dim]"
+                t("[green]Page ouverte dans votre navigateur.[/green]\n")
+                + f"[dim]{path}[/dim]"
             )
         else:
             # Cas normal sur un NAS sans environnement graphique.
             target.update(
-                f"[yellow]Aucun navigateur disponible ici.[/yellow]\n"
-                f"[dim]Ouvrez ce fichier depuis un autre appareil : {path}[/dim]"
+                t(
+                    "[yellow]Aucun navigateur disponible ici.[/yellow]\n"
+                    "[dim]Ouvrez ce fichier depuis un autre appareil : {chemin}[/dim]",
+                    chemin=path,
+                )
             )
 
     @on(Button.Pressed, "#close")
