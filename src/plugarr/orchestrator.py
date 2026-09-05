@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import catalog, compose, dashboard, seed
 from .clients.arr import ArrClient
+from .i18n import t
 from .layout import CONTAINER_PATHS, PROFILE_DEFAULTS, create_tree, resolve_ids
 from .models import PlatformProfile, ServiceInstance, StackConfig
 from .runner import (
@@ -444,28 +445,30 @@ def prochaine_etape(cfg: StackConfig) -> list[str]:
     """
     arrs = [sid for sid in ("sonarr", "radarr", "lidarr") if cfg.enabled(sid)]
     if cfg.enabled("prowlarr"):
-        lignes = ["Prochaine etape : ajoutez vos indexeurs dans Prowlarr."]
+        lignes = [t("Prochaine etape : ajoutez vos indexeurs dans Prowlarr.")]
         if arrs:
             noms = ", ".join(catalog.get(a).display_name for a in arrs)
-            lignes.append(f"Ils descendront automatiquement vers {noms}.")
-        lignes.append("plugarr ne fournit aucun indexeur : ce choix vous appartient.")
+            lignes.append(t("Ils descendront automatiquement vers {noms}.", noms=noms))
+        lignes.append(
+            t("plugarr ne fournit aucun indexeur : ce choix vous appartient.")
+        )
         return lignes
     if arrs:
         # Sans Prowlarr, chaque application reste a alimenter une par une.
         noms = ", ".join(catalog.get(a).display_name for a in arrs)
         return [
-            f"Prochaine etape : ajoutez vos indexeurs dans {noms}.",
-            "Prowlarr les aurait distribues a votre place : il n'est pas installe.",
-            "plugarr ne fournit aucun indexeur : ce choix vous appartient.",
+            t("Prochaine etape : ajoutez vos indexeurs dans {noms}.", noms=noms),
+            t("Prowlarr les aurait distribues a votre place : il n'est pas installe."),
+            t("plugarr ne fournit aucun indexeur : ce choix vous appartient."),
         ]
     media = [sid for sid in ("jellyfin", "silo") if cfg.enabled(sid)]
     if media:
         noms = ", ".join(catalog.get(m).display_name for m in media)
         return [
-            f"Prochaine etape : deposez vos medias sous {cfg.data_root}.",
-            f"{noms} les trouvera a la prochaine analyse.",
+            t("Prochaine etape : deposez vos medias sous {racine}.", racine=cfg.data_root),
+            t("{noms} les trouvera a la prochaine analyse.", noms=noms),
         ]
-    return ["Prochaine etape : ouvrez chaque service depuis la page d'acces."]
+    return [t("Prochaine etape : ouvrez chaque service depuis la page d'acces.")]
 
 
 def blocking_failures(checks: list[Check]) -> list[Check]:

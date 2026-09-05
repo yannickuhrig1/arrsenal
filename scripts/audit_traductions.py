@@ -91,6 +91,18 @@ def phrases() -> dict[str, list[str]]:
                             if isinstance(valeur, ast.Constant) and isinstance(valeur.value, str):
                                 retenir(fichier, valeur.value)
 
+        # `resolve_ids` rend trois origines de plus, construites dans son corps
+        # plutot que declarees : elles finissent affichees sous le profil de
+        # plateforme, au meme titre que les autres.
+        if fichier.name == "layout.py":
+            for noeud in ast.walk(arbre):
+                if isinstance(noeud, ast.Return) and isinstance(noeud.value, ast.Tuple):
+                    for element in noeud.value.elts:
+                        if isinstance(element, ast.Constant) and isinstance(
+                            element.value, str
+                        ):
+                            retenir(fichier, element.value)
+
         # Phrases portees par des mots-cles plutot que par un appel de widget :
         # les notes du catalogue, affichees sous chaque service a la selection,
         # et l'origine des PUID/PGID, affichee sous le profil de plateforme.

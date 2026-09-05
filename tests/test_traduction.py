@@ -110,6 +110,7 @@ def test_aucune_phrase_n_echappe_au_catalogue():
         capture_output=True,
         text=True,
         cwd=RACINE,
+        check=False,
     )
 
     assert resultat.returncode == 0, resultat.stdout + resultat.stderr
@@ -153,9 +154,16 @@ def test_le_catalogue_ne_traduit_pas_par_l_identite():
     identiques = {fr for fr, en in EN.items() if fr == en}
 
     assert identiques <= {
+        # Mots identiques dans les deux langues. La liste est volontairement
+        # close : elle doit etre allongee sciemment, pas par accident.
         "Service",
+        "Services",
         "Image",
         "URL",
+        "Administration",
+        "Preflight",
+        "Detail",
+        "diagnostic",
         "[green]Configuration complete.[/green]",
     }, identiques
 

@@ -24,7 +24,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import __version__, catalog
+from . import __version__, catalog, i18n
+from .i18n import t
 from .layout import CONTAINER_PATHS
 from .models import Category, StackConfig
 
@@ -61,13 +62,15 @@ def resolve_host(cfg: StackConfig) -> tuple[str, str | None]:
         return cfg.host, None
     lan = primary_lan_ip()
     if lan:
-        return lan, (
-            f"Les liens utilisent {lan}, l'adresse de cette machine sur le reseau local, "
-            f"et non localhost : la page reste donc valable depuis un autre appareil."
+        return lan, t(
+            "Les liens utilisent {adresse}, l'adresse de cette machine sur le "
+            "reseau local, et non localhost : la page reste donc valable depuis "
+            "un autre appareil.",
+            adresse=lan,
         )
-    return cfg.host, (
-        "Les liens pointent vers localhost. Depuis un autre appareil, remplacez-le par "
-        "l'adresse de cette machine sur le reseau."
+    return cfg.host, t(
+        "Les liens pointent vers localhost. Depuis un autre appareil, "
+        "remplacez-le par l'adresse de cette machine sur le reseau."
     )
 
 
@@ -76,9 +79,11 @@ def _secret(value: str | None, label: str) -> str:
         return '<span class="none">—</span>'
     safe = html.escape(value)
     return (
-        f'<span class="secret" data-value="{safe}" title="Cliquer pour afficher {label}">'
+        f'<span class="secret" data-value="{safe}" '
+        f'title="{t("Cliquer pour afficher {quoi}", quoi=label)}">'
         f"<span class=\"dots\">••••••••</span></span>"
-        f'<button class="copy" data-value="{safe}" title="Copier">copier</button>'
+        f'<button class="copy" data-value="{safe}" title="{t("Copier")}">'
+        f'{t("copier")}</button>'
     )
 
 
@@ -86,7 +91,10 @@ def _secret(value: str | None, label: str) -> str:
 #: renouvellement n'a pas ete verifie contre le service n'a pas de bouton : un
 #: bouton qui casse vaut moins que pas de bouton.
 _ROTATIONS = {
-    "password": (catalog.ROTATABLE_FAMILIES, "Tirer un nouveau mot de passe et recabler"),
+    "password": (
+        catalog.ROTATABLE_FAMILIES,
+        "Tirer un nouveau mot de passe et recabler",
+    ),
     # Seuls les *arr ont une cle API que plugarr choisit. Celle de Jellyfin est
     # emise par Jellyfin lui-meme, lors de son assistant de demarrage.
     "api_key": (("arr",), "Tirer une nouvelle cle API et recabler"),
@@ -131,19 +139,19 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
         rows = ""
         if inst.username:
             rows += (
-                f'<div class="row"><span class="k">Identifiant</span>'
+                f'<div class="row"><span class="k">{t("Identifiant")}</span>'
                 f'<span class="v mono">{html.escape(inst.username)}</span></div>'
             )
         if inst.password:
             rows += (
-                f'<div class="row"><span class="k">Mot de passe</span>'
+                f'<div class="row"><span class="k">{t("Mot de passe")}</span>'
                 f'<span class="v" data-secret="{spec.id}:password">'
                 f'{_secret(inst.password, "le mot de passe")}'
                 f'{_bouton_rotation(spec, "password", live)}</span></div>'
             )
         if inst.api_key:
             rows += (
-                f'<div class="row"><span class="k">Cle API</span>'
+                f'<div class="row"><span class="k">{t("Cle API")}</span>'
                 f'<span class="v" data-secret="{spec.id}:api_key">'
                 f'{_secret(inst.api_key, "la cle API")}'
                 f'{_bouton_rotation(spec, "api_key", live)}</span></div>'
@@ -165,12 +173,13 @@ def _cards(cfg: StackConfig, host: str, live: bool = False) -> str:
                 '<div class="title headless">'
                 f'<span class="badge">{html.escape(spec.display_name[0])}</span>'
                 f"<span><strong>{html.escape(spec.display_name)}</strong>"
-                '<span class="url">tache de fond, sans interface</span></span></div>'
+                f'<span class="url">{t("tache de fond, sans interface")}</span>'
+                "</span></div>"
             )
         blocks.append(
             f"""      <article class="card" style="--accent:{accent}">
         {title}
-        <p class="note">{html.escape(spec.notes)}</p>
+        <p class="note">{html.escape(t(spec.notes))}</p>
 {controls}        <div class="creds">{rows}</div>
       </article>"""
         )
@@ -195,26 +204,35 @@ def _ajouts(cfg: StackConfig) -> str:
     for sid in absents:
         spec = catalog.get(sid)
         prerequis = [d for d in spec.requires if not cfg.enabled(d)]
-        note = html.escape(spec.notes)
+        note = html.escape(t(spec.notes))
         if prerequis:
             noms = ", ".join(catalog.get(d).display_name for d in prerequis)
-            note += f' <span class="dim">— tirera aussi {html.escape(noms)}</span>'
+            note += (
+                ' <span class="dim">'
+                + html.escape(t("— tirera aussi {noms}", noms=noms))
+                + "</span>"
+            )
         lignes += (
             f'      <article class="card add" data-add="{spec.id}">\n'
             f'        <div class="title headless"><span class="badge">'
             f"{html.escape(spec.display_name[0])}</span>"
             f"<span><strong>{html.escape(spec.display_name)}</strong>"
-            f'<span class="url">pas encore installe</span></span></div>\n'
+            f'<span class="url">{t("pas encore installe")}</span></span></div>\n'
             f'        <p class="note">{note}</p>\n'
             f'        <div class="state"><span class="actions">'
-            f'<button class="install" data-service="{spec.id}">installer et cabler</button>'
+            f'<button class="install" data-service="{spec.id}">'
+            f'{t("installer et cabler")}</button>'
             f"</span></div>\n      </article>\n"
         )
     return (
-        "\n  <h2>Ajouter un service</h2>\n"
-        '  <p class="note">Le service est installe puis <b>cable dans les deux sens</b> : '
-        "il apprend a parler aux autres, et les autres apprennent a lui parler. Rien "
-        "n'est arrete, et aucun mot de passe existant n'est touche.</p>\n"
+        "\n  <h2>" + t("Ajouter un service") + "</h2>\n"
+        + '  <p class="note">'
+        + t(
+            "Le service est installe puis <b>cable dans les deux sens</b> : il "
+            "apprend a parler aux autres, et les autres apprennent a lui parler. "
+            "Rien n'est arrete, et aucun mot de passe existant n'est touche."
+        )
+        + "</p>\n"
         f'  <div class="grid">\n{lignes}  </div>\n'
     )
 
@@ -225,13 +243,19 @@ def _has_download_client(cfg: StackConfig) -> bool:
 
 def _paths(cfg: StackConfig) -> str:
     entries = [
-        ("Films", f"{cfg.data_root}/media/movies", CONTAINER_PATHS["media_movies"]),
-        ("Series", f"{cfg.data_root}/media/tv", CONTAINER_PATHS["media_tv"]),
-        ("Telechargements", f"{cfg.data_root}/torrents", CONTAINER_PATHS["torrents_root"]),
-        ("Configurations", cfg.config_root, "—"),
+        (t("Films"), f"{cfg.data_root}/media/movies", CONTAINER_PATHS["media_movies"]),
+        (t("Series"), f"{cfg.data_root}/media/tv", CONTAINER_PATHS["media_tv"]),
+        (
+            t("Telechargements"),
+            f"{cfg.data_root}/torrents",
+            CONTAINER_PATHS["torrents_root"],
+        ),
+        (t("Configurations"), cfg.config_root, "—"),
     ]
     if cfg.enabled("lidarr"):
-        entries.insert(2, ("Musique", f"{cfg.data_root}/media/music", "/data/media/music"))
+        entries.insert(
+            2, (t("Musique"), f"{cfg.data_root}/media/music", "/data/media/music")
+        )
 
     rows = ""
     for label, host_path, container_path in entries:
@@ -239,9 +263,9 @@ def _paths(cfg: StackConfig) -> str:
         link = html.escape("file:///" + host_path.lstrip("/").replace("\\", "/"))
         rows += f"""        <tr>
           <td>{html.escape(label)}</td>
-          <td class="mono">{safe} <button class="copy" data-value="{safe}">copier</button></td>
+          <td class="mono">{safe} <button class="copy" data-value="{safe}">{t("copier")}</button></td>
           <td class="mono dim">{html.escape(container_path)}</td>
-          <td><a href="{link}">ouvrir</a></td>
+          <td><a href="{link}">{t("ouvrir")}</a></td>
         </tr>"""
     return rows
 
@@ -255,35 +279,52 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
     de repondre aux appels.
     """
     host, host_note = resolve_host(cfg)
-    generated = datetime.now().astimezone().strftime("%d/%m/%Y a %H:%M")
+    # Le format de date suit la langue : jour/mois pour le francais, mois/jour
+    # pour l'anglais. Afficher « 05/09 » a un anglophone se lit « 9 mai ».
+    generated = datetime.now().astimezone().strftime(t("%d/%m/%Y a %H:%M"))
     count = sum(1 for sid in catalog.STARTUP_ORDER if cfg.enabled(sid))
 
     banner = ""
     if failed:
         banner = (
-            f'<div class="banner warn"><strong>{failed} lien(s) n\'ont pas pu etre '
-            f"etablis.</strong> Lancez <code>plugarr doctor</code> pour un diagnostic.</div>"
+            '<div class="banner warn"><strong>'
+            + t("{nombre} lien(s) n\'ont pas pu etre etablis.", nombre=failed)
+            + "</strong> "
+            + t("Lancez <code>plugarr doctor</code> pour un diagnostic.")
+            + "</div>"
         )
     if host_note:
         banner += f'<div class="banner info">{html.escape(host_note)}</div>'
     if not cfg.vpn_enabled and _has_download_client(cfg):
         banner += (
-            '<div class="banner warn"><strong>Aucun VPN.</strong> Le trafic BitTorrent '
-            "sort sur l'adresse IP publique de cette machine.</div>"
+            '<div class="banner warn"><strong>'
+            + t("Aucun VPN.")
+            + "</strong> "
+            + t(
+                "Le trafic BitTorrent sort sur l'adresse IP publique de "
+                "cette machine."
+            )
+            + "</div>"
         )
     if not cfg.ids_certain:
         banner += (
             f'<div class="banner warn"><strong>PUID/PGID {cfg.puid}:{cfg.pgid}</strong> — '
-            f"{html.escape(cfg.ids_source)}. Cette valeur decide de qui possede vos medias."
-            "</div>"
+            f"{html.escape(t(cfg.ids_source))}. "
+            + t("Cette valeur decide de qui possede vos medias.")
+            + "</div>"
         )
 
     if not live:
         banner += (
-            "<div class=\"banner info\">Cette page est un <b>fichier fige</b> : elle ne "
-            "montre ni l'etat des services, ni les mises a jour disponibles, et ses "
-            "boutons n'existent pas ici.<br>Pour tout cela, ouvrez "
-            f"<code>{LAUNCHER_NAME}</code>, depose a cote de cette page.</div>"
+            '<div class="banner info">'
+            + t(
+                "Cette page est un <b>fichier fige</b> : elle ne montre ni "
+                "l'etat des services, ni les mises a jour disponibles, et ses "
+                "boutons n'existent pas ici.<br>Pour tout cela, ouvrez "
+                "<code>{lanceur}</code>, depose a cote de cette page.",
+                lanceur=LAUNCHER_NAME,
+            )
+            + "</div>"
         )
 
     # Importe ici et non en tete : `orchestrator` importe `dashboard`.
@@ -295,7 +336,7 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
         cards=_cards(cfg, host, live=live),
         paths=_paths(cfg),
         ajouts=_ajouts(cfg) if live else "",
-        outils=_OUTILS if live else "",
+        outils=_outils() if live else "",
         banner=banner,
         data_root=html.escape(cfg.data_root),
         # Le conseil de fin depend de ce qui est REELLEMENT installe : citer
@@ -304,7 +345,36 @@ def render(cfg: StackConfig, *, failed: int = 0, live: bool = False) -> str:
         prochaine_etape=html.escape(" ".join(prochaine_etape(cfg))),
         version=__version__,
         live_script=_LIVE_SCRIPT if live else "",
-        title="Administration" if live else "Acces",
+        title=t("Administration") if live else t("Acces"),
+        # Le bouton « copier » change de libelle une seconde apres le clic.
+        copie=t("copie"),
+        langue=i18n.langue(),
+        titre_page=t("Votre stack media"),
+        sous_titre=t(
+            "{nombre} services installes et cables le {date}.",
+            nombre=count,
+            date=generated,
+        ),
+        titre_services=t("Services"),
+        titre_dossiers=t("Dossiers"),
+        colonne_contenu=t("Contenu"),
+        colonne_hote=t("Sur cette machine"),
+        colonne_conteneur=t("Vu par les conteneurs"),
+        note_liens=t(
+            "Les liens « ouvrir » ne fonctionnent que si ce navigateur tourne "
+            "sur la machine d'installation. Depuis un autre appareil, utilisez "
+            "le chemin copiable, ou passez par un partage reseau."
+        ),
+        note_secrets=t(
+            "Cette page contient vos mots de passe et vos cles API. Elle est "
+            "en lecture seule pour vous (<code>chmod 600</code>) et exclue du "
+            "depot git. Ne la partagez pas."
+        ),
+        note_generee=t(
+            "Genere par plugarr {version} — donnees dans <code>{racine}</code>.",
+            version=__version__,
+            racine=html.escape(cfg.data_root),
+        ),
     )
 
 
@@ -333,7 +403,7 @@ def open_in_browser(path: Path) -> bool:
 
 
 _TEMPLATE = """<!doctype html>
-<html lang="fr">
+<html lang="{langue}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -469,34 +539,31 @@ _TEMPLATE = """<!doctype html>
 <body>
 <div class="wrap">
   <header>
-    <h1>Votre stack media</h1>
-    <p>{count} services installes et cables le {generated}.</p>
+    <h1>{titre_page}</h1>
+    <p>{sous_titre}</p>
     {banner}
     {outils}
   </header>
 
-  <h2>Services</h2>
+  <h2>{titre_services}</h2>
   <div class="grid">
 {cards}
   </div>
 
 {ajouts}
-  <h2>Dossiers</h2>
+  <h2>{titre_dossiers}</h2>
   <table>
-    <thead><tr><th>Contenu</th><th>Sur cette machine</th><th>Vu par les conteneurs</th><th></th></tr></thead>
+    <thead><tr><th>{colonne_contenu}</th><th>{colonne_hote}</th><th>{colonne_conteneur}</th><th></th></tr></thead>
     <tbody>
 {paths}
     </tbody>
   </table>
-  <p class="note">Les liens « ouvrir » ne fonctionnent que si ce navigateur tourne sur la
-  machine d'installation. Depuis un autre appareil, utilisez le chemin copiable, ou passez
-  par un partage reseau.</p>
+  <p class="note">{note_liens}</p>
 
   <footer>
     <p><strong>{prochaine_etape}</strong></p>
-    <p>Cette page contient vos mots de passe et vos cles API. Elle est en lecture seule
-    pour vous (<code>chmod 600</code>) et exclue du depot git. Ne la partagez pas.</p>
-    <p>Genere par plugarr {version} — donnees dans <code>{data_root}</code>.</p>
+    <p>{note_secrets}</p>
+    <p>{note_generee}</p>
   </footer>
 </div>
 <script>
@@ -516,7 +583,7 @@ _TEMPLATE = """<!doctype html>
     btn.addEventListener('click', function () {{
       navigator.clipboard.writeText(btn.dataset.value).then(function () {{
         var before = btn.textContent;
-        btn.textContent = 'copie';
+        btn.textContent = '{copie}';
         setTimeout(function () {{ btn.textContent = before; }}, 1200);
       }});
     }});
@@ -531,12 +598,27 @@ _TEMPLATE = """<!doctype html>
 #: mais seule et en silence — toutes les quinze minutes, sans qu'on puisse la
 #: declencher ni savoir quand elle avait eu lieu.
 _OUTILS = """<div class="outils">
-      <button class="outil" id="btn-doctor">diagnostic</button>
-      <button class="outil" id="btn-maj">chercher les mises a jour</button>
-      <button class="outil" id="btn-sauvegarde">sauvegarder la configuration</button>
+      <button class="outil" id="btn-doctor">{diagnostic}</button>
+      <button class="outil" id="btn-maj">{maj}</button>
+      <button class="outil" id="btn-sauvegarde">{sauvegarde}</button>
       <span class="outil-etat" id="outil-etat"></span>
     </div>
     <pre class="rapport" id="rapport-doctor" hidden></pre>"""
+
+
+def _outils() -> str:
+    """Barre d'outils formee A L'AFFICHAGE.
+
+    `str.format` ne recurse pas : passee telle quelle au gabarit, cette chaine
+    aurait affiche ses champs en clair sur la page. Et la former a l'import
+    figerait ses libelles dans la langue chargee a ce moment-la, avant meme
+    que l'utilisateur ait choisi la sienne.
+    """
+    return _OUTILS.format(
+        diagnostic=t("diagnostic"),
+        maj=t("chercher les mises a jour"),
+        sauvegarde=t("sauvegarder la configuration"),
+    )
 
 
 _LIVE_SCRIPT = """<script>

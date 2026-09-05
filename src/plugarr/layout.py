@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import catalog
+from .i18n import t
 from .models import PlatformProfile
 
 
@@ -210,7 +211,7 @@ def resolve_ids(profile: PlatformProfile) -> tuple[int, int, str, bool]:
             "lance en root : conteneurs et medias appartiendront a root",
             False,
         )
-    return detected[0], detected[1], f"detecte ({defaults.source})", True
+    return detected[0], detected[1], t("detecte ({origine})", origine=t(defaults.source)), True
 
 
 def create_tree(data_root: str | Path, config_root: str | Path, service_ids: list[str]) -> list[Path]:
@@ -258,12 +259,15 @@ def hardlink_supported(data_root: str | Path) -> tuple[bool, str]:
     dst = dst_dir / (Path(src).name + ".link")
     try:
         os.link(src, dst)
-        return True, "hardlink OK entre torrents/ et media/"
+        return True, t("hardlink OK entre torrents/ et media/")
     except OSError as exc:
-        return False, (
-            f"hardlink impossible ({exc}). Les imports recopieront les fichiers au lieu "
-            f"de les lier. Verifiez que {src_dir} et {dst_dir} sont sur le MEME systeme "
-            f"de fichiers, et que DATA_ROOT est monte d'un seul bloc."
+        return False, t(
+            "hardlink impossible ({erreur}). Les imports recopieront les fichiers "
+            "au lieu de les lier. Verifiez que {source} et {cible} sont sur le "
+            "MEME systeme de fichiers, et que DATA_ROOT est monte d'un seul bloc.",
+            erreur=exc,
+            source=src_dir,
+            cible=dst_dir,
         )
     finally:
         for p in (dst, Path(src)):
