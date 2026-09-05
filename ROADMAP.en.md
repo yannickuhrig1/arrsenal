@@ -136,6 +136,14 @@ real instance. The order below is the order of study.
 
 **Readarr is not on the list**: the project has been archived since 27 June 2025.
 
+### Distribution to study
+
+- [ ] **Proxmox VE Helper-Scripts / Community Scripts** — Study adding PlugArr to the
+  Proxmox community script catalogue to make it easier to install. Check the admission
+  criteria, the right deployment mode and the script's maintenance before proposing
+  anything.
+
+
 ---
 
 ## The PlugArr console

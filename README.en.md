@@ -8,6 +8,8 @@
 plugarr
 ```
 
+**[plugarr-site.vercel.app](https://plugarr-site.vercel.app/en)** — the project site.
+
 <p align="center">
   <img src="docs/screenshots/2-services.svg" alt="Service selection" width="49%">
   <img src="docs/screenshots/7-installation.svg" alt="Wiring in progress" width="49%">
